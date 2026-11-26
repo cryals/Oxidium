@@ -1,6 +1,4 @@
-use journal_app::{
-    CreateProfileInput, CreateSubjectInput, UpdateProfileInput, UpdateSubjectInput,
-};
+use journal_app::{CreateProfileInput, CreateSubjectInput, UpdateProfileInput, UpdateSubjectInput};
 use journal_domain::RecordSource;
 use rmcp::{
     handler::server::wrapper::Parameters, model::CallToolResult, schemars, tool, tool_router,
@@ -134,10 +132,7 @@ impl OxidiumMcpServer {
     }
 
     #[tool(description = "Get a single academic profile by UUID.")]
-    pub async fn get_profile(
-        &self,
-        Parameters(args): Parameters<ProfileIdArgs>,
-    ) -> CallToolResult {
+    pub async fn get_profile(&self, Parameters(args): Parameters<ProfileIdArgs>) -> CallToolResult {
         run_tool(
             &self.app,
             &self.metrics,
@@ -280,10 +275,7 @@ impl OxidiumMcpServer {
     }
 
     #[tool(description = "Get a single subject by UUID.")]
-    pub async fn get_subject(
-        &self,
-        Parameters(args): Parameters<SubjectIdArgs>,
-    ) -> CallToolResult {
+    pub async fn get_subject(&self, Parameters(args): Parameters<SubjectIdArgs>) -> CallToolResult {
         run_tool(
             &self.app,
             &self.metrics,
@@ -386,10 +378,11 @@ impl OxidiumMcpServer {
                 let sid = parse_uuid_arg("subject_id", &args.subject_id)?;
                 let tgt = match args.target_average {
                     Some(ref s) if s.trim().is_empty() => Some(None),
-                    Some(ref s) => Some(Some(
-                        Decimal::from_str(s.trim())
-                            .map_err(|_| format!("invalid target_average decimal: '{s}'"))?,
-                    )),
+                    Some(ref s) => {
+                        Some(Some(Decimal::from_str(s.trim()).map_err(|_| {
+                            format!("invalid target_average decimal: '{s}'")
+                        })?))
+                    }
                     None => None,
                 };
                 self.app
@@ -467,7 +460,8 @@ impl OxidiumMcpServer {
 }
 
 impl OxidiumMcpServer {
-    pub(crate) fn build_profiles_subjects_router() -> rmcp::handler::server::router::tool::ToolRouter<Self> {
+    pub(crate) fn build_profiles_subjects_router()
+    -> rmcp::handler::server::router::tool::ToolRouter<Self> {
         Self::profiles_subjects_router()
     }
 }

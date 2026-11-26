@@ -148,7 +148,11 @@ impl Database {
                 params![m.version, m.name, Utc::now().to_rfc3339(), checksum],
             )?;
             tx.commit()?;
-            tracing::info!(version = m.version, name = m.name, "applied database migration");
+            tracing::info!(
+                version = m.version,
+                name = m.name,
+                "applied database migration"
+            );
         }
         Ok(())
     }
@@ -344,10 +348,8 @@ impl Database {
     }
 
     fn rollback_from_file(&self, safety_backup: &Path) -> StorageResult<()> {
-        let src = Connection::open_with_flags(
-            safety_backup,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )?;
+        let src =
+            Connection::open_with_flags(safety_backup, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         let mut dst = self.lock_conn()?;
         let b = backup::Backup::new(&src, &mut dst)?;
         b.run_to_completion(50, Duration::from_millis(10), None)?;

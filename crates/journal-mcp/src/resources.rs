@@ -25,10 +25,13 @@ pub fn list_static_resources(app: &AppServices) -> ListResourcesResult {
     if let Ok(active) = app.get_active_profile() {
         let pid = active.id;
         resources.push(
-            Resource::new(format!("oxidium://profiles/{pid}/subjects"), "active_subjects")
-                .with_title(format!("Subjects ({})", active.name))
-                .with_description("Subjects in the currently active profile.")
-                .with_mime_type("application/json"),
+            Resource::new(
+                format!("oxidium://profiles/{pid}/subjects"),
+                "active_subjects",
+            )
+            .with_title(format!("Subjects ({})", active.name))
+            .with_description("Subjects in the currently active profile.")
+            .with_mime_type("application/json"),
         );
         resources.push(
             Resource::new(
@@ -119,8 +122,9 @@ pub fn read_resource_uri(app: &AppServices, uri: &str) -> Result<ReadResourceRes
         if parts.len() < 2 {
             return Err(ErrorData::resource_not_found(uri.to_string(), None));
         }
-        let pid = Uuid::parse_str(parts[0])
-            .map_err(|_| ErrorData::invalid_params(format!("invalid profile_id in URI: {uri}"), None))?;
+        let pid = Uuid::parse_str(parts[0]).map_err(|_| {
+            ErrorData::invalid_params(format!("invalid profile_id in URI: {uri}"), None)
+        })?;
         match parts[1..] {
             ["subjects"] => {
                 let items = app

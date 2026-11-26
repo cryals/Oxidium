@@ -37,7 +37,10 @@ fn headless_ui_end_to_end_flows() {
     assert_eq!(subj_row.average_text.as_str(), "—");
 
     // 3. Add numeric grades (5 and 4) and an absence (must NOT distort average!)
-    let today_iso = chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string();
+    let today_iso = chrono::Utc::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string();
     win.invoke_journal_quick_mark(
         subj_row.subject_id.clone(),
         today_iso.clone().into(),
@@ -95,11 +98,19 @@ fn headless_ui_end_to_end_flows() {
     // Move task one column right
     win.invoke_kanban_move_task_step(task.id.clone(), 1);
     assert_eq!(
-        win.get_kanban_columns().row_data(0).unwrap().tasks.row_count(),
+        win.get_kanban_columns()
+            .row_data(0)
+            .unwrap()
+            .tasks
+            .row_count(),
         0
     );
     assert_eq!(
-        win.get_kanban_columns().row_data(1).unwrap().tasks.row_count(),
+        win.get_kanban_columns()
+            .row_data(1)
+            .unwrap()
+            .tasks
+            .row_count(),
         1
     );
 
@@ -137,4 +148,30 @@ fn headless_ui_end_to_end_flows() {
     assert_eq!(win.get_active_profile_name().as_str(), "Университет");
     assert_eq!(win.get_journal_rows().row_count(), 0);
     assert_eq!(win.get_journal_overall_avg().as_str(), "—");
+
+    // 9. 100-subject UI stress check in the new profile
+    let p2 = app.get_active_profile().expect("p2");
+    for i in 0..100 {
+        app.create_subject(
+            journal_app::CreateSubjectInput {
+                profile_id: p2.id,
+                name: format!("Предмет #{:03}", i + 1),
+                short_name: Some(format!("П{:02}", i + 1)),
+                teacher: None,
+                color: Some("#4A4459".into()),
+                icon: None,
+                description: None,
+                academic_period_id: None,
+                target_average: None,
+            },
+            journal_domain::RecordSource::Gui,
+            None,
+        )
+        .expect("create stress subject");
+    }
+    let t_ui = std::time::Instant::now();
+    controller.refresh_journal(&win);
+    let ui_ms = t_ui.elapsed().as_secs_f64() * 1000.0;
+    assert_eq!(win.get_journal_rows().row_count(), 100);
+    println!("[UI-STRESS] refresh_journal(100 subjects) = {ui_ms:.2}ms");
 }

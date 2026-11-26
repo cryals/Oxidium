@@ -156,7 +156,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
         (Language::Ru, "journal.year") => "Учебный год",
         (Language::Ru, "journal.custom") => "Период",
         (Language::Ru, "journal.add_subject") => "Добавить предмет",
-        (Language::Ru, "journal.empty") => "Нет предметов. Добавьте первый предмет, чтобы начать вести журнал.",
+        (Language::Ru, "journal.empty") => {
+            "Нет предметов. Добавьте первый предмет, чтобы начать вести журнал."
+        }
         (Language::Ru, "stats.overall_avg") => "Общий средний балл",
         (Language::Ru, "stats.total_grades") => "Всего оценок",
         (Language::Ru, "stats.absences") => "Пропуски (Н/Б)",
@@ -165,7 +167,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
         (Language::Ru, "stats.completed_tasks") => "Выполнено задач",
         (Language::Ru, "stats.overdue_tasks") => "Просрочено задач",
         (Language::Ru, "stats.forecast_badge") => "Прогноз — не записывается в журнал",
-        (Language::Ru, "stats.attendance_no_total") => "Показаны зарегистрированные пропуски (общее число занятий не задано)",
+        (Language::Ru, "stats.attendance_no_total") => {
+            "Показаны зарегистрированные пропуски (общее число занятий не задано)"
+        }
         (Language::Ru, "kanban.new_task") => "Новая задача",
         (Language::Ru, "kanban.new_column") => "Новая колонка",
         (Language::Ru, "kanban.new_board") => "Новая доска",
@@ -173,8 +177,12 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
         (Language::Ru, "mcp.running") => "Запущен",
         (Language::Ru, "mcp.stopped") => "Остановлен",
         (Language::Ru, "mcp.error") => "Ошибка",
-        (Language::Ru, "mcp.privacy_notice") => "Подключённый AI-ассистент получает доступ к учебным данным строго в пределах выбранных разрешений.",
-        (Language::Ru, "reminders.background_notice") => "Напоминания доставляются, пока запущен Oxidium. При закрытом приложении уведомления не отправляются.",
+        (Language::Ru, "mcp.privacy_notice") => {
+            "Подключённый AI-ассистент получает доступ к учебным данным строго в пределах выбранных разрешений."
+        }
+        (Language::Ru, "reminders.background_notice") => {
+            "Напоминания доставляются, пока запущен Oxidium. При закрытом приложении уведомления не отправляются."
+        }
 
         (Language::En, "nav.journal") => "Journal",
         (Language::En, "nav.statistics") => "Statistics",
@@ -192,7 +200,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
         (Language::En, "journal.year") => "Academic Year",
         (Language::En, "journal.custom") => "Custom",
         (Language::En, "journal.add_subject") => "Add Subject",
-        (Language::En, "journal.empty") => "No subjects yet. Add your first subject to start tracking grades.",
+        (Language::En, "journal.empty") => {
+            "No subjects yet. Add your first subject to start tracking grades."
+        }
         (Language::En, "stats.overall_avg") => "Overall Average",
         (Language::En, "stats.total_grades") => "Total Grades",
         (Language::En, "stats.absences") => "Absences",
@@ -201,7 +211,9 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
         (Language::En, "stats.completed_tasks") => "Completed Tasks",
         (Language::En, "stats.overdue_tasks") => "Overdue Tasks",
         (Language::En, "stats.forecast_badge") => "Forecast — not saved to journal",
-        (Language::En, "stats.attendance_no_total") => "Showing recorded absences only (total scheduled classes not configured)",
+        (Language::En, "stats.attendance_no_total") => {
+            "Showing recorded absences only (total scheduled classes not configured)"
+        }
         (Language::En, "kanban.new_task") => "New Task",
         (Language::En, "kanban.new_column") => "New Column",
         (Language::En, "kanban.new_board") => "New Board",
@@ -209,8 +221,12 @@ pub fn tr(lang: Language, key: &str) -> &'static str {
         (Language::En, "mcp.running") => "Running",
         (Language::En, "mcp.stopped") => "Stopped",
         (Language::En, "mcp.error") => "Error",
-        (Language::En, "mcp.privacy_notice") => "Connected AI assistants can access your academic data strictly within the permissions you grant.",
-        (Language::En, "reminders.background_notice") => "Reminders are delivered while Oxidium is running. Closed-app background delivery is not enabled.",
+        (Language::En, "mcp.privacy_notice") => {
+            "Connected AI assistants can access your academic data strictly within the permissions you grant."
+        }
+        (Language::En, "reminders.background_notice") => {
+            "Reminders are delivered while Oxidium is running. Closed-app background delivery is not enabled."
+        }
         _ => "",
     }
 }

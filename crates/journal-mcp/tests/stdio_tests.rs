@@ -75,7 +75,10 @@ fn stdio_child_process_protocol_clean_stdout_and_cross_process_sync() {
             }
         }),
     );
-    assert_eq!(init["result"]["serverInfo"]["name"], "oxidium-student-journal-mcp");
+    assert_eq!(
+        init["result"]["serverInfo"]["name"],
+        "oxidium-student-journal-mcp"
+    );
 
     // Send notifications/initialized
     writeln!(

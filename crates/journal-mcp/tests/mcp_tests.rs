@@ -127,7 +127,8 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
     let (status_unauth, _) = post_mcp(&client, &url, None, init_req.clone()).await;
     assert_eq!(status_unauth, reqwest::StatusCode::UNAUTHORIZED);
 
-    let (status_bad, _) = post_mcp(&client, &url, Some("oxd_invalid_token"), init_req.clone()).await;
+    let (status_bad, _) =
+        post_mcp(&client, &url, Some("oxd_invalid_token"), init_req.clone()).await;
     assert_eq!(status_bad, reqwest::StatusCode::UNAUTHORIZED);
 
     // 2. Authorized initialize + capture session ID
@@ -187,7 +188,10 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
         prompt_req = prompt_req.header("mcp-session-id", sid);
     }
     let prompt_list = parse_sse_or_json(&prompt_req.send().await.unwrap().text().await.unwrap());
-    assert_eq!(prompt_list["result"]["prompts"].as_array().unwrap().len(), 7);
+    assert_eq!(
+        prompt_list["result"]["prompts"].as_array().unwrap().len(),
+        7
+    );
 
     // 4. Execute ALL 9 natural-language user scenarios from specification §55 via real MCP tools
     let active_rpc = call_tool_http(
@@ -207,7 +211,12 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
 
     // Create subjects: Философия, Физкультура, Базы данных, Программирование
     let mut subj_ids = std::collections::HashMap::new();
-    for name in ["Философия", "Физкультура", "Базы данных", "Программирование"] {
+    for name in [
+        "Философия",
+        "Физкультура",
+        "Базы данных",
+        "Программирование",
+    ] {
         let r = call_tool_http(
             &client,
             &url,
@@ -218,7 +227,10 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
             json!({ "profile_id": profile_id, "name": name }),
         )
         .await;
-        subj_ids.insert(name, extract_tool_json(&r)["id"].as_str().unwrap().to_string());
+        subj_ids.insert(
+            name,
+            extract_tool_json(&r)["id"].as_str().unwrap().to_string(),
+        );
     }
 
     let today = Utc::now().date_naive();
@@ -241,7 +253,10 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
         }),
     )
     .await;
-    let g1_id = extract_tool_json(&g1_rpc)["id"].as_str().unwrap().to_string();
+    let g1_id = extract_tool_json(&g1_rpc)["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     // Replay same idempotency_key -> returns exact same grade ID, no duplicate created!
     let g1_replay = call_tool_http(
         &client,
@@ -298,7 +313,10 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
         }),
     )
     .await;
-    let task_id = extract_tool_json(&task_rpc)["id"].as_str().unwrap().to_string();
+    let task_id = extract_tool_json(&task_rpc)["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Scenario 4: «Покажи мой средний балл по программированию»
     let _ = call_tool_http(
@@ -400,7 +418,10 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
         }),
     )
     .await;
-    assert_eq!(extract_tool_json(&fc_rpc)["target_plan"]["grades_needed"], 3);
+    assert_eq!(
+        extract_tool_json(&fc_rpc)["target_plan"]["grades_needed"],
+        3
+    );
 
     // Scenario 8: «Составь сводку моей успеваемости за ноябрь»
     let nov_rpc = call_tool_http(
@@ -413,7 +434,12 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
         json!({ "profile_id": profile_id, "year": 2026, "month": 11 }),
     )
     .await;
-    assert!(extract_tool_json(&nov_rpc)["numeric_grades"].as_u64().unwrap() >= 4);
+    assert!(
+        extract_tool_json(&nov_rpc)["numeric_grades"]
+            .as_u64()
+            .unwrap()
+            >= 4
+    );
 
     // Scenario 9: «Добавь все задания из переданного мной списка»
     let batch_tasks_rpc = call_tool_http(
@@ -433,7 +459,10 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
     )
     .await;
     assert_eq!(
-        extract_tool_json(&batch_tasks_rpc).as_array().unwrap().len(),
+        extract_tool_json(&batch_tasks_rpc)
+            .as_array()
+            .unwrap()
+            .len(),
         3
     );
 

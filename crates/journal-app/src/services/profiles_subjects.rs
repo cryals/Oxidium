@@ -1,9 +1,9 @@
 use chrono::{NaiveDate, Utc};
 use journal_domain::{
-    AcademicPeriod, Board, DomainError, Holiday, KanbanColumn, MarkCategory, MarkType, PeriodType,
-    Profile, RecordSource, Subject, validate_date_range, validate_hex_color, validate_non_empty,
-    validate_optional_text, validate_target_average, MAX_SHORT_NAME_LEN, MAX_TEXT_LEN,
-    MAX_TITLE_LEN,
+    AcademicPeriod, Board, DomainError, Holiday, KanbanColumn, MAX_SHORT_NAME_LEN, MAX_TEXT_LEN,
+    MAX_TITLE_LEN, MarkCategory, MarkType, PeriodType, Profile, RecordSource, Subject,
+    validate_date_range, validate_hex_color, validate_non_empty, validate_optional_text,
+    validate_target_average,
 };
 use journal_storage::DeleteImpact;
 use rust_decimal::Decimal;
@@ -101,13 +101,13 @@ impl AppServices {
     }
 
     pub fn get_profile(&self, id: Uuid) -> AppResult<Profile> {
-        self.db
-            .get_profile(id)?
-            .ok_or_else(|| DomainError::NotFound {
+        self.db.get_profile(id)?.ok_or_else(|| {
+            DomainError::NotFound {
                 entity: "profile".into(),
                 id: id.to_string(),
             }
-            .into())
+            .into()
+        })
     }
 
     pub fn create_profile(
@@ -151,7 +151,11 @@ impl AppServices {
         self.db.insert_profile(&profile, source)?;
 
         // Create default Kanban board with 4 standard columns for this profile
-        let lang = self.db.load_settings().map(|s| s.language).unwrap_or_default();
+        let lang = self
+            .db
+            .load_settings()
+            .map(|s| s.language)
+            .unwrap_or_default();
         let board_name = match lang {
             journal_domain::Language::Ru => "Основная доска",
             journal_domain::Language::En => "Main Board",
@@ -168,7 +172,9 @@ impl AppServices {
             updated_at: now,
         };
         self.db.insert_board(&board, source)?;
-        for (idx, (col_name, col_color, is_done)) in i18n::default_column_names(lang).into_iter().enumerate() {
+        for (idx, (col_name, col_color, is_done)) in
+            i18n::default_column_names(lang).into_iter().enumerate()
+        {
             let col = KanbanColumn {
                 id: Uuid::new_v4(),
                 board_id: board.id,
@@ -317,7 +323,11 @@ impl AppServices {
             if archived { "archive" } else { "restore" },
             format!(
                 "{} профиль «{}»",
-                if archived { "Архивирован" } else { "Восстановлен" },
+                if archived {
+                    "Архивирован"
+                } else {
+                    "Восстановлен"
+                },
                 p.name
             ),
             None,
@@ -339,10 +349,9 @@ impl AppServices {
         let p = self.get_profile(id)?;
         let active = self.db.list_profiles(false)?;
         if active.len() <= 1 && active.iter().any(|x| x.id == id) {
-            return Err(DomainError::InvalidState(
-                "cannot delete the only active profile".into(),
-            )
-            .into());
+            return Err(
+                DomainError::InvalidState("cannot delete the only active profile".into()).into(),
+            );
         }
         self.db.delete_profile_cascade_explicit(id, source)?;
         // Switch active profile if we deleted it
@@ -380,13 +389,13 @@ impl AppServices {
     }
 
     pub fn get_subject(&self, id: Uuid) -> AppResult<Subject> {
-        self.db
-            .get_subject(id)?
-            .ok_or_else(|| DomainError::NotFound {
+        self.db.get_subject(id)?.ok_or_else(|| {
+            DomainError::NotFound {
                 entity: "subject".into(),
                 id: id.to_string(),
             }
-            .into())
+            .into()
+        })
     }
 
     /// Searches subjects by name or short_name within a profile.
@@ -461,7 +470,9 @@ impl AppServices {
         let _ = self.get_profile(input.profile_id)?;
         let name = validate_non_empty("name", &input.name, MAX_TITLE_LEN)?;
         let short_name = match input.short_name {
-            Some(s) if !s.trim().is_empty() => validate_non_empty("short_name", &s, MAX_SHORT_NAME_LEN)?,
+            Some(s) if !s.trim().is_empty() => {
+                validate_non_empty("short_name", &s, MAX_SHORT_NAME_LEN)?
+            }
             _ => name.chars().take(6).collect(),
         };
         let color = validate_hex_color("color", input.color.as_deref().unwrap_or("#445E91"))?;
@@ -585,7 +596,11 @@ impl AppServices {
             if archived { "archive" } else { "restore" },
             format!(
                 "{} предмет «{}»",
-                if archived { "Архивирован" } else { "Восстановлен" },
+                if archived {
+                    "Архивирован"
+                } else {
+                    "Восстановлен"
+                },
                 s.name
             ),
             None,
@@ -652,7 +667,9 @@ impl AppServices {
         profile_id: Uuid,
         include_archived: bool,
     ) -> AppResult<Vec<AcademicPeriod>> {
-        Ok(self.db.list_academic_periods(profile_id, include_archived)?)
+        Ok(self
+            .db
+            .list_academic_periods(profile_id, include_archived)?)
     }
 
     pub fn create_academic_period(
@@ -721,7 +738,8 @@ impl AppServices {
         let short_label = validate_non_empty("short_label", &input.short_label, 12)?;
         let color = validate_hex_color("color", &input.color)?;
         // By default custom marks do NOT affect GPA unless explicitly enabled with a numeric value
-        let counts_in_average = input.counts_in_average.unwrap_or(false) && input.numeric_value.is_some();
+        let counts_in_average =
+            input.counts_in_average.unwrap_or(false) && input.numeric_value.is_some();
         let existing = self.db.list_mark_types(Some(input.profile_id))?;
         let next_order = existing.iter().map(|m| m.sort_order).max().unwrap_or(10) + 1;
 

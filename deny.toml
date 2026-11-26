@@ -2,7 +2,11 @@
 all-features = false
 
 [advisories]
-ignore = []
+# Security vulnerabilities are strictly denied.
+# Only non-security `unmaintained` notices from upstream dependencies are explicitly documented here.
+ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice (not a vulnerability); pulled transitively by i-slint-core, rmcp, rusqlite, and schemars" },
+]
 
 [licenses]
 confidence-threshold = 0.8
@@ -18,23 +22,8 @@ allow = [
     "Unicode-3.0",
     "BSL-1.0",
     "CC0-1.0",
-    "CDLA-Permissive-2.0",
+    "Unlicense",
     "GPL-3.0-only",
-    "LGPL-3.0-only",
-    "OpenSSL",
-]
-exceptions = [
-    { allow = ["GPL-3.0-only"], crate = "slint" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-core" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-compiler" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-common" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-backend-selector" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-backend-winit" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-backend-testing" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-renderer-femtovg" },
-    { allow = ["GPL-3.0-only"], crate = "i-slint-renderer-software" },
-    { allow = ["GPL-3.0-only"], crate = "slint-build" },
-    { allow = ["GPL-3.0-only"], crate = "slint-macros" },
 ]
 
 [bans]

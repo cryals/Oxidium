@@ -49,9 +49,12 @@ impl OxidiumMcpServer {
         &self,
         Parameters(args): Parameters<DailySummaryPromptArgs>,
     ) -> GetPromptResult {
-        let date_str = args
-            .date
-            .unwrap_or_else(|| chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string());
+        let date_str = args.date.unwrap_or_else(|| {
+            chrono::Utc::now()
+                .date_naive()
+                .format("%Y-%m-%d")
+                .to_string()
+        });
         let prof = args.profile_id.unwrap_or_else(|| "active profile".into());
         GetPromptResult::new(vec![PromptMessage::new_text(
             Role::User,
@@ -156,7 +159,8 @@ impl OxidiumMcpServer {
 }
 
 impl OxidiumMcpServer {
-    pub(crate) fn build_prompts_router() -> rmcp::handler::server::router::prompt::PromptRouter<Self> {
+    pub(crate) fn build_prompts_router() -> rmcp::handler::server::router::prompt::PromptRouter<Self>
+    {
         Self::prompts_router()
     }
 }

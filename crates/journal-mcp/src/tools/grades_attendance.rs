@@ -41,7 +41,9 @@ pub struct AddGradeArgs {
     pub mark_type: Option<String>,
     #[schemars(description = "Optional numeric grade 1..5")]
     pub grade: Option<u8>,
-    #[schemars(description = "Optional positive decimal weight (default 1, control_work 2, exam 3)")]
+    #[schemars(
+        description = "Optional positive decimal weight (default 1, control_work 2, exam 3)"
+    )]
     pub weight: Option<String>,
     pub work_type: Option<String>,
     pub topic: Option<String>,
@@ -106,11 +108,15 @@ pub struct GradeForecastArgs {
     pub subject_id: Option<String>,
     pub from_date: Option<String>,
     pub to_date: Option<String>,
-    #[schemars(description = "Optional list of hypothetical numeric grades (e.g. [5, 5]) to simulate")]
+    #[schemars(
+        description = "Optional list of hypothetical numeric grades (e.g. [5, 5]) to simulate"
+    )]
     pub hypothetical_grades: Option<Vec<u8>>,
     #[schemars(description = "Optional weight for hypothetical or target grades (default 1)")]
     pub weight: Option<String>,
-    #[schemars(description = "Optional target average to calculate how many grades are needed (e.g. '4.5')")]
+    #[schemars(
+        description = "Optional target average to calculate how many grades are needed (e.g. '4.5')"
+    )]
     pub target_average: Option<String>,
     #[schemars(description = "Assumed future grade value for target calculation (default 5)")]
     pub assumed_grade: Option<u8>,
@@ -159,7 +165,9 @@ fn parse_mode(m: Option<&str>) -> Result<Option<AverageMode>, String> {
         None | Some("") => Ok(None),
         Some("arithmetic") => Ok(Some(AverageMode::Arithmetic)),
         Some("weighted") => Ok(Some(AverageMode::Weighted)),
-        Some(other) => Err(format!("invalid mode '{other}'; expected 'arithmetic' or 'weighted'")),
+        Some(other) => Err(format!(
+            "invalid mode '{other}'; expected 'arithmetic' or 'weighted'"
+        )),
     }
 }
 
@@ -195,7 +203,9 @@ fn to_add_grade_input(args: &AddGradeArgs) -> Result<AddGradeInput, String> {
 
 #[tool_router(router = grades_attendance_router)]
 impl OxidiumMcpServer {
-    #[tool(description = "List grades with optional subject, date range, work type, and pagination filters.")]
+    #[tool(
+        description = "List grades with optional subject, date range, work type, and pagination filters."
+    )]
     pub async fn list_grades(
         &self,
         Parameters(args): Parameters<ListGradesArgs>,
@@ -261,7 +271,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Add a grade or pass/fail mark to a subject on an ISO 8601 date. Supports idempotency_key.")]
+    #[tool(
+        description = "Add a grade or pass/fail mark to a subject on an ISO 8601 date. Supports idempotency_key."
+    )]
     pub async fn add_grade(&self, Parameters(args): Parameters<AddGradeArgs>) -> CallToolResult {
         let idem = args.idempotency_key.clone();
         run_tool(
@@ -280,7 +292,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Atomically add a batch of grades inside a single transaction. Supports idempotency_key.")]
+    #[tool(
+        description = "Atomically add a batch of grades inside a single transaction. Supports idempotency_key."
+    )]
     pub async fn add_grades_batch(
         &self,
         Parameters(args): Parameters<AddGradesBatchArgs>,
@@ -456,7 +470,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Calculate exact arithmetic or weighted average grade for a profile or subject.")]
+    #[tool(
+        description = "Calculate exact arithmetic or weighted average grade for a profile or subject."
+    )]
     pub async fn get_average_grade(
         &self,
         Parameters(args): Parameters<AverageGradeArgs>,
@@ -650,7 +666,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Record an attendance event (absent, excused, present, or custom) independently of numeric grades.")]
+    #[tool(
+        description = "Record an attendance event (absent, excused, present, or custom) independently of numeric grades."
+    )]
     pub async fn add_attendance(
         &self,
         Parameters(args): Parameters<AddAttendanceArgs>,
@@ -758,7 +776,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "List attendance records for a profile with optional subject and date range filters.")]
+    #[tool(
+        description = "List attendance records for a profile with optional subject and date range filters."
+    )]
     pub async fn list_attendance(
         &self,
         Parameters(args): Parameters<ListAttendanceArgs>,
@@ -794,7 +814,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Get attendance summary statistics (never fabricates attendance % from empty days).")]
+    #[tool(
+        description = "Get attendance summary statistics (never fabricates attendance % from empty days)."
+    )]
     pub async fn get_attendance_statistics(
         &self,
         Parameters(args): Parameters<ListAttendanceArgs>,
@@ -839,7 +861,8 @@ impl OxidiumMcpServer {
 }
 
 impl OxidiumMcpServer {
-    pub(crate) fn build_grades_attendance_router() -> rmcp::handler::server::router::tool::ToolRouter<Self> {
+    pub(crate) fn build_grades_attendance_router()
+    -> rmcp::handler::server::router::tool::ToolRouter<Self> {
         Self::grades_attendance_router()
     }
 }

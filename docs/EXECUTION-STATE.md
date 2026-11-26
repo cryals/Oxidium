@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-26 (Phase 11 + Visual QA)
+Last updated: 2026-11-26 (Phase 13)
 
 ## Current Phase
-- **Active**: Phase 12–13 — Security Hardening (`cargo audit`, `cargo deny`), Real Performance Benchmarks, and Full Workspace Test Suite
-- **Next**: Phase 14 — CI/CD Workflows, Release Build, Windows Portable ZIP + Installer, SBOM & Production Readiness Report
+- **Active**: Phase 14 — CI/CD Workflows, Release Build (`--release`), Real 100k Scale Benchmarks, Windows Portable ZIP + Native HKCU Installer, SBOM & Production Readiness Report
+- **Next**: Complete — Final verification & commit
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |
@@ -21,9 +21,9 @@ Last updated: 2026-11-26 (Phase 11 + Visual QA)
 | 09 | GUI ↔ MCP Cross-Process Synchronization | DONE | `SyncCoordinator` + 400ms live SQLite revision watcher wired into `UiController`; verified over real STDIO subprocess |
 | 10 | Settings Persistence, Localization & Notifications | DONE | 6-tab Settings modal, Russian/English live switch, dynamic MD3 accent palette, OS notifications & reminder ticker verified |
 | 11 | Import, Export & Online Backup/Restore | DONE | JSON/CSV/XLSX/Markdown export, JSON/CSV/Telegram import preview, rotating online ZIP backup & transactional restore wired in UI |
-| 12 | Security Hardening & Real Performance Benchmarks | IN_PROGRESS | Running real benchmarks, `cargo audit`, `cargo deny`, and full workspace checks |
-| 13 | Comprehensive Testing & Visual Screenshot QA | DONE | Headless UI E2E test (`ui_tests.rs`) PASSED + all 5 1440×900 PNGs visually inspected & layout defects fixed |
-| 14 | CI/CD, Release Packaging, Windows Installer & Readiness Report | PENDING | — |
+| 12 | Security Hardening & Real Performance Benchmarks | DONE | `cargo audit` (0 vulns), `cargo deny check` (`advisories/bans/licenses/sources ok`), SQL parameterization audited, `perf_benchmarks.rs` + 100-subject UI stress test PASSED |
+| 13 | Comprehensive Testing & Visual Screenshot QA | DONE | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, 23/23 workspace tests PASSED, 5 1440×900 PNGs visually verified |
+| 14 | CI/CD, Release Packaging, Windows Installer & Readiness Report | IN_PROGRESS | Building `--release`, running 100k scale benchmarks, creating CI workflows, Windows portable ZIP + installer, SBOM & readiness report |
 
 ## Resume Notes
 - App icons provided by user at `E:\oxidium\assets\icon\` (`web/icon-512.png`, `oxidium.ico`, Android/iOS/Web assets).

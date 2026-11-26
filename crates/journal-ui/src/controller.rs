@@ -352,8 +352,8 @@ impl UiController {
                                     "Н/З" => "fail",
                                     c => c,
                                 };
-                                let weight = Decimal::from_str(weight_str.trim())
-                                    .unwrap_or(Decimal::ONE);
+                                let weight =
+                                    Decimal::from_str(weight_str.trim()).unwrap_or(Decimal::ONE);
                                 let wt = WorkType::all()
                                     .get(wt_idx as usize)
                                     .copied()
@@ -404,9 +404,13 @@ impl UiController {
                     && let Ok(id) = Uuid::parse_str(&id_str)
                 {
                     let res = if is_att {
-                        ctrl.app.delete_attendance(id, RecordSource::Gui, None).map(|_| ())
+                        ctrl.app
+                            .delete_attendance(id, RecordSource::Gui, None)
+                            .map(|_| ())
                     } else {
-                        ctrl.app.delete_grade(id, RecordSource::Gui, None).map(|_| ())
+                        ctrl.app
+                            .delete_grade(id, RecordSource::Gui, None)
+                            .map(|_| ())
                     };
                     if res.is_ok() {
                         let sid = win.get_journal_picker_subject_id().to_string();
@@ -501,11 +505,20 @@ impl UiController {
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
-            win.on_stats_run_forecast(move |subj_idx, add_g_str, weight_str, target_str, max_w_str| {
-                if let Some(win) = w.upgrade() {
-                    ctrl.handle_run_forecast(&win, subj_idx, &add_g_str, &weight_str, &target_str, &max_w_str);
-                }
-            });
+            win.on_stats_run_forecast(
+                move |subj_idx, add_g_str, weight_str, target_str, max_w_str| {
+                    if let Some(win) = w.upgrade() {
+                        ctrl.handle_run_forecast(
+                            &win,
+                            subj_idx,
+                            &add_g_str,
+                            &weight_str,
+                            &target_str,
+                            &max_w_str,
+                        );
+                    }
+                },
+            );
         }
 
         // Kanban callbacks
@@ -590,12 +603,16 @@ impl UiController {
             let w = win.as_weak();
             win.on_kanban_move_column_delta(move |cid_str, delta| {
                 if let Some(win) = w.upgrade()
-                    && let (Some(bid), Ok(cid)) = (ctrl.active_board_id_or_first(), Uuid::parse_str(&cid_str))
+                    && let (Some(bid), Ok(cid)) =
+                        (ctrl.active_board_id_or_first(), Uuid::parse_str(&cid_str))
                     && let Ok(cols) = ctrl.app.list_columns(bid, false)
                     && let Some(pos) = cols.iter().position(|c| c.id == cid)
                 {
-                    let target = (pos as i32 + delta).clamp(0, cols.len().saturating_sub(1) as i32) as usize;
-                    let _ = ctrl.app.move_column(bid, cid, target, RecordSource::Gui, None);
+                    let target =
+                        (pos as i32 + delta).clamp(0, cols.len().saturating_sub(1) as i32) as usize;
+                    let _ = ctrl
+                        .app
+                        .move_column(bid, cid, target, RecordSource::Gui, None);
                     ctrl.refresh_kanban(&win);
                 }
             });
@@ -603,66 +620,71 @@ impl UiController {
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
-            win.on_kanban_create_task(move |col_str, title, desc, deadline_str, prio, subj_idx, tags_str| {
-                if let Some(win) = w.upgrade()
-                    && let Ok(p) = ctrl.app.get_active_profile()
-                {
-                    let cid = Uuid::parse_str(&col_str).ok();
-                    let bid = ctrl.active_board_id_or_first();
-                    let due_at = NaiveDate::parse_from_str(deadline_str.trim(), "%Y-%m-%d")
-                        .ok()
-                        .and_then(|d| d.and_hms_opt(23, 59, 0))
-                        .map(|ndt| chrono::DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc));
-                    let subject_id = if subj_idx > 0 {
-                        ctrl.app
-                            .list_subjects(p.id, false)
+            win.on_kanban_create_task(
+                move |col_str, title, desc, deadline_str, prio, subj_idx, tags_str| {
+                    if let Some(win) = w.upgrade()
+                        && let Ok(p) = ctrl.app.get_active_profile()
+                    {
+                        let cid = Uuid::parse_str(&col_str).ok();
+                        let bid = ctrl.active_board_id_or_first();
+                        let due_at = NaiveDate::parse_from_str(deadline_str.trim(), "%Y-%m-%d")
                             .ok()
-                            .and_then(|s| s.get((subj_idx - 1) as usize).map(|x| x.id))
-                    } else {
-                        None
-                    };
-                    let tags: Vec<String> = tags_str
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    match ctrl.app.create_task(
-                        CreateTaskInput {
-                            profile_id: p.id,
-                            board_id: bid,
-                            column_id: cid,
-                            subject_id,
-                            title: title.to_string(),
-                            description: Some(desc.to_string()),
-                            priority: Some(TaskPriority::from_i32(prio)),
-                            color: None,
-                            start_date: None,
-                            due_at,
-                            notes: None,
-                            tag_names: tags,
-                            badge_names: vec![],
-                            checklist_titles: vec![],
-                            reminder_offsets: vec![],
-                        },
-                        RecordSource::Gui,
-                        None,
-                    ) {
-                        Ok(_) => {
-                            ctrl.refresh_kanban(&win);
-                            ctrl.refresh_undo_flags(&win);
-                            show_toast(&win, "Задача создана");
+                            .and_then(|d| d.and_hms_opt(23, 59, 0))
+                            .map(|ndt| {
+                                chrono::DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc)
+                            });
+                        let subject_id = if subj_idx > 0 {
+                            ctrl.app
+                                .list_subjects(p.id, false)
+                                .ok()
+                                .and_then(|s| s.get((subj_idx - 1) as usize).map(|x| x.id))
+                        } else {
+                            None
+                        };
+                        let tags: Vec<String> = tags_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                        match ctrl.app.create_task(
+                            CreateTaskInput {
+                                profile_id: p.id,
+                                board_id: bid,
+                                column_id: cid,
+                                subject_id,
+                                title: title.to_string(),
+                                description: Some(desc.to_string()),
+                                priority: Some(TaskPriority::from_i32(prio)),
+                                color: None,
+                                start_date: None,
+                                due_at,
+                                notes: None,
+                                tag_names: tags,
+                                badge_names: vec![],
+                                checklist_titles: vec![],
+                                reminder_offsets: vec![],
+                            },
+                            RecordSource::Gui,
+                            None,
+                        ) {
+                            Ok(_) => {
+                                ctrl.refresh_kanban(&win);
+                                ctrl.refresh_undo_flags(&win);
+                                show_toast(&win, "Задача создана");
+                            }
+                            Err(e) => show_toast(&win, &format!("Ошибка: {e}")),
                         }
-                        Err(e) => show_toast(&win, &format!("Ошибка: {e}")),
                     }
-                }
-            });
+                },
+            );
         }
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_kanban_move_task_to_column(move |tid_str, cid_str| {
                 if let Some(win) = w.upgrade()
-                    && let (Ok(tid), Ok(cid)) = (Uuid::parse_str(&tid_str), Uuid::parse_str(&cid_str))
+                    && let (Ok(tid), Ok(cid)) =
+                        (Uuid::parse_str(&tid_str), Uuid::parse_str(&cid_str))
                 {
                     let _ = ctrl.app.move_task(tid, cid, None, RecordSource::Gui, None);
                     ctrl.refresh_kanban(&win);
@@ -680,9 +702,12 @@ impl UiController {
                     && let Ok(cols) = ctrl.app.list_columns(task.board_id, false)
                     && let Some(pos) = cols.iter().position(|c| c.id == task.column_id)
                 {
-                    let next = (pos as i32 + delta).clamp(0, cols.len().saturating_sub(1) as i32) as usize;
+                    let next =
+                        (pos as i32 + delta).clamp(0, cols.len().saturating_sub(1) as i32) as usize;
                     if next != pos {
-                        let _ = ctrl.app.move_task(tid, cols[next].id, None, RecordSource::Gui, None);
+                        let _ =
+                            ctrl.app
+                                .move_task(tid, cols[next].id, None, RecordSource::Gui, None);
                         ctrl.refresh_kanban(&win);
                         ctrl.refresh_undo_flags(&win);
                     }
@@ -751,35 +776,41 @@ impl UiController {
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
-            win.on_kanban_save_task_detail(move |tid_str, title, desc, notes, deadline_str, prio| {
-                if let Some(win) = w.upgrade()
-                    && let Ok(tid) = Uuid::parse_str(&tid_str)
-                {
-                    let due_at = if deadline_str.trim().is_empty() {
-                        Some(None)
-                    } else {
-                        NaiveDate::parse_from_str(deadline_str.trim(), "%Y-%m-%d")
-                            .ok()
-                            .and_then(|d| d.and_hms_opt(23, 59, 0))
-                            .map(|ndt| Some(chrono::DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc)))
-                    };
-                    let _ = ctrl.app.update_task(
-                        tid,
-                        UpdateTaskInput {
-                            title: Some(title.to_string()),
-                            description: Some(desc.to_string()),
-                            notes: Some(notes.to_string()),
-                            due_at,
-                            priority: Some(TaskPriority::from_i32(prio)),
-                            ..Default::default()
-                        },
-                        RecordSource::Gui,
-                        None,
-                    );
-                    ctrl.refresh_kanban(&win);
-                    show_toast(&win, "Задача сохранена");
-                }
-            });
+            win.on_kanban_save_task_detail(
+                move |tid_str, title, desc, notes, deadline_str, prio| {
+                    if let Some(win) = w.upgrade()
+                        && let Ok(tid) = Uuid::parse_str(&tid_str)
+                    {
+                        let due_at = if deadline_str.trim().is_empty() {
+                            Some(None)
+                        } else {
+                            NaiveDate::parse_from_str(deadline_str.trim(), "%Y-%m-%d")
+                                .ok()
+                                .and_then(|d| d.and_hms_opt(23, 59, 0))
+                                .map(|ndt| {
+                                    Some(chrono::DateTime::<Utc>::from_naive_utc_and_offset(
+                                        ndt, Utc,
+                                    ))
+                                })
+                        };
+                        let _ = ctrl.app.update_task(
+                            tid,
+                            UpdateTaskInput {
+                                title: Some(title.to_string()),
+                                description: Some(desc.to_string()),
+                                notes: Some(notes.to_string()),
+                                due_at,
+                                priority: Some(TaskPriority::from_i32(prio)),
+                                ..Default::default()
+                            },
+                            RecordSource::Gui,
+                            None,
+                        );
+                        ctrl.refresh_kanban(&win);
+                        show_toast(&win, "Задача сохранена");
+                    }
+                },
+            );
         }
         {
             let ctrl = Arc::clone(self);
@@ -814,7 +845,10 @@ impl UiController {
             win.on_kanban_add_checklist(move |tid_str, title| {
                 if let Some(win) = w.upgrade()
                     && let Ok(tid) = Uuid::parse_str(&tid_str)
-                    && ctrl.app.add_checklist_item(tid, title.to_string(), RecordSource::Gui).is_ok()
+                    && ctrl
+                        .app
+                        .add_checklist_item(tid, title.to_string(), RecordSource::Gui)
+                        .is_ok()
                 {
                     win.invoke_kanban_open_task_detail(tid_str);
                     ctrl.refresh_kanban(&win);
@@ -828,7 +862,13 @@ impl UiController {
                 if let Some(win) = w.upgrade()
                     && let Ok(cid) = Uuid::parse_str(&cid_str)
                 {
-                    let _ = ctrl.app.update_checklist_item(cid, None, Some(done), None, RecordSource::Gui);
+                    let _ = ctrl.app.update_checklist_item(
+                        cid,
+                        None,
+                        Some(done),
+                        None,
+                        RecordSource::Gui,
+                    );
                     let tid = win.get_kanban_detail_task_id();
                     win.invoke_kanban_open_task_detail(tid);
                     ctrl.refresh_kanban(&win);
@@ -854,8 +894,11 @@ impl UiController {
             let w = win.as_weak();
             win.on_kanban_add_tag(move |tid_str, tag_name| {
                 if let Some(win) = w.upgrade()
-                    && let (Ok(tid), Ok(p)) = (Uuid::parse_str(&tid_str), ctrl.app.get_active_profile())
-                    && let Ok(tag) = ctrl.app.get_or_create_tag(p.id, &tag_name, None, RecordSource::Gui)
+                    && let (Ok(tid), Ok(p)) =
+                        (Uuid::parse_str(&tid_str), ctrl.app.get_active_profile())
+                    && let Ok(tag) =
+                        ctrl.app
+                            .get_or_create_tag(p.id, &tag_name, None, RecordSource::Gui)
                 {
                     let _ = ctrl.app.assign_tag(tid, tag.id, RecordSource::Gui);
                     win.invoke_kanban_open_task_detail(tid_str);
@@ -932,7 +975,10 @@ impl UiController {
             win.on_profile_duplicate(move |id_str| {
                 if let Some(win) = w.upgrade()
                     && let Ok(id) = Uuid::parse_str(&id_str)
-                    && ctrl.app.duplicate_profile(id, None, true, RecordSource::Gui).is_ok()
+                    && ctrl
+                        .app
+                        .duplicate_profile(id, None, true, RecordSource::Gui)
+                        .is_ok()
                 {
                     ctrl.refresh_profiles(&win);
                     show_toast(&win, "Профиль продублирован");
@@ -946,7 +992,10 @@ impl UiController {
                 if let Some(win) = w.upgrade()
                     && let Ok(id) = Uuid::parse_str(&id_str)
                 {
-                    match ctrl.app.set_profile_archived(id, arch, RecordSource::Gui, None) {
+                    match ctrl
+                        .app
+                        .set_profile_archived(id, arch, RecordSource::Gui, None)
+                    {
                         Ok(_) => ctrl.refresh_profiles(&win),
                         Err(e) => show_toast(&win, &format!("{e}")),
                     }
@@ -1028,15 +1077,19 @@ impl UiController {
             let w = win.as_weak();
             win.on_subject_move(move |sid_str, delta| {
                 if let Some(win) = w.upgrade()
-                    && let (Ok(p), Ok(sid)) = (ctrl.app.get_active_profile(), Uuid::parse_str(&sid_str))
+                    && let (Ok(p), Ok(sid)) =
+                        (ctrl.app.get_active_profile(), Uuid::parse_str(&sid_str))
                     && let Ok(mut list) = ctrl.app.list_subjects(p.id, false)
                     && let Some(pos) = list.iter().position(|s| s.id == sid)
                 {
-                    let target = (pos as i32 + delta).clamp(0, list.len().saturating_sub(1) as i32) as usize;
+                    let target =
+                        (pos as i32 + delta).clamp(0, list.len().saturating_sub(1) as i32) as usize;
                     let item = list.remove(pos);
                     list.insert(target, item);
                     let ids: Vec<Uuid> = list.into_iter().map(|s| s.id).collect();
-                    let _ = ctrl.app.reorder_subjects(p.id, &ids, RecordSource::Gui, None);
+                    let _ = ctrl
+                        .app
+                        .reorder_subjects(p.id, &ids, RecordSource::Gui, None);
                     ctrl.refresh_all(&win);
                 }
             });
@@ -1048,7 +1101,9 @@ impl UiController {
                 if let Some(win) = w.upgrade()
                     && let Ok(sid) = Uuid::parse_str(&sid_str)
                 {
-                    let _ = ctrl.app.set_subject_archived(sid, arch, RecordSource::Gui, None);
+                    let _ = ctrl
+                        .app
+                        .set_subject_archived(sid, arch, RecordSource::Gui, None);
                     ctrl.refresh_all(&win);
                 }
             });
@@ -1078,7 +1133,10 @@ impl UiController {
             win.on_subject_confirm_delete(move |sid_str| {
                 if let Some(win) = w.upgrade()
                     && let Ok(sid) = Uuid::parse_str(&sid_str)
-                    && ctrl.app.delete_subject(sid, RecordSource::Gui, None).is_ok()
+                    && ctrl
+                        .app
+                        .delete_subject(sid, RecordSource::Gui, None)
+                        .is_ok()
                 {
                     ctrl.refresh_all(&win);
                     show_toast(&win, "Предмет удалён");
@@ -1213,27 +1271,33 @@ impl UiController {
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
-            win.on_save_appearance(move |theme_idx, lang_idx, accent, compact, reduced, scale_pct| {
-                if let Some(win) = w.upgrade()
-                    && let Ok(mut s) = ctrl.app.get_settings()
-                {
-                    s.theme_mode = match theme_idx {
-                        0 => ThemeMode::Light,
-                        1 => ThemeMode::Dark,
-                        _ => ThemeMode::System,
-                    };
-                    s.language = if lang_idx == 1 { Language::En } else { Language::Ru };
-                    s.accent_color = accent.to_string();
-                    s.compact_mode = compact;
-                    s.reduced_motion = reduced;
-                    s.ui_scale = (scale_pct as f32 / 100.0).clamp(0.85, 1.4);
-                    if ctrl.app.update_settings(&s, RecordSource::Gui).is_ok() {
-                        ctrl.apply_settings_and_theme(&win);
-                        ctrl.refresh_all(&win);
-                        show_toast(&win, "Настройки внешнего вида сохранены");
+            win.on_save_appearance(
+                move |theme_idx, lang_idx, accent, compact, reduced, scale_pct| {
+                    if let Some(win) = w.upgrade()
+                        && let Ok(mut s) = ctrl.app.get_settings()
+                    {
+                        s.theme_mode = match theme_idx {
+                            0 => ThemeMode::Light,
+                            1 => ThemeMode::Dark,
+                            _ => ThemeMode::System,
+                        };
+                        s.language = if lang_idx == 1 {
+                            Language::En
+                        } else {
+                            Language::Ru
+                        };
+                        s.accent_color = accent.to_string();
+                        s.compact_mode = compact;
+                        s.reduced_motion = reduced;
+                        s.ui_scale = (scale_pct as f32 / 100.0).clamp(0.85, 1.4);
+                        if ctrl.app.update_settings(&s, RecordSource::Gui).is_ok() {
+                            ctrl.apply_settings_and_theme(&win);
+                            ctrl.refresh_all(&win);
+                            show_toast(&win, "Настройки внешнего вида сохранены");
+                        }
                     }
-                }
-            });
+                },
+            );
         }
         {
             let ctrl = Arc::clone(self);
@@ -1319,7 +1383,10 @@ impl UiController {
                     match ctrl.mcp.start(rt, s.mcp_http_port) {
                         Ok(()) => {
                             ctrl.refresh_mcp_panel(&win);
-                            show_toast(&win, &format!("MCP HTTP запущен на 127.0.0.1:{}", s.mcp_http_port));
+                            show_toast(
+                                &win,
+                                &format!("MCP HTTP запущен на 127.0.0.1:{}", s.mcp_http_port),
+                            );
                         }
                         Err(e) => show_toast(&win, &format!("Ошибка запуска MCP: {e}")),
                     }
@@ -1390,8 +1457,12 @@ impl UiController {
                     match ctrl.app.create_backup_archive(None) {
                         Ok(info) => {
                             win.set_backup_status_text(
-                                format!("Резервная копия создана: {} ({} байт)", info.path.display(), info.size_bytes)
-                                    .into(),
+                                format!(
+                                    "Резервная копия создана: {} ({} байт)",
+                                    info.path.display(),
+                                    info.size_bytes
+                                )
+                                .into(),
                             );
                             show_toast(&win, "Резервная копия создана");
                         }
@@ -1412,11 +1483,16 @@ impl UiController {
                     match ctrl.app.restore_from_backup_archive(&file) {
                         Ok(()) => {
                             ctrl.refresh_all(&win);
-                            win.set_backup_status_text("База успешно восстановлена из архива.".into());
+                            win.set_backup_status_text(
+                                "База успешно восстановлена из архива.".into(),
+                            );
                             show_toast(&win, "База восстановлена");
                         }
                         Err(e) => {
-                            win.set_backup_status_text(format!("Восстановление отменено (исходные данные сохранены): {e}").into());
+                            win.set_backup_status_text(
+                                format!("Восстановление отменено (исходные данные сохранены): {e}")
+                                    .into(),
+                            );
                         }
                     }
                 }
@@ -1443,7 +1519,9 @@ impl UiController {
                         };
                         match res {
                             Ok(()) => {
-                                win.set_backup_status_text(format!("Экспорт сохранён: {}", path.display()).into());
+                                win.set_backup_status_text(
+                                    format!("Экспорт сохранён: {}", path.display()).into(),
+                                );
                                 show_toast(&win, "Экспорт завершён");
                             }
                             Err(e) => show_toast(&win, &format!("Ошибка экспорта: {e}")),
@@ -1614,15 +1692,7 @@ impl UiController {
         if let Ok(target) = Decimal::from_str(target_str.trim()) {
             let max_w = max_w_str.trim().parse::<u32>().ok();
             if let Ok(reach) = self.app.forecast_needed_for_target(
-                p.id,
-                sid,
-                None,
-                None,
-                target,
-                add_g,
-                weight,
-                max_w,
-                None,
+                p.id, sid, None, None, target, add_g, weight, max_w, None,
             ) {
                 let text = if reach.already_reached {
                     format!("Целевой балл {target} уже достигнут!")
@@ -1632,7 +1702,9 @@ impl UiController {
                         (Some(lim), Some(false)) => format!(" — НЕ достижимо за {lim} работ."),
                         _ => String::new(),
                     };
-                    format!("Для достижения {target} нужно оценок «{add_g}» (вес {weight}): {n}{within}")
+                    format!(
+                        "Для достижения {target} нужно оценок «{add_g}» (вес {weight}): {n}{within}"
+                    )
                 } else {
                     format!("Цель {target} математически недостижима оценками «{add_g}».")
                 };
@@ -1659,15 +1731,42 @@ impl UiController {
         th.set_compact_mode(s.compact_mode);
         th.set_reduced_motion(s.reduced_motion);
         th.set_ui_scale(s.ui_scale);
-        th.set_grade_5(parse_hex_color(&s.mark_colors.grade_5, Color::from_rgb_u8(46, 125, 50)));
-        th.set_grade_4(parse_hex_color(&s.mark_colors.grade_4, Color::from_rgb_u8(0, 137, 123)));
-        th.set_grade_3(parse_hex_color(&s.mark_colors.grade_3, Color::from_rgb_u8(217, 119, 6)));
-        th.set_grade_2(parse_hex_color(&s.mark_colors.grade_2, Color::from_rgb_u8(234, 88, 12)));
-        th.set_grade_1(parse_hex_color(&s.mark_colors.grade_1, Color::from_rgb_u8(220, 38, 38)));
-        th.set_mark_absent(parse_hex_color(&s.mark_colors.absent, Color::from_rgb_u8(225, 29, 72)));
-        th.set_mark_excused(parse_hex_color(&s.mark_colors.excused, Color::from_rgb_u8(37, 99, 235)));
-        th.set_mark_pass(parse_hex_color(&s.mark_colors.pass, Color::from_rgb_u8(13, 148, 136)));
-        th.set_mark_fail(parse_hex_color(&s.mark_colors.fail, Color::from_rgb_u8(185, 28, 28)));
+        th.set_grade_5(parse_hex_color(
+            &s.mark_colors.grade_5,
+            Color::from_rgb_u8(46, 125, 50),
+        ));
+        th.set_grade_4(parse_hex_color(
+            &s.mark_colors.grade_4,
+            Color::from_rgb_u8(0, 137, 123),
+        ));
+        th.set_grade_3(parse_hex_color(
+            &s.mark_colors.grade_3,
+            Color::from_rgb_u8(217, 119, 6),
+        ));
+        th.set_grade_2(parse_hex_color(
+            &s.mark_colors.grade_2,
+            Color::from_rgb_u8(234, 88, 12),
+        ));
+        th.set_grade_1(parse_hex_color(
+            &s.mark_colors.grade_1,
+            Color::from_rgb_u8(220, 38, 38),
+        ));
+        th.set_mark_absent(parse_hex_color(
+            &s.mark_colors.absent,
+            Color::from_rgb_u8(225, 29, 72),
+        ));
+        th.set_mark_excused(parse_hex_color(
+            &s.mark_colors.excused,
+            Color::from_rgb_u8(37, 99, 235),
+        ));
+        th.set_mark_pass(parse_hex_color(
+            &s.mark_colors.pass,
+            Color::from_rgb_u8(13, 148, 136),
+        ));
+        th.set_mark_fail(parse_hex_color(
+            &s.mark_colors.fail,
+            Color::from_rgb_u8(185, 28, 28),
+        ));
 
         // Sync settings form fields
         win.set_setting_theme_idx(mode_idx);
@@ -1676,20 +1775,32 @@ impl UiController {
         win.set_setting_compact(s.compact_mode);
         win.set_setting_reduced_motion(s.reduced_motion);
         win.set_setting_scale_percent((s.ui_scale * 100.0).round() as i32);
-        win.set_setting_avg_mode_idx(if s.average_mode == AverageMode::Weighted { 1 } else { 0 });
+        win.set_setting_avg_mode_idx(if s.average_mode == AverageMode::Weighted {
+            1
+        } else {
+            0
+        });
         win.set_setting_avg_precision_idx(match s.average_precision {
             AveragePrecision::One => 0,
             AveragePrecision::Two => 1,
             AveragePrecision::Three => 2,
         });
-        win.set_setting_week_start_idx(if s.week_start == WeekStart::Sunday { 1 } else { 0 });
+        win.set_setting_week_start_idx(if s.week_start == WeekStart::Sunday {
+            1
+        } else {
+            0
+        });
         win.set_setting_highlight_weekends(s.highlight_weekends);
         win.set_setting_highlight_holidays(s.highlight_holidays);
         win.set_setting_reminders_enabled(s.reminders_enabled);
         win.set_setting_os_notifications(s.os_notifications_enabled);
         win.set_mcp_port_text(s.mcp_http_port.to_string().into());
         win.set_mcp_autostart(s.mcp_http_autostart);
-        win.set_mcp_permission_idx(if s.mcp_permission_mode == McpPermissionMode::ReadOnly { 0 } else { 1 });
+        win.set_mcp_permission_idx(if s.mcp_permission_mode == McpPermissionMode::ReadOnly {
+            0
+        } else {
+            1
+        });
         win.set_mcp_allow_destructive(s.mcp_allow_destructive);
 
         // Localized strings
@@ -1771,7 +1882,10 @@ impl UiController {
             .collect::<Vec<_>>()
             .join(" / ");
         win.set_active_profile_sub(sub.into());
-        win.set_active_profile_color(parse_hex_color(&active.color, Color::from_rgb_u8(68, 94, 145)));
+        win.set_active_profile_color(parse_hex_color(
+            &active.color,
+            Color::from_rgb_u8(68, 94, 145),
+        ));
 
         let profiles = self.app.list_profiles(true).unwrap_or_default();
         let items: Vec<ProfileItem> = profiles
@@ -1798,7 +1912,11 @@ impl UiController {
                 short_name: s.short_name.into(),
                 teacher: s.teacher.into(),
                 color: parse_hex_color(&s.color, Color::from_rgb_u8(68, 94, 145)),
-                target_average: s.target_average.map(|d| d.to_string()).unwrap_or_default().into(),
+                target_average: s
+                    .target_average
+                    .map(|d| d.to_string())
+                    .unwrap_or_default()
+                    .into(),
                 is_archived: s.is_archived,
                 sort_order: s.sort_order,
             })
@@ -1810,7 +1928,10 @@ impl UiController {
         let Ok(active) = self.app.get_active_profile() else {
             return;
         };
-        let periods = self.app.list_academic_periods(active.id, false).unwrap_or_default();
+        let periods = self
+            .app
+            .list_academic_periods(active.id, false)
+            .unwrap_or_default();
         let items: Vec<PeriodItem> = periods
             .into_iter()
             .map(|p| PeriodItem {
@@ -1841,7 +1962,8 @@ impl UiController {
 
         let matrix = match view_mode {
             CalendarViewMode::Week => {
-                let anchor = NaiveDate::from_ymd_opt(year, month, today.day().min(28)).unwrap_or(today);
+                let anchor =
+                    NaiveDate::from_ymd_opt(year, month, today.day().min(28)).unwrap_or(today);
                 let (s, e) = week_bounds(anchor, settings.week_start);
                 self.app.get_journal_for_range(active.id, s, e, today)
             }
@@ -1851,7 +1973,8 @@ impl UiController {
                     && let Some(per) = periods.into_iter().find(|p| p.id == pid)
                 {
                     win.set_active_period_label(per.name.into());
-                    self.app.get_journal_for_range(active.id, per.start_date, per.end_date, today)
+                    self.app
+                        .get_journal_for_range(active.id, per.start_date, per.end_date, today)
                 } else {
                     self.app.get_monthly_journal(active.id, year, month, today)
                 }
@@ -2009,10 +2132,16 @@ impl UiController {
         win.set_journal_detail_move_date(date_iso.into());
 
         let mut items = Vec::new();
-        if let Ok(grades) = self
-            .app
-            .list_grades(profile.id, Some(sid), Some(date), Some(date), None, None, None, None)
-        {
+        if let Ok(grades) = self.app.list_grades(
+            profile.id,
+            Some(sid),
+            Some(date),
+            Some(date),
+            None,
+            None,
+            None,
+            None,
+        ) {
             for g in grades {
                 items.push(CellDetailEntry {
                     id: g.id.to_string().into(),
@@ -2141,9 +2270,14 @@ impl UiController {
             let (py, pm) = prev_month(today.year(), today.month());
             let (b_from, b_to) = month_bounds(py, pm).unwrap();
             let (c_from, c_to) = month_bounds(today.year(), today.month()).unwrap();
-            if let Ok(cmp) = self.app.compare_periods(active.id, None, b_from, b_to, c_from, c_to) {
-                let b_str = format_average(cmp.metrics.baseline_average, settings.average_precision);
-                let c_str = format_average(cmp.metrics.comparison_average, settings.average_precision);
+            if let Ok(cmp) = self
+                .app
+                .compare_periods(active.id, None, b_from, b_to, c_from, c_to)
+            {
+                let b_str =
+                    format_average(cmp.metrics.baseline_average, settings.average_precision);
+                let c_str =
+                    format_average(cmp.metrics.comparison_average, settings.average_precision);
                 let delta_str = cmp
                     .metrics
                     .absolute_delta
@@ -2201,17 +2335,58 @@ impl UiController {
         ));
 
         // Grade distribution vertical bars
-        let max_g = [rep.count_5, rep.count_4, rep.count_3, rep.count_2, rep.count_1]
-            .into_iter()
-            .max()
-            .unwrap_or(1)
-            .max(1) as f32;
+        let max_g = [
+            rep.count_5,
+            rep.count_4,
+            rep.count_3,
+            rep.count_2,
+            rep.count_1,
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or(1)
+        .max(1) as f32;
         let dist_bars = vec![
-            StatBarItem { label: "5".into(), value_text: rep.count_5.to_string().into(), ratio: rep.count_5 as f32 / max_g, color: g5_c, extra_text: SharedString::new(), below_target: false },
-            StatBarItem { label: "4".into(), value_text: rep.count_4.to_string().into(), ratio: rep.count_4 as f32 / max_g, color: g4_c, extra_text: SharedString::new(), below_target: false },
-            StatBarItem { label: "3".into(), value_text: rep.count_3.to_string().into(), ratio: rep.count_3 as f32 / max_g, color: g3_c, extra_text: SharedString::new(), below_target: false },
-            StatBarItem { label: "2".into(), value_text: rep.count_2.to_string().into(), ratio: rep.count_2 as f32 / max_g, color: g2_c, extra_text: SharedString::new(), below_target: false },
-            StatBarItem { label: "1".into(), value_text: rep.count_1.to_string().into(), ratio: rep.count_1 as f32 / max_g, color: g1_c, extra_text: SharedString::new(), below_target: false },
+            StatBarItem {
+                label: "5".into(),
+                value_text: rep.count_5.to_string().into(),
+                ratio: rep.count_5 as f32 / max_g,
+                color: g5_c,
+                extra_text: SharedString::new(),
+                below_target: false,
+            },
+            StatBarItem {
+                label: "4".into(),
+                value_text: rep.count_4.to_string().into(),
+                ratio: rep.count_4 as f32 / max_g,
+                color: g4_c,
+                extra_text: SharedString::new(),
+                below_target: false,
+            },
+            StatBarItem {
+                label: "3".into(),
+                value_text: rep.count_3.to_string().into(),
+                ratio: rep.count_3 as f32 / max_g,
+                color: g3_c,
+                extra_text: SharedString::new(),
+                below_target: false,
+            },
+            StatBarItem {
+                label: "2".into(),
+                value_text: rep.count_2.to_string().into(),
+                ratio: rep.count_2 as f32 / max_g,
+                color: g2_c,
+                extra_text: SharedString::new(),
+                below_target: false,
+            },
+            StatBarItem {
+                label: "1".into(),
+                value_text: rep.count_1.to_string().into(),
+                ratio: rep.count_1 as f32 / max_g,
+                color: g1_c,
+                extra_text: SharedString::new(),
+                below_target: false,
+            },
         ];
         win.set_stats_grade_dist(ModelRc::new(VecModel::from(dist_bars)));
 
@@ -2343,7 +2518,9 @@ impl UiController {
         );
 
         let Some(bid) = active_bid else {
-            win.set_kanban_columns(ModelRc::new(VecModel::from(Vec::<KanbanColumnModel>::new())));
+            win.set_kanban_columns(ModelRc::new(
+                VecModel::from(Vec::<KanbanColumnModel>::new()),
+            ));
             return;
         };
 
@@ -2404,7 +2581,10 @@ impl UiController {
                         .unwrap_or_else(|| (String::new(), Color::from_rgb_u8(100, 116, 139)));
                     let (done_c, total_c) = t.checklist_progress();
                     let (cl_text, cl_ratio) = if total_c > 0 {
-                        (format!("{done_c}/{total_c}"), done_c as f32 / total_c as f32)
+                        (
+                            format!("{done_c}/{total_c}"),
+                            done_c as f32 / total_c as f32,
+                        )
                     } else {
                         (String::new(), 0.0)
                     };
@@ -2522,7 +2702,10 @@ impl UiController {
                 .into(),
         );
 
-        let logs = self.app.list_activity_log(None, None, 25).unwrap_or_default();
+        let logs = self
+            .app
+            .list_activity_log(None, None, 25)
+            .unwrap_or_default();
         let rows: Vec<ActivityRowItem> = logs
             .into_iter()
             .map(|l| ActivityRowItem {

@@ -33,7 +33,10 @@ pub fn extract_countable_samples(entries: &[GradeEntry]) -> Vec<GradeSample> {
 
 /// Calculates exact arithmetic or weighted average with zero intermediate rounding.
 /// Returns `None` when no countable numeric grades exist (UI renders `—`, never `0`).
-pub fn calculate_average_from_samples(samples: &[GradeSample], mode: AverageMode) -> Option<Decimal> {
+pub fn calculate_average_from_samples(
+    samples: &[GradeSample],
+    mode: AverageMode,
+) -> Option<Decimal> {
     if samples.is_empty() {
         return None;
     }

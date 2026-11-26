@@ -3,9 +3,7 @@ use chrono::{Duration, NaiveDate, Utc};
 use journal_app::{
     AddAttendanceInput, AddGradeInput, AppServices, AuditMeta, CreateSubjectInput, CreateTaskInput,
 };
-use journal_domain::{
-    AttendanceStatus, RecordSource, TaskPriority, ThemeMode, WorkType,
-};
+use journal_domain::{AttendanceStatus, RecordSource, TaskPriority, ThemeMode, WorkType};
 use journal_mcp::EmbeddedHttpManager;
 use rust_decimal::Decimal;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
@@ -141,11 +139,41 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
     app.update_settings(&settings, RecordSource::Gui)?;
 
     let subjects = [
-        ("Философия", "Фил", "Сократов А.А.", "#2E7D32", Some(Decimal::new(45, 1))),
-        ("Базы данных", "БД", "Королёв В.С.", "#2563EB", Some(Decimal::new(46, 1))),
-        ("Программирование", "Прог", "Линусов Д.И.", "#7C3AED", Some(Decimal::new(48, 1))),
-        ("Математический анализ", "Матан", "Эйлеров Н.П.", "#D97706", Some(Decimal::new(42, 1))),
-        ("Операционные системы", "ОС", "Керниган Р.М.", "#0F766E", Some(Decimal::new(45, 1))),
+        (
+            "Философия",
+            "Фил",
+            "Сократов А.А.",
+            "#2E7D32",
+            Some(Decimal::new(45, 1)),
+        ),
+        (
+            "Базы данных",
+            "БД",
+            "Королёв В.С.",
+            "#2563EB",
+            Some(Decimal::new(46, 1)),
+        ),
+        (
+            "Программирование",
+            "Прог",
+            "Линусов Д.И.",
+            "#7C3AED",
+            Some(Decimal::new(48, 1)),
+        ),
+        (
+            "Математический анализ",
+            "Матан",
+            "Эйлеров Н.П.",
+            "#D97706",
+            Some(Decimal::new(42, 1)),
+        ),
+        (
+            "Операционные системы",
+            "ОС",
+            "Керниган Р.М.",
+            "#0F766E",
+            Some(Decimal::new(45, 1)),
+        ),
         ("Физкультура", "Физра", "Спортов Е.К.", "#E11D48", None),
     ];
 
@@ -263,11 +291,51 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
     let boards = app.list_boards(p.id, false)?;
     let cols = app.list_columns(boards[0].id, false)?;
     let tasks = [
-        (0, Some(ids[1]), "Лабораторная №4: SQL-индексы", TaskPriority::High, 3, vec!["Лабораторная"], vec!["Схема таблиц", "EXPLAIN QUERY PLAN", "Отчёт"]),
-        (0, Some(ids[3]), "Решить типовой расчёт по рядам", TaskPriority::Medium, 5, vec!["Домашнее задание"], vec!["Вариант 12"]),
-        (1, Some(ids[2]), "Курсовой проект на Rust + Slint", TaskPriority::Critical, 2, vec!["Проект"], vec!["Доменная модель", "SQLite слой", "MCP-сервер", "Тесты"]),
-        (2, Some(ids[4]), "Отчёт по лабораторной ОС №3", TaskPriority::Medium, -1, vec!["На проверке"], vec!["Скриншоты", "Выводы"]),
-        (3, Some(ids[0]), "Эссе по философии Канта", TaskPriority::Low, -4, vec!["Эссе"], vec!["План", "Текст"]),
+        (
+            0,
+            Some(ids[1]),
+            "Лабораторная №4: SQL-индексы",
+            TaskPriority::High,
+            3,
+            vec!["Лабораторная"],
+            vec!["Схема таблиц", "EXPLAIN QUERY PLAN", "Отчёт"],
+        ),
+        (
+            0,
+            Some(ids[3]),
+            "Решить типовой расчёт по рядам",
+            TaskPriority::Medium,
+            5,
+            vec!["Домашнее задание"],
+            vec!["Вариант 12"],
+        ),
+        (
+            1,
+            Some(ids[2]),
+            "Курсовой проект на Rust + Slint",
+            TaskPriority::Critical,
+            2,
+            vec!["Проект"],
+            vec!["Доменная модель", "SQLite слой", "MCP-сервер", "Тесты"],
+        ),
+        (
+            2,
+            Some(ids[4]),
+            "Отчёт по лабораторной ОС №3",
+            TaskPriority::Medium,
+            -1,
+            vec!["На проверке"],
+            vec!["Скриншоты", "Выводы"],
+        ),
+        (
+            3,
+            Some(ids[0]),
+            "Эссе по философии Канта",
+            TaskPriority::Low,
+            -4,
+            vec!["Эссе"],
+            vec!["План", "Текст"],
+        ),
     ];
     for (ci, sid, title, prio, due_days, tags, checklist) in tasks {
         let t = app.create_task(
@@ -284,7 +352,11 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
                 due_at: Some(Utc::now() + Duration::days(due_days)),
                 notes: None,
                 tag_names: tags.into_iter().map(String::from).collect(),
-                badge_names: if ci == 2 { vec!["Срочно".into()] } else { vec![] },
+                badge_names: if ci == 2 {
+                    vec!["Срочно".into()]
+                } else {
+                    vec![]
+                },
                 checklist_titles: checklist.into_iter().map(String::from).collect(),
                 reminder_offsets: vec![],
             },

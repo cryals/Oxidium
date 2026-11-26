@@ -9,8 +9,8 @@ use uuid::Uuid;
 use crate::db::Database;
 use crate::error::{StorageError, StorageResult};
 use crate::helpers::{
-    bump_sync_revision, delete_search_entry, parse_date, parse_decimal, parse_dt, parse_opt_decimal,
-    parse_opt_time, parse_opt_uuid, parse_uuid, upsert_search_entry,
+    bump_sync_revision, delete_search_entry, parse_date, parse_decimal, parse_dt,
+    parse_opt_decimal, parse_opt_time, parse_opt_uuid, parse_uuid, upsert_search_entry,
 };
 
 impl Database {
@@ -105,24 +105,37 @@ impl Database {
             .optional()?;
         match row {
             None => Ok(None),
-            Some((id, pid, ap, name, short, teacher, color, icon, desc, ord, arch, tgt, ca, ua)) => {
-                Ok(Some(Subject {
-                    id: parse_uuid(&id)?,
-                    profile_id: parse_uuid(&pid)?,
-                    academic_period_id: parse_opt_uuid(ap)?,
-                    name,
-                    short_name: short,
-                    teacher,
-                    color,
-                    icon,
-                    description: desc,
-                    sort_order: ord,
-                    is_archived: arch != 0,
-                    target_average: parse_opt_decimal(tgt)?,
-                    created_at: parse_dt(&ca)?,
-                    updated_at: parse_dt(&ua)?,
-                }))
-            }
+            Some((
+                id,
+                pid,
+                ap,
+                name,
+                short,
+                teacher,
+                color,
+                icon,
+                desc,
+                ord,
+                arch,
+                tgt,
+                ca,
+                ua,
+            )) => Ok(Some(Subject {
+                id: parse_uuid(&id)?,
+                profile_id: parse_uuid(&pid)?,
+                academic_period_id: parse_opt_uuid(ap)?,
+                name,
+                short_name: short,
+                teacher,
+                color,
+                icon,
+                description: desc,
+                sort_order: ord,
+                is_archived: arch != 0,
+                target_average: parse_opt_decimal(tgt)?,
+                created_at: parse_dt(&ca)?,
+                updated_at: parse_dt(&ua)?,
+            })),
         }
     }
 
@@ -159,7 +172,10 @@ impl Database {
             Some(subject.id),
             None,
             &subject.name,
-            &format!("{} {} {}", subject.short_name, subject.teacher, subject.description),
+            &format!(
+                "{} {} {}",
+                subject.short_name, subject.teacher, subject.description
+            ),
         )?;
         bump_sync_revision(&tx, source)?;
         tx.commit()?;
@@ -204,7 +220,10 @@ impl Database {
             Some(subject.id),
             None,
             &subject.name,
-            &format!("{} {} {}", subject.short_name, subject.teacher, subject.description),
+            &format!(
+                "{} {} {}",
+                subject.short_name, subject.teacher, subject.description
+            ),
         )?;
         bump_sync_revision(&tx, source)?;
         tx.commit()?;
@@ -239,10 +258,16 @@ impl Database {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
         let sid = subject_id.to_string();
-        tx.execute("DELETE FROM search_index WHERE subject_id = ?1", params![sid])?;
+        tx.execute(
+            "DELETE FROM search_index WHERE subject_id = ?1",
+            params![sid],
+        )?;
         tx.execute("DELETE FROM grades WHERE subject_id = ?1", params![sid])?;
         tx.execute("DELETE FROM attendance WHERE subject_id = ?1", params![sid])?;
-        tx.execute("UPDATE tasks SET subject_id = NULL WHERE subject_id = ?1", params![sid])?;
+        tx.execute(
+            "UPDATE tasks SET subject_id = NULL WHERE subject_id = ?1",
+            params![sid],
+        )?;
         let changed = tx.execute("DELETE FROM subjects WHERE id = ?1", params![sid])?;
         if changed == 0 {
             return Err(StorageError::Domain(DomainError::NotFound {
@@ -450,7 +475,11 @@ impl Database {
                         g.profile_id,
                         Some(g.subject_id),
                         Some(g.date),
-                        if g.topic.is_empty() { &g.mark_label } else { &g.topic },
+                        if g.topic.is_empty() {
+                            &g.mark_label
+                        } else {
+                            &g.topic
+                        },
                         &format!("{} {} {}", g.mark_label, g.topic, g.comment),
                     )?;
                 }
@@ -885,10 +914,7 @@ impl Database {
         sql.push_str(" ORDER BY date ASC, created_at ASC");
 
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map(
-            rusqlite::params_from_iter(values),
-            Self::map_attendance_row,
-        )?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(values), Self::map_attendance_row)?;
         let mut out = Vec::new();
         for r in rows {
             out.push(Self::decode_attendance_row(r?)?);

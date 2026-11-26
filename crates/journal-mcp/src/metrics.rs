@@ -100,16 +100,8 @@ impl McpMetrics {
                 .lock()
                 .map(|s| *s)
                 .unwrap_or(McpServerStatus::Stopped),
-            transport: self
-                .transport
-                .lock()
-                .map(|t| t.clone())
-                .unwrap_or_default(),
-            endpoint: self
-                .endpoint
-                .lock()
-                .map(|e| e.clone())
-                .unwrap_or_default(),
+            transport: self.transport.lock().map(|t| t.clone()).unwrap_or_default(),
+            endpoint: self.endpoint.lock().map(|e| e.clone()).unwrap_or_default(),
             server_version: env!("CARGO_PKG_VERSION").to_string(),
             protocol_compatibility: "MCP 2025-03-26 / 2026-07-28 (rmcp 3.11)".into(),
             total_requests: self.total_requests.load(Ordering::Relaxed),

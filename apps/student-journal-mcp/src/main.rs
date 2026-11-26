@@ -42,11 +42,7 @@ async fn main() -> Result<()> {
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("warn,journal_mcp=info")),
         )
-        .with(
-            fmt::layer()
-                .with_writer(std::io::stderr)
-                .with_ansi(false),
-        )
+        .with(fmt::layer().with_writer(std::io::stderr).with_ansi(false))
         .init();
 
     let (db_arg, http_mode, port_arg, show_help) = parse_args();

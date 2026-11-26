@@ -354,9 +354,13 @@ impl WorkType {
             "class_answer" | "answer" | "ответ" => Some(Self::ClassAnswer),
             "homework" | "дз" => Some(Self::Homework),
             "control_work" | "control" | "контрольная" => Some(Self::ControlWork),
-            "independent_work" | "independent" | "самостоятельная" => Some(Self::IndependentWork),
+            "independent_work" | "independent" | "самостоятельная" => {
+                Some(Self::IndependentWork)
+            }
             "lab_work" | "lab" | "лабораторная" => Some(Self::LabWork),
-            "practical_work" | "practical" | "практическая" => Some(Self::PracticalWork),
+            "practical_work" | "practical" | "практическая" => {
+                Some(Self::PracticalWork)
+            }
             "test" | "тест" => Some(Self::Test),
             "project" | "проект" => Some(Self::Project),
             "exam" | "экзамен" => Some(Self::Exam),
@@ -523,7 +527,9 @@ pub struct KanbanColumn {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskPriority {
     #[default]
@@ -640,9 +646,7 @@ impl Task {
     }
 
     pub fn is_overdue(&self, now: DateTime<Utc>) -> bool {
-        !self.is_archived
-            && self.completed_at.is_none()
-            && self.due_at.is_some_and(|due| due < now)
+        !self.is_archived && self.completed_at.is_none() && self.due_at.is_some_and(|due| due < now)
     }
 
     pub fn checklist_progress(&self) -> (usize, usize) {

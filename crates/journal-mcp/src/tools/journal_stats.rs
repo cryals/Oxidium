@@ -62,7 +62,9 @@ pub struct ComparePeriodsArgs {
 
 #[tool_router(router = journal_stats_router)]
 impl OxidiumMcpServer {
-    #[tool(description = "Get structured journal entries (subjects, grades, attendance, averages) for a date range.")]
+    #[tool(
+        description = "Get structured journal entries (subjects, grades, attendance, averages) for a date range."
+    )]
     pub async fn get_journal(
         &self,
         Parameters(args): Parameters<GetJournalArgs>,
@@ -135,7 +137,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Search across subjects, grades, attendance, tasks, tags, and badges using FTS5.")]
+    #[tool(
+        description = "Search across subjects, grades, attendance, tasks, tags, and badges using FTS5."
+    )]
     pub async fn search_journal(
         &self,
         Parameters(args): Parameters<SearchJournalArgs>,
@@ -188,7 +192,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Get a compact daily summary of grades and attendance for an ISO 8601 date.")]
+    #[tool(
+        description = "Get a compact daily summary of grades and attendance for an ISO 8601 date."
+    )]
     pub async fn get_daily_summary(
         &self,
         Parameters(args): Parameters<DateSummaryArgs>,
@@ -203,12 +209,16 @@ impl OxidiumMcpServer {
             |args, _| {
                 let pid = parse_uuid_arg("profile_id", &args.profile_id)?;
                 let d = parse_date_arg("date", &args.date)?;
-                self.app.get_daily_summary(pid, d).map_err(|e| e.to_string())
+                self.app
+                    .get_daily_summary(pid, d)
+                    .map_err(|e| e.to_string())
             },
         )
     }
 
-    #[tool(description = "Get a compact weekly summary for the week containing the specified date.")]
+    #[tool(
+        description = "Get a compact weekly summary for the week containing the specified date."
+    )]
     pub async fn get_weekly_summary(
         &self,
         Parameters(args): Parameters<DateSummaryArgs>,
@@ -251,7 +261,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Get full overall academic statistics for a profile and optional period/subject.")]
+    #[tool(
+        description = "Get full overall academic statistics for a profile and optional period/subject."
+    )]
     pub async fn get_overall_statistics(
         &self,
         Parameters(args): Parameters<StatsPeriodArgs>,
@@ -473,7 +485,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Get Kanban task completion, active, overdue, and weekly/monthly dynamics statistics.")]
+    #[tool(
+        description = "Get Kanban task completion, active, overdue, and weekly/monthly dynamics statistics."
+    )]
     pub async fn get_task_statistics(
         &self,
         Parameters(args): Parameters<StatsPeriodArgs>,
@@ -516,7 +530,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Compare academic performance, absences, and completed tasks across two date periods.")]
+    #[tool(
+        description = "Compare academic performance, absences, and completed tasks across two date periods."
+    )]
     pub async fn compare_periods(
         &self,
         Parameters(args): Parameters<ComparePeriodsArgs>,
@@ -546,7 +562,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "List all subjects whose current average is below their configured target average.")]
+    #[tool(
+        description = "List all subjects whose current average is below their configured target average."
+    )]
     pub async fn get_subjects_below_target(
         &self,
         Parameters(args): Parameters<StatsPeriodArgs>,
@@ -579,7 +597,8 @@ impl OxidiumMcpServer {
 }
 
 impl OxidiumMcpServer {
-    pub(crate) fn build_journal_stats_router() -> rmcp::handler::server::router::tool::ToolRouter<Self> {
+    pub(crate) fn build_journal_stats_router()
+    -> rmcp::handler::server::router::tool::ToolRouter<Self> {
         Self::journal_stats_router()
     }
 }

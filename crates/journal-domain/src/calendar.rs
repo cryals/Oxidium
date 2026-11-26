@@ -101,10 +101,8 @@ pub fn build_date_days(
     if start > end {
         return Vec::new();
     }
-    let holiday_map: HashMap<NaiveDate, String> = holidays
-        .iter()
-        .map(|h| (h.date, h.name.clone()))
-        .collect();
+    let holiday_map: HashMap<NaiveDate, String> =
+        holidays.iter().map(|h| (h.date, h.name.clone())).collect();
 
     let total_days = (end - start).num_days() as usize + 1;
     let mut days = Vec::with_capacity(total_days);

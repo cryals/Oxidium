@@ -49,7 +49,8 @@ impl TokenStore {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&self.secret_path, std::fs::Permissions::from_mode(0o600));
+            let _ =
+                std::fs::set_permissions(&self.secret_path, std::fs::Permissions::from_mode(0o600));
         }
         Ok(token)
     }
@@ -94,10 +95,7 @@ pub fn redact_secrets(input: &str) -> String {
     while let Some(pos) = rest.find("oxd_") {
         out.push_str(&rest[..pos]);
         let after = &rest[pos + 4..];
-        let hex_len = after
-            .bytes()
-            .take_while(|b| b.is_ascii_hexdigit())
-            .count();
+        let hex_len = after.bytes().take_while(|b| b.is_ascii_hexdigit()).count();
         if hex_len >= 16 {
             out.push_str("[REDACTED_TOKEN]");
             rest = &after[hex_len..];

@@ -417,7 +417,14 @@ impl AppServices {
             .set_name("Grades")
             .map_err(|e| AppError::Xlsx(e.to_string()))?;
         for (col, hdr) in [
-            "Date", "Subject", "Mark", "Numeric", "Weight", "Work Type", "Topic", "Comment",
+            "Date",
+            "Subject",
+            "Mark",
+            "Numeric",
+            "Weight",
+            "Work Type",
+            "Topic",
+            "Comment",
         ]
         .iter()
         .enumerate()
@@ -427,7 +434,10 @@ impl AppServices {
         }
         for (row, g) in grades.iter().enumerate() {
             let r = (row + 1) as u32;
-            let sname = subj_map.get(&g.subject_id).map(String::as_str).unwrap_or("");
+            let sname = subj_map
+                .get(&g.subject_id)
+                .map(String::as_str)
+                .unwrap_or("");
             ws_g.write_string(r, 0, g.date.format("%Y-%m-%d").to_string())
                 .map_err(|e| AppError::Xlsx(e.to_string()))?;
             ws_g.write_string(r, 1, sname)
@@ -464,7 +474,10 @@ impl AppServices {
         }
         for (row, a) in attendance.iter().enumerate() {
             let r = (row + 1) as u32;
-            let sname = subj_map.get(&a.subject_id).map(String::as_str).unwrap_or("");
+            let sname = subj_map
+                .get(&a.subject_id)
+                .map(String::as_str)
+                .unwrap_or("");
             ws_a.write_string(r, 0, a.date.format("%Y-%m-%d").to_string())
                 .map_err(|e| AppError::Xlsx(e.to_string()))?;
             ws_a.write_string(r, 1, sname)
@@ -528,12 +541,8 @@ impl AppServices {
                 .map_err(|e| AppError::Xlsx(e.to_string()))?;
             ws_t.write_string(r, 2, t.priority.as_str())
                 .map_err(|e| AppError::Xlsx(e.to_string()))?;
-            ws_t.write_string(
-                r,
-                3,
-                t.due_at.map(|d| d.to_rfc3339()).unwrap_or_default(),
-            )
-            .map_err(|e| AppError::Xlsx(e.to_string()))?;
+            ws_t.write_string(r, 3, t.due_at.map(|d| d.to_rfc3339()).unwrap_or_default())
+                .map_err(|e| AppError::Xlsx(e.to_string()))?;
             ws_t.write_string(
                 r,
                 4,
@@ -572,7 +581,11 @@ impl AppServices {
         for s in &stats.subject_stats {
             md.push_str(&format!(
                 "| {} | {} | {} | {} | {} |\n",
-                s.subject_name, s.average_formatted, s.numeric_grade_count, s.absences, s.excused_absences
+                s.subject_name,
+                s.average_formatted,
+                s.numeric_grade_count,
+                s.absences,
+                s.excused_absences
             ));
         }
         md.push_str("\n## Active Tasks\n\n");
@@ -738,7 +751,15 @@ impl AppServices {
             if !dry_run {
                 let weight = weight_str.parse::<Decimal>().unwrap_or(Decimal::ONE);
                 let wt = WorkType::parse(wt_str).unwrap_or(WorkType::Other);
-                pending.push((date, subj_name.to_string(), mark.to_string(), weight, wt, topic, comment));
+                pending.push((
+                    date,
+                    subj_name.to_string(),
+                    mark.to_string(),
+                    weight,
+                    wt,
+                    topic,
+                    comment,
+                ));
             }
         }
 
@@ -863,7 +884,10 @@ impl AppServices {
         std::fs::create_dir_all(&backups_dir)?;
         let now = Utc::now();
         let zip_path = dest_zip.unwrap_or_else(|| {
-            backups_dir.join(format!("oxidium-backup-{}.zip", now.format("%Y%m%d-%H%M%S")))
+            backups_dir.join(format!(
+                "oxidium-backup-{}.zip",
+                now.format("%Y%m%d-%H%M%S")
+            ))
         });
 
         let temp_db = backups_dir.join(format!(".snapshot-{}.db", Uuid::new_v4()));
@@ -909,8 +933,8 @@ impl AppServices {
         std::fs::create_dir_all(&backups_dir)?;
 
         let file = std::fs::File::open(zip_path)?;
-        let mut archive =
-            zip::ZipArchive::new(file).map_err(|e| AppError::Backup(format!("invalid zip: {e}")))?;
+        let mut archive = zip::ZipArchive::new(file)
+            .map_err(|e| AppError::Backup(format!("invalid zip: {e}")))?;
         let mut db_entry = archive
             .by_name("oxidium.db")
             .map_err(|_| AppError::Backup("backup archive missing oxidium.db".into()))?;
@@ -928,7 +952,8 @@ impl AppServices {
         let _ = std::fs::remove_file(&temp_restore);
         res?;
         self.invalidate_stats_cache();
-        self.sync.notify_local_change(RecordSource::Import, "restore");
+        self.sync
+            .notify_local_change(RecordSource::Import, "restore");
         Ok(())
     }
 

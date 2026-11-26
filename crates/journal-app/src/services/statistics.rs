@@ -173,12 +173,9 @@ impl AppServices {
                 .collect()
         };
 
-        let raw_att = self.db.list_attendance(
-            filter.profile_id,
-            None,
-            filter.from_date,
-            filter.to_date,
-        )?;
+        let raw_att =
+            self.db
+                .list_attendance(filter.profile_id, None, filter.from_date, filter.to_date)?;
         let attendance: Vec<_> = if filter.subject_ids.is_empty() {
             raw_att
         } else {
@@ -377,7 +374,8 @@ impl AppServices {
             if let Some(done_at) = t.completed_at {
                 completed_tasks += 1;
                 let d = done_at.date_naive();
-                if filter.from_date.is_none_or(|f| d >= f) && filter.to_date.is_none_or(|to| d <= to)
+                if filter.from_date.is_none_or(|f| d >= f)
+                    && filter.to_date.is_none_or(|to| d <= to)
                 {
                     heat.entry(d).or_insert((0, 0, 0)).2 += 1;
                 }
@@ -395,7 +393,8 @@ impl AppServices {
             }
             if let Some(due) = t.due_at {
                 let d = due.date_naive();
-                if filter.from_date.is_none_or(|f| d >= f) && filter.to_date.is_none_or(|to| d <= to)
+                if filter.from_date.is_none_or(|f| d >= f)
+                    && filter.to_date.is_none_or(|to| d <= to)
                 {
                     heat.entry(d).or_insert((0, 0, 0)).2 += 1;
                 }
@@ -507,9 +506,12 @@ impl AppServices {
             None,
             None,
         )?;
-        let a1 = self
-            .db
-            .list_attendance(profile_id, subject_id, Some(baseline_from), Some(baseline_to))?;
+        let a1 = self.db.list_attendance(
+            profile_id,
+            subject_id,
+            Some(baseline_from),
+            Some(baseline_to),
+        )?;
         let a2 = self.db.list_attendance(
             profile_id,
             subject_id,
@@ -601,14 +603,7 @@ impl AppServices {
         let settings = self.db.load_settings()?;
         let mode = mode_override.unwrap_or(settings.average_mode);
         let grades = self.db.list_grades(
-            profile_id,
-            subject_id,
-            from_date,
-            to_date,
-            None,
-            None,
-            None,
-            None,
+            profile_id, subject_id, from_date, to_date, None, None, None, None,
         )?;
         let current = extract_countable_samples(&grades);
         Ok(forecast_after_grades(&current, hypothetical, mode))
@@ -631,14 +626,7 @@ impl AppServices {
         let settings = self.db.load_settings()?;
         let mode = mode_override.unwrap_or(settings.average_mode);
         let grades = self.db.list_grades(
-            profile_id,
-            subject_id,
-            from_date,
-            to_date,
-            None,
-            None,
-            None,
-            None,
+            profile_id, subject_id, from_date, to_date, None, None, None, None,
         )?;
         let current = extract_countable_samples(&grades);
         Ok(grades_needed_for_target(

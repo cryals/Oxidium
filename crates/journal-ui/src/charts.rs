@@ -34,9 +34,13 @@ impl Canvas {
 
     fn draw_line(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, thickness: f32, color: [u8; 4]) {
         let min_x = (x0.min(x1) - thickness - 2.0).floor().max(0.0) as i32;
-        let max_x = (x0.max(x1) + thickness + 2.0).ceil().min(self.w as f32 - 1.0) as i32;
+        let max_x = (x0.max(x1) + thickness + 2.0)
+            .ceil()
+            .min(self.w as f32 - 1.0) as i32;
         let min_y = (y0.min(y1) - thickness - 2.0).floor().max(0.0) as i32;
-        let max_y = (y0.max(y1) + thickness + 2.0).ceil().min(self.h as f32 - 1.0) as i32;
+        let max_y = (y0.max(y1) + thickness + 2.0)
+            .ceil()
+            .min(self.h as f32 - 1.0) as i32;
         let dx = x1 - x0;
         let dy = y1 - y0;
         let len_sq = (dx * dx + dy * dy).max(1e-6);
@@ -75,8 +79,11 @@ impl Canvas {
     }
 
     fn into_image(self) -> Image {
-        let pixel_buf =
-            SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&self.buf, self.w as u32, self.h as u32);
+        let pixel_buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+            &self.buf,
+            self.w as u32,
+            self.h as u32,
+        );
         Image::from_rgba8(pixel_buf)
     }
 }
@@ -241,7 +248,12 @@ pub fn render_donut_chart(segments: &[(usize, [u8; 3])], size: usize, dark_mode:
             }
             for &(a0, a1, rgb) in &ranges {
                 if angle >= a0 && angle <= a1 {
-                    canvas.blend_pixel(x as i32, y as i32, [rgb[0], rgb[1], rgb[2], 255], radial_cov);
+                    canvas.blend_pixel(
+                        x as i32,
+                        y as i32,
+                        [rgb[0], rgb[1], rgb[2], 255],
+                        radial_cov,
+                    );
                     break;
                 }
             }

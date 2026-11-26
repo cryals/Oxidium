@@ -249,7 +249,11 @@ fn grades_statistics_forecast_undo_and_honest_attendance() {
         .unwrap();
     assert_eq!(mcp_logs.len(), 1);
     assert!(app.undo_activity_entry(mcp_logs[0].id).unwrap());
-    assert!(app.list_attendance(p.id, None, None, None).unwrap().is_empty());
+    assert!(
+        app.list_attendance(p.id, None, None, None)
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -276,8 +280,12 @@ fn kanban_tags_reminders_export_import_backup_and_secrets() {
         .unwrap();
 
     // Case-insensitive tag deduplication
-    let t1 = app.get_or_create_tag(p.id, "Лабораторная", None, RecordSource::Gui).unwrap();
-    let t2 = app.get_or_create_tag(p.id, "лабораторная", None, RecordSource::Mcp).unwrap();
+    let t1 = app
+        .get_or_create_tag(p.id, "Лабораторная", None, RecordSource::Gui)
+        .unwrap();
+    let t2 = app
+        .get_or_create_tag(p.id, "лабораторная", None, RecordSource::Mcp)
+        .unwrap();
     assert_eq!(t1.id, t2.id);
 
     // Create task with due reminder already due -> triggers notification
@@ -335,7 +343,8 @@ fn kanban_tags_reminders_export_import_backup_and_secrets() {
             None,
         )
         .unwrap();
-    app.link_task_grade(task.id, grade.id, RecordSource::Gui).unwrap();
+    app.link_task_grade(task.id, grade.id, RecordSource::Gui)
+        .unwrap();
     let done = app.complete_task(task.id, RecordSource::Gui, None).unwrap();
     assert!(done.is_completed());
     assert_eq!(done.linked_grade_ids, vec![grade.id]);
@@ -350,7 +359,11 @@ fn kanban_tags_reminders_export_import_backup_and_secrets() {
     app.export_profile_xlsx(p.id, &xlsx_path).unwrap();
     app.export_profile_markdown(p.id, &md_path).unwrap();
     assert!(xlsx_path.metadata().unwrap().len() > 1000);
-    assert!(std::fs::read_to_string(&md_path).unwrap().contains("Базы данных"));
+    assert!(
+        std::fs::read_to_string(&md_path)
+            .unwrap()
+            .contains("Базы данных")
+    );
 
     // Preview & Import JSON into a second profile
     let preview = app.preview_json_import(&json_path).unwrap();
@@ -371,9 +384,18 @@ fn kanban_tags_reminders_export_import_backup_and_secrets() {
     let backup = app.create_backup_archive(None).unwrap();
     assert!(backup.path.exists());
     app.delete_grade(grade.id, RecordSource::Gui, None).unwrap();
-    assert!(app.list_grades(p.id, None, None, None, None, None, None, None).unwrap().is_empty());
+    assert!(
+        app.list_grades(p.id, None, None, None, None, None, None, None)
+            .unwrap()
+            .is_empty()
+    );
     app.restore_from_backup_archive(&backup.path).unwrap();
-    assert_eq!(app.list_grades(p.id, None, None, None, None, None, None, None).unwrap().len(), 1);
+    assert_eq!(
+        app.list_grades(p.id, None, None, None, None, None, None, None)
+            .unwrap()
+            .len(),
+        1
+    );
 
     // Secret token management & redaction
     let tok = app.tokens.load_or_create().unwrap();

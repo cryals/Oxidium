@@ -7,15 +7,36 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum UndoCommand {
-    GradeAdded { grade: GradeEntry },
-    GradeUpdated { before: GradeEntry, after: GradeEntry },
-    GradeDeleted { grade: GradeEntry },
-    AttendanceAdded { entry: AttendanceEntry },
-    AttendanceDeleted { entry: AttendanceEntry },
-    TaskCreated { task: Task },
-    TaskUpdated { before: Task, after: Task },
-    TaskDeleted { task: Task },
-    BatchGradesAdded { grade_ids: Vec<Uuid>, grades: Vec<GradeEntry> },
+    GradeAdded {
+        grade: GradeEntry,
+    },
+    GradeUpdated {
+        before: GradeEntry,
+        after: GradeEntry,
+    },
+    GradeDeleted {
+        grade: GradeEntry,
+    },
+    AttendanceAdded {
+        entry: AttendanceEntry,
+    },
+    AttendanceDeleted {
+        entry: AttendanceEntry,
+    },
+    TaskCreated {
+        task: Task,
+    },
+    TaskUpdated {
+        before: Task,
+        after: Task,
+    },
+    TaskDeleted {
+        task: Task,
+    },
+    BatchGradesAdded {
+        grade_ids: Vec<Uuid>,
+        grades: Vec<GradeEntry>,
+    },
 }
 
 pub struct UndoStack {

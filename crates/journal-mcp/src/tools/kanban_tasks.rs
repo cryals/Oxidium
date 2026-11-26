@@ -388,7 +388,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Update a Kanban column's properties (name, color, WIP limit, completion flag).")]
+    #[tool(
+        description = "Update a Kanban column's properties (name, color, WIP limit, completion flag)."
+    )]
     pub async fn update_column(
         &self,
         Parameters(args): Parameters<UpdateColumnArgs>,
@@ -472,7 +474,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "List Kanban tasks with optional board, column, subject, and archive filters.")]
+    #[tool(
+        description = "List Kanban tasks with optional board, column, subject, and archive filters."
+    )]
     pub async fn list_tasks(&self, Parameters(args): Parameters<ListTasksArgs>) -> CallToolResult {
         run_tool(
             &self.app,
@@ -505,7 +509,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Get full task details including tags, badges, checklist, and linked grades.")]
+    #[tool(
+        description = "Get full task details including tags, badges, checklist, and linked grades."
+    )]
     pub async fn get_task(&self, Parameters(args): Parameters<TaskIdArgs>) -> CallToolResult {
         run_tool(
             &self.app,
@@ -521,7 +527,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Create a new academic Kanban task with optional subject, priority, deadline, tags, badges, and checklist.")]
+    #[tool(
+        description = "Create a new academic Kanban task with optional subject, priority, deadline, tags, badges, and checklist."
+    )]
     pub async fn create_task(
         &self,
         Parameters(args): Parameters<CreateTaskArgs>,
@@ -543,7 +551,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Atomically create multiple Kanban tasks in a single request. Supports idempotency_key.")]
+    #[tool(
+        description = "Atomically create multiple Kanban tasks in a single request. Supports idempotency_key."
+    )]
     pub async fn create_tasks_batch(
         &self,
         Parameters(args): Parameters<CreateTasksBatchArgs>,
@@ -568,7 +578,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Update an existing Kanban task's fields (title, description, priority, deadline, subject, notes).")]
+    #[tool(
+        description = "Update an existing Kanban task's fields (title, description, priority, deadline, subject, notes)."
+    )]
     pub async fn update_task(
         &self,
         Parameters(args): Parameters<UpdateTaskArgs>,
@@ -601,7 +613,9 @@ impl OxidiumMcpServer {
                 let prio = args
                     .priority
                     .as_deref()
-                    .map(|s| TaskPriority::parse(s).ok_or_else(|| format!("invalid priority: '{s}'")))
+                    .map(|s| {
+                        TaskPriority::parse(s).ok_or_else(|| format!("invalid priority: '{s}'"))
+                    })
                     .transpose()?;
                 let due = args
                     .deadline
@@ -728,7 +742,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Permanently delete a Kanban task (requires Destructive permission enabled).")]
+    #[tool(
+        description = "Permanently delete a Kanban task (requires Destructive permission enabled)."
+    )]
     pub async fn delete_task(&self, Parameters(args): Parameters<TaskIdArgs>) -> CallToolResult {
         run_tool(
             &self.app,
@@ -808,7 +824,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Search tasks in a profile by title, description, notes, tags, or badges.")]
+    #[tool(
+        description = "Search tasks in a profile by title, description, notes, tags, or badges."
+    )]
     pub async fn search_tasks(
         &self,
         Parameters(args): Parameters<SearchTasksArgs>,
@@ -831,7 +849,8 @@ impl OxidiumMcpServer {
 }
 
 impl OxidiumMcpServer {
-    pub(crate) fn build_kanban_tasks_router() -> rmcp::handler::server::router::tool::ToolRouter<Self> {
+    pub(crate) fn build_kanban_tasks_router()
+    -> rmcp::handler::server::router::tool::ToolRouter<Self> {
         Self::kanban_tasks_router()
     }
 }

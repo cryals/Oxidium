@@ -114,7 +114,11 @@ impl Database {
         if trimmed.is_empty() {
             return Ok(Vec::new());
         }
-        let limit = if filter.limit == 0 { 50 } else { filter.limit.min(200) };
+        let limit = if filter.limit == 0 {
+            50
+        } else {
+            filter.limit.min(200)
+        };
 
         // Construct safe FTS5 prefix query from alphanumeric/Unicode tokens
         let tokens: Vec<String> = trimmed
@@ -176,7 +180,8 @@ impl Database {
                     let Some(entity_type) = SearchEntityType::parse(&et) else {
                         continue;
                     };
-                    if !filter.entity_types.is_empty() && !filter.entity_types.contains(&entity_type)
+                    if !filter.entity_types.is_empty()
+                        && !filter.entity_types.contains(&entity_type)
                     {
                         continue;
                     }

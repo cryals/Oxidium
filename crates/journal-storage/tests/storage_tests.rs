@@ -1,8 +1,8 @@
 use chrono::{NaiveDate, Utc};
 use journal_domain::{
-    AttendanceEntry, AttendanceStatus, Board, ChecklistItem, GradeEntry, KanbanColumn, MarkCategory,
-    Profile, RecordSource, SearchEntityType, Subject, Tag, Task, TaskPriority, WorkType,
-    builtin_marks,
+    AttendanceEntry, AttendanceStatus, Board, ChecklistItem, GradeEntry, KanbanColumn,
+    MarkCategory, Profile, RecordSource, SearchEntityType, Subject, Tag, Task, TaskPriority,
+    WorkType, builtin_marks,
 };
 use journal_storage::{Database, SearchFilter};
 use rust_decimal::Decimal;
@@ -166,7 +166,11 @@ fn kanban_hydration_and_attendance_independence() {
     };
     db.insert_attendance(&att).unwrap();
     assert_eq!(db.list_attendance(p.id, None, None, None).unwrap().len(), 1);
-    assert!(db.list_grades(p.id, None, None, None, None, None, None, None).unwrap().is_empty());
+    assert!(
+        db.list_grades(p.id, None, None, None, None, None, None, None)
+            .unwrap()
+            .is_empty()
+    );
 
     let board = Board {
         id: Uuid::new_v4(),
@@ -204,7 +208,11 @@ fn kanban_hydration_and_attendance_independence() {
         description: String::new(),
     };
     db.insert_tag(&tag, RecordSource::Gui).unwrap();
-    assert!(db.find_tag_by_name(p.id, "  лабораторная ").unwrap().is_some());
+    assert!(
+        db.find_tag_by_name(p.id, "  лабораторная ")
+            .unwrap()
+            .is_some()
+    );
 
     let task = Task {
         id: Uuid::new_v4(),

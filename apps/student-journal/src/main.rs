@@ -1,4 +1,7 @@
-#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 use anyhow::Result;
 use journal_app::AppServices;
@@ -49,11 +52,7 @@ fn main() -> Result<()> {
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("warn,journal_app=info,journal_mcp=info")),
         )
-        .with(
-            fmt::layer()
-                .with_writer(std::io::stderr)
-                .with_ansi(false),
-        )
+        .with(fmt::layer().with_writer(std::io::stderr).with_ansi(false))
         .init();
 
     match parse_cli() {
@@ -70,9 +69,7 @@ fn main() -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(journal_mcp::run_stdio_server(app))
         }
-        CliMode::RenderScreenshots { out_dir } => {
-            journal_ui::render_screenshots_headless(&out_dir)
-        }
+        CliMode::RenderScreenshots { out_dir } => journal_ui::render_screenshots_headless(&out_dir),
         CliMode::Gui { db_path } => {
             let db = db_path.unwrap_or_else(AppServices::default_db_path);
             let app = AppServices::open_file(&db)?;

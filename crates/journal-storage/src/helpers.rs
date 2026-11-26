@@ -54,8 +54,7 @@ pub fn parse_opt_time(s: Option<String>) -> StorageResult<Option<NaiveTime>> {
 }
 
 pub fn parse_decimal(s: &str) -> StorageResult<Decimal> {
-    Decimal::from_str(s)
-        .map_err(|e| StorageError::DataParse(format!("invalid decimal '{s}': {e}")))
+    Decimal::from_str(s).map_err(|e| StorageError::DataParse(format!("invalid decimal '{s}': {e}")))
 }
 
 pub fn parse_opt_decimal(s: Option<String>) -> StorageResult<Option<Decimal>> {

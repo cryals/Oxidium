@@ -63,10 +63,7 @@ pub struct ChecklistItemIdArgs {
 #[tool_router(router = tags_checklists_router)]
 impl OxidiumMcpServer {
     #[tool(description = "List all tags in a profile.")]
-    pub async fn list_tags(
-        &self,
-        Parameters(args): Parameters<ProfileOnlyArgs>,
-    ) -> CallToolResult {
+    pub async fn list_tags(&self, Parameters(args): Parameters<ProfileOnlyArgs>) -> CallToolResult {
         run_tool(
             &self.app,
             &self.metrics,
@@ -81,7 +78,9 @@ impl OxidiumMcpServer {
         )
     }
 
-    #[tool(description = "Create a tag (returns existing tag case-insensitively to prevent duplicates).")]
+    #[tool(
+        description = "Create a tag (returns existing tag case-insensitively to prevent duplicates)."
+    )]
     pub async fn create_tag(
         &self,
         Parameters(args): Parameters<CreateTagOrBadgeArgs>,
@@ -226,7 +225,9 @@ impl OxidiumMcpServer {
                 self.app
                     .assign_badge(task_id, badge_id, RecordSource::Mcp)
                     .map_err(|e| e.to_string())?;
-                Ok(serde_json::json!({ "assigned": true, "task_id": task_id, "badge_id": badge_id }))
+                Ok(
+                    serde_json::json!({ "assigned": true, "task_id": task_id, "badge_id": badge_id }),
+                )
             },
         )
     }
@@ -330,7 +331,8 @@ impl OxidiumMcpServer {
 }
 
 impl OxidiumMcpServer {
-    pub(crate) fn build_tags_checklists_router() -> rmcp::handler::server::router::tool::ToolRouter<Self> {
+    pub(crate) fn build_tags_checklists_router()
+    -> rmcp::handler::server::router::tool::ToolRouter<Self> {
         Self::tags_checklists_router()
     }
 }

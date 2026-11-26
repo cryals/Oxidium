@@ -39,7 +39,10 @@ impl AppServices {
             && !env_path.trim().is_empty()
         {
             let p = PathBuf::from(env_path);
-            return p.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
+            return p
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."));
         }
         ProjectDirs::from("io", "oxidium", "Oxidium")
             .map(|d| d.data_local_dir().to_path_buf())
@@ -150,17 +153,17 @@ impl AppServices {
     }
 
     pub fn set_active_profile(&self, profile_id: Uuid) -> AppResult<Profile> {
-        let profile = self
-            .db
-            .get_profile(profile_id)?
-            .ok_or_else(|| journal_domain::DomainError::NotFound {
+        let profile = self.db.get_profile(profile_id)?.ok_or_else(|| {
+            journal_domain::DomainError::NotFound {
                 entity: "profile".into(),
                 id: profile_id.to_string(),
-            })?;
+            }
+        })?;
         let mut settings = self.db.load_settings()?;
         settings.active_profile_id = Some(profile.id);
         self.db.save_settings(&settings, RecordSource::Gui)?;
-        self.sync.notify_local_change(RecordSource::Gui, "active_profile");
+        self.sync
+            .notify_local_change(RecordSource::Gui, "active_profile");
         Ok(profile)
     }
 

@@ -64,7 +64,12 @@ pub fn build_http_router(
     let factory_metrics = Arc::clone(&metrics);
     let http_service: StreamableHttpService<OxidiumMcpServer, LocalSessionManager> =
         StreamableHttpService::new(
-            move || Ok(OxidiumMcpServer::new(Arc::clone(&factory_app), Arc::clone(&factory_metrics))),
+            move || {
+                Ok(OxidiumMcpServer::new(
+                    Arc::clone(&factory_app),
+                    Arc::clone(&factory_metrics),
+                ))
+            },
             Arc::new(LocalSessionManager::default()),
             config,
         );

@@ -8,11 +8,8 @@ fn main() {
     println!("cargo:rerun-if-changed=../../assets/fonts");
     println!("cargo:rerun-if-changed=../../assets/icons");
 
-    let config = slint_build::CompilerConfiguration::new().with_library_paths(HashMap::from([(
-        "material".to_string(),
-        material_path,
-    )]));
+    let config = slint_build::CompilerConfiguration::new()
+        .with_library_paths(HashMap::from([("material".to_string(), material_path)]));
 
-    slint_build::compile_with_config("ui/main.slint", config)
-        .expect("Slint compilation failed");
+    slint_build::compile_with_config("ui/main.slint", config).expect("Slint compilation failed");
 }

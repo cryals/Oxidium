@@ -1,10 +1,9 @@
 use chrono::{NaiveDate, NaiveTime, Utc};
 use journal_domain::{
     AttendanceEntry, AttendanceStatus, AverageMode, CalendarDay, DomainError, GradeEntry,
-    MarkCategory, MarkType, RecordSource, Subject, WorkType, build_date_days,
-    build_month_calendar, builtin_marks, calculate_average, format_average, month_bounds,
-    validate_batch_size, validate_optional_text, validate_weight, week_bounds, MAX_TEXT_LEN,
-    MAX_TITLE_LEN,
+    MAX_TEXT_LEN, MAX_TITLE_LEN, MarkCategory, MarkType, RecordSource, Subject, WorkType,
+    build_date_days, build_month_calendar, builtin_marks, calculate_average, format_average,
+    month_bounds, validate_batch_size, validate_optional_text, validate_weight, week_bounds,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -138,9 +137,10 @@ impl AppServices {
         if let Some(ref code) = input.mark_code {
             let needle = code.trim().to_lowercase();
             let all = self.db.list_mark_types(Some(profile_id))?;
-            if let Some(mt) = all.into_iter().find(|m| {
-                m.code.to_lowercase() == needle || m.short_label.to_lowercase() == needle
-            }) {
+            if let Some(mt) = all
+                .into_iter()
+                .find(|m| m.code.to_lowercase() == needle || m.short_label.to_lowercase() == needle)
+            {
                 return Ok(mt);
             }
         }
@@ -194,7 +194,11 @@ impl AppServices {
             numeric_value: mt.numeric_value,
             weight,
             work_type,
-            topic: validate_optional_text("topic", input.topic.as_deref().unwrap_or(""), MAX_TITLE_LEN)?,
+            topic: validate_optional_text(
+                "topic",
+                input.topic.as_deref().unwrap_or(""),
+                MAX_TITLE_LEN,
+            )?,
             comment: validate_optional_text(
                 "comment",
                 input.comment.as_deref().unwrap_or(""),
@@ -224,7 +228,10 @@ impl AppServices {
             "grade",
             Some(entry.id),
             "create",
-            format!("Добавлена отметка «{}» по предмету «{}» ({})", entry.mark_label, subject.name, entry.date),
+            format!(
+                "Добавлена отметка «{}» по предмету «{}» ({})",
+                entry.mark_label, subject.name, entry.date
+            ),
             Some(serde_json::to_value(&undo_cmd)?),
         );
         self.sync.notify_local_change(source, "grade");
@@ -252,7 +259,8 @@ impl AppServices {
                 .into());
             }
             let work_type = input.work_type.unwrap_or(WorkType::ClassAnswer);
-            let weight = validate_weight(input.weight.unwrap_or_else(|| work_type.default_weight()))?;
+            let weight =
+                validate_weight(input.weight.unwrap_or_else(|| work_type.default_weight()))?;
             entries.push(GradeEntry {
                 id: Uuid::new_v4(),
                 profile_id: input.profile_id,
@@ -459,7 +467,10 @@ impl AppServices {
             "grade",
             Some(existing.id),
             "delete",
-            format!("Удалена отметка «{}» ({})", existing.mark_label, existing.date),
+            format!(
+                "Удалена отметка «{}» ({})",
+                existing.mark_label, existing.date
+            ),
             Some(serde_json::to_value(&undo_cmd)?),
         );
         self.sync.notify_local_change(source, "grade");
@@ -467,13 +478,13 @@ impl AppServices {
     }
 
     pub fn get_grade(&self, id: Uuid) -> AppResult<GradeEntry> {
-        self.db
-            .get_grade(id)?
-            .ok_or_else(|| DomainError::NotFound {
+        self.db.get_grade(id)?.ok_or_else(|| {
+            DomainError::NotFound {
                 entity: "grade".into(),
                 id: id.to_string(),
             }
-            .into())
+            .into()
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -504,7 +515,11 @@ impl AppServices {
     // Attendance
     // ========================================================================
 
-    fn mark_type_for_attendance(&self, profile_id: Uuid, status: &AttendanceStatus) -> AppResult<Uuid> {
+    fn mark_type_for_attendance(
+        &self,
+        profile_id: Uuid,
+        status: &AttendanceStatus,
+    ) -> AppResult<Uuid> {
         match status {
             AttendanceStatus::Absent => Ok(builtin_marks::ABSENT_ID),
             AttendanceStatus::Excused => Ok(builtin_marks::EXCUSED_ID),
@@ -735,11 +750,17 @@ impl AppServices {
 
         let mut grades_by_subject: HashMap<Uuid, Vec<GradeEntry>> = HashMap::new();
         for g in &grades {
-            grades_by_subject.entry(g.subject_id).or_default().push(g.clone());
+            grades_by_subject
+                .entry(g.subject_id)
+                .or_default()
+                .push(g.clone());
         }
         let mut att_by_subject: HashMap<Uuid, Vec<AttendanceEntry>> = HashMap::new();
         for a in &attendance {
-            att_by_subject.entry(a.subject_id).or_default().push(a.clone());
+            att_by_subject
+                .entry(a.subject_id)
+                .or_default()
+                .push(a.clone());
         }
 
         let mut rows = Vec::with_capacity(subjects.len());

@@ -1,8 +1,8 @@
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use journal_domain::{
-    Badge, Board, ChecklistItem, DomainError, KanbanColumn, RecordSource, Reminder, ReminderOffset,
-    Tag, Task, TaskPriority, validate_batch_size, validate_hex_color, validate_non_empty,
-    validate_optional_text, MAX_TEXT_LEN, MAX_TITLE_LEN,
+    Badge, Board, ChecklistItem, DomainError, KanbanColumn, MAX_TEXT_LEN, MAX_TITLE_LEN,
+    RecordSource, Reminder, ReminderOffset, Tag, Task, TaskPriority, validate_batch_size,
+    validate_hex_color, validate_non_empty, validate_optional_text,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -93,13 +93,13 @@ impl AppServices {
     }
 
     pub fn get_board(&self, board_id: Uuid) -> AppResult<Board> {
-        self.db
-            .get_board(board_id)?
-            .ok_or_else(|| DomainError::NotFound {
+        self.db.get_board(board_id)?.ok_or_else(|| {
+            DomainError::NotFound {
                 entity: "board".into(),
                 id: board_id.to_string(),
             }
-            .into())
+            .into()
+        })
     }
 
     pub fn create_board(
@@ -132,8 +132,14 @@ impl AppServices {
         self.db.insert_board(&board, source)?;
 
         if input.with_default_columns.unwrap_or(true) {
-            let lang = self.db.load_settings().map(|s| s.language).unwrap_or_default();
-            for (idx, (cname, ccolor, done)) in i18n::default_column_names(lang).into_iter().enumerate() {
+            let lang = self
+                .db
+                .load_settings()
+                .map(|s| s.language)
+                .unwrap_or_default();
+            for (idx, (cname, ccolor, done)) in
+                i18n::default_column_names(lang).into_iter().enumerate()
+            {
                 let col = KanbanColumn {
                     id: Uuid::new_v4(),
                     board_id: board.id,
@@ -418,9 +424,7 @@ impl AppServices {
                 .list_columns(board.id, false)?
                 .into_iter()
                 .next()
-                .ok_or_else(|| {
-                    DomainError::InvalidState("board has no active columns".into())
-                })?,
+                .ok_or_else(|| DomainError::InvalidState("board has no active columns".into()))?,
         };
         Ok((board, col))
     }
@@ -488,9 +492,9 @@ impl AppServices {
             }
 
             let task_id = Uuid::new_v4();
-            let existing = self
-                .db
-                .list_tasks(input.profile_id, Some(board.id), Some(col.id), None, false)?;
+            let existing =
+                self.db
+                    .list_tasks(input.profile_id, Some(board.id), Some(col.id), None, false)?;
             let next_order =
                 existing.iter().map(|t| t.sort_order).max().unwrap_or(-1) + 1 + built.len() as i32;
 
@@ -596,13 +600,13 @@ impl AppServices {
     }
 
     pub fn get_task(&self, id: Uuid) -> AppResult<Task> {
-        self.db
-            .get_task(id)?
-            .ok_or_else(|| DomainError::NotFound {
+        self.db.get_task(id)?.ok_or_else(|| {
+            DomainError::NotFound {
                 entity: "task".into(),
                 id: id.to_string(),
             }
-            .into())
+            .into()
+        })
     }
 
     pub fn list_tasks(
@@ -613,9 +617,13 @@ impl AppServices {
         subject_id: Option<Uuid>,
         include_archived: bool,
     ) -> AppResult<Vec<Task>> {
-        Ok(self
-            .db
-            .list_tasks(profile_id, board_id, column_id, subject_id, include_archived)?)
+        Ok(self.db.list_tasks(
+            profile_id,
+            board_id,
+            column_id,
+            subject_id,
+            include_archived,
+        )?)
     }
 
     pub fn update_task(
@@ -717,19 +725,16 @@ impl AppServices {
         source: RecordSource,
         audit: Option<&AuditMeta>,
     ) -> AppResult<Task> {
-        let mut col_tasks = self
-            .db
-            .list_tasks(
-                self.get_task(task_id)?.profile_id,
-                None,
-                Some(target_column_id),
-                None,
-                false,
-            )?;
+        let mut col_tasks = self.db.list_tasks(
+            self.get_task(task_id)?.profile_id,
+            None,
+            Some(target_column_id),
+            None,
+            false,
+        )?;
         col_tasks.retain(|t| t.id != task_id);
-        let order = target_order.unwrap_or_else(|| {
-            col_tasks.iter().map(|t| t.sort_order).max().unwrap_or(-1) + 1
-        });
+        let order = target_order
+            .unwrap_or_else(|| col_tasks.iter().map(|t| t.sort_order).max().unwrap_or(-1) + 1);
         let moved = self.update_task(
             task_id,
             UpdateTaskInput {
@@ -790,11 +795,8 @@ impl AppServices {
     ) -> AppResult<Task> {
         let task = self.get_task(task_id)?;
         let cols = self.db.list_columns(task.board_id, false)?;
-        let open_col = target_column_id.or_else(|| {
-            cols.iter()
-                .find(|c| !c.is_completed_column)
-                .map(|c| c.id)
-        });
+        let open_col =
+            target_column_id.or_else(|| cols.iter().find(|c| !c.is_completed_column).map(|c| c.id));
         let mut updated = task.clone();
         if let Some(cid) = open_col {
             updated.column_id = cid;
@@ -884,8 +886,7 @@ impl AppServices {
         let mut out: Vec<Task> = tasks
             .into_iter()
             .filter(|t| {
-                t.completed_at.is_none()
-                    && t.due_at.is_some_and(|d| d >= now && d <= horizon)
+                t.completed_at.is_none() && t.due_at.is_some_and(|d| d >= now && d <= horizon)
             })
             .collect();
         out.sort_by_key(|t| t.due_at);
@@ -904,8 +905,12 @@ impl AppServices {
                 t.title.to_lowercase().contains(&needle)
                     || t.description.to_lowercase().contains(&needle)
                     || t.notes.to_lowercase().contains(&needle)
-                    || t.tags.iter().any(|tg| tg.name.to_lowercase().contains(&needle))
-                    || t.badges.iter().any(|b| b.name.to_lowercase().contains(&needle))
+                    || t.tags
+                        .iter()
+                        .any(|tg| tg.name.to_lowercase().contains(&needle))
+                    || t.badges
+                        .iter()
+                        .any(|b| b.name.to_lowercase().contains(&needle))
             })
             .collect())
     }
@@ -953,13 +958,13 @@ impl AppServices {
         source: RecordSource,
     ) -> AppResult<Tag> {
         let tags = self.db.list_tags(profile_id)?;
-        let mut tag = tags
-            .into_iter()
-            .find(|t| t.id == tag_id)
-            .ok_or_else(|| DomainError::NotFound {
-                entity: "tag".into(),
-                id: tag_id.to_string(),
-            })?;
+        let mut tag =
+            tags.into_iter()
+                .find(|t| t.id == tag_id)
+                .ok_or_else(|| DomainError::NotFound {
+                    entity: "tag".into(),
+                    id: tag_id.to_string(),
+                })?;
         if let Some(n) = name {
             tag.name = validate_non_empty("name", &n, 64)?;
         }
@@ -1074,13 +1079,13 @@ impl AppServices {
         sort_order: Option<i32>,
         source: RecordSource,
     ) -> AppResult<ChecklistItem> {
-        let mut item = self
-            .db
-            .get_checklist_item(item_id)?
-            .ok_or_else(|| DomainError::NotFound {
-                entity: "checklist_item".into(),
-                id: item_id.to_string(),
-            })?;
+        let mut item =
+            self.db
+                .get_checklist_item(item_id)?
+                .ok_or_else(|| DomainError::NotFound {
+                    entity: "checklist_item".into(),
+                    id: item_id.to_string(),
+                })?;
         if let Some(t) = title {
             item.title = validate_non_empty("title", &t, MAX_TITLE_LEN)?;
         }

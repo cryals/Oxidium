@@ -85,19 +85,21 @@ impl Database {
             .optional()?;
         match row {
             None => Ok(None),
-            Some((id, name, icon, color, inst, grp, year, desc, arch, ca, ua)) => Ok(Some(Profile {
-                id: parse_uuid(&id)?,
-                name,
-                icon,
-                color,
-                institution: inst,
-                group_name: grp,
-                academic_year: year,
-                description: desc,
-                is_archived: arch != 0,
-                created_at: parse_dt(&ca)?,
-                updated_at: parse_dt(&ua)?,
-            })),
+            Some((id, name, icon, color, inst, grp, year, desc, arch, ca, ua)) => {
+                Ok(Some(Profile {
+                    id: parse_uuid(&id)?,
+                    name,
+                    icon,
+                    color,
+                    institution: inst,
+                    group_name: grp,
+                    academic_year: year,
+                    description: desc,
+                    is_archived: arch != 0,
+                    created_at: parse_dt(&ca)?,
+                    updated_at: parse_dt(&ua)?,
+                }))
+            }
         }
     }
 
@@ -170,7 +172,10 @@ impl Database {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
         let pid = profile_id.to_string();
-        tx.execute("DELETE FROM search_index WHERE profile_id = ?1", params![pid])?;
+        tx.execute(
+            "DELETE FROM search_index WHERE profile_id = ?1",
+            params![pid],
+        )?;
         tx.execute("DELETE FROM grades WHERE profile_id = ?1", params![pid])?;
         tx.execute("DELETE FROM attendance WHERE profile_id = ?1", params![pid])?;
         tx.execute("DELETE FROM tasks WHERE profile_id = ?1", params![pid])?;
@@ -182,10 +187,16 @@ impl Database {
         tx.execute("DELETE FROM tags WHERE profile_id = ?1", params![pid])?;
         tx.execute("DELETE FROM badges WHERE profile_id = ?1", params![pid])?;
         tx.execute("DELETE FROM subjects WHERE profile_id = ?1", params![pid])?;
-        tx.execute("DELETE FROM academic_periods WHERE profile_id = ?1", params![pid])?;
+        tx.execute(
+            "DELETE FROM academic_periods WHERE profile_id = ?1",
+            params![pid],
+        )?;
         tx.execute("DELETE FROM mark_types WHERE profile_id = ?1", params![pid])?;
         tx.execute("DELETE FROM holidays WHERE profile_id = ?1", params![pid])?;
-        tx.execute("DELETE FROM notifications WHERE profile_id = ?1", params![pid])?;
+        tx.execute(
+            "DELETE FROM notifications WHERE profile_id = ?1",
+            params![pid],
+        )?;
         let changed = tx.execute("DELETE FROM profiles WHERE id = ?1", params![pid])?;
         if changed == 0 {
             return Err(StorageError::Domain(DomainError::NotFound {
@@ -311,7 +322,10 @@ impl Database {
     pub fn delete_academic_period(&self, id: Uuid, source: RecordSource) -> StorageResult<()> {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
-        tx.execute("DELETE FROM academic_periods WHERE id = ?1", params![id.to_string()])?;
+        tx.execute(
+            "DELETE FROM academic_periods WHERE id = ?1",
+            params![id.to_string()],
+        )?;
         bump_sync_revision(&tx, source)?;
         tx.commit()?;
         Ok(())
@@ -370,7 +384,10 @@ impl Database {
     pub fn delete_holiday(&self, id: Uuid, source: RecordSource) -> StorageResult<()> {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
-        tx.execute("DELETE FROM holidays WHERE id = ?1", params![id.to_string()])?;
+        tx.execute(
+            "DELETE FROM holidays WHERE id = ?1",
+            params![id.to_string()],
+        )?;
         bump_sync_revision(&tx, source)?;
         tx.commit()?;
         Ok(())

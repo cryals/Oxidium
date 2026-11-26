@@ -19,7 +19,11 @@ impl Database {
     // Boards & Columns
     // ========================================================================
 
-    pub fn list_boards(&self, profile_id: Uuid, include_archived: bool) -> StorageResult<Vec<Board>> {
+    pub fn list_boards(
+        &self,
+        profile_id: Uuid,
+        include_archived: bool,
+    ) -> StorageResult<Vec<Board>> {
         let conn = self.lock_conn()?;
         let sql = if include_archived {
             "SELECT id, profile_id, name, description, color, sort_order, is_archived, created_at, updated_at
@@ -149,7 +153,11 @@ impl Database {
         Ok(())
     }
 
-    pub fn list_columns(&self, board_id: Uuid, include_archived: bool) -> StorageResult<Vec<KanbanColumn>> {
+    pub fn list_columns(
+        &self,
+        board_id: Uuid,
+        include_archived: bool,
+    ) -> StorageResult<Vec<KanbanColumn>> {
         let conn = self.lock_conn()?;
         let sql = if include_archived {
             "SELECT id, board_id, name, color, sort_order, is_collapsed, is_archived,
@@ -223,19 +231,21 @@ impl Database {
             .optional()?;
         match row {
             None => Ok(None),
-            Some((id, bid, name, color, ord, coll, arch, wip, comp, ca, ua)) => Ok(Some(KanbanColumn {
-                id: parse_uuid(&id)?,
-                board_id: parse_uuid(&bid)?,
-                name,
-                color,
-                sort_order: ord,
-                is_collapsed: coll != 0,
-                is_archived: arch != 0,
-                wip_limit: wip,
-                is_completed_column: comp != 0,
-                created_at: parse_dt(&ca)?,
-                updated_at: parse_dt(&ua)?,
-            })),
+            Some((id, bid, name, color, ord, coll, arch, wip, comp, ca, ua)) => {
+                Ok(Some(KanbanColumn {
+                    id: parse_uuid(&id)?,
+                    board_id: parse_uuid(&bid)?,
+                    name,
+                    color,
+                    sort_order: ord,
+                    is_collapsed: coll != 0,
+                    is_archived: arch != 0,
+                    wip_limit: wip,
+                    is_completed_column: comp != 0,
+                    created_at: parse_dt(&ca)?,
+                    updated_at: parse_dt(&ua)?,
+                }))
+            }
         }
     }
 
@@ -951,7 +961,12 @@ impl Database {
         Ok(())
     }
 
-    pub fn assign_tag(&self, task_id: Uuid, tag_id: Uuid, source: RecordSource) -> StorageResult<()> {
+    pub fn assign_tag(
+        &self,
+        task_id: Uuid,
+        tag_id: Uuid,
+        source: RecordSource,
+    ) -> StorageResult<()> {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
         tx.execute(
@@ -963,7 +978,12 @@ impl Database {
         Ok(())
     }
 
-    pub fn remove_tag(&self, task_id: Uuid, tag_id: Uuid, source: RecordSource) -> StorageResult<()> {
+    pub fn remove_tag(
+        &self,
+        task_id: Uuid,
+        tag_id: Uuid,
+        source: RecordSource,
+    ) -> StorageResult<()> {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
         tx.execute(
