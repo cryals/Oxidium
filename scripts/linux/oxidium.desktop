@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Oxidium
+GenericName=Student Journal
+GenericName[ru]=Электронный журнал ученика
+Comment=Personal local-first student journal with built-in MCP server
+Comment[ru]=Персональный локальный электронный журнал ученика со встроенным MCP-сервером
+Exec=student-journal
+Icon=oxidium
+Terminal=false
+Categories=Education;Office;Utility;
+Keywords=journal;grades;kanban;mcp;student;учёба;журнал;оценки;
+StartupNotify=true
+StartupWMClass=student-journal

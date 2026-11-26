@@ -1,0 +1,113 @@
+name: Oxidium CI & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint-and-audit:
+    name: Format, Clippy, Audit & Deny
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux GUI build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev pkg-config
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Install cargo-audit & cargo-deny
+        run: cargo install --locked cargo-audit cargo-deny
+      - name: Run cargo audit
+        run: cargo audit
+      - name: Run cargo deny
+        run: cargo deny check
+
+  test-windows-x64:
+    name: Build, Test & Package (Windows x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build MCP binary & run full workspace test suite
+        shell: pwsh
+        run: |
+          cargo build -p student-journal-mcp
+          cargo test --workspace
+      - name: Build release binaries
+        shell: pwsh
+        run: cargo build --release --workspace
+      - name: Run release performance benchmark (100k grades + 10k tasks)
+        shell: pwsh
+        run: cargo test --release -p journal-app --test perf_benchmarks -- --include-ignored --nocapture
+      - name: Package Windows portable ZIP, installer, checksums & SBOM
+        shell: pwsh
+        run: pwsh -File scripts/package-windows.ps1
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxidium-windows-x86_64
+          path: dist/*
+
+  test-linux-x64:
+    name: Build, Test & Package (Linux x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev pkg-config dpkg-dev
+      - name: Build MCP binary & run full workspace test suite
+        run: |
+          cargo build -p student-journal-mcp
+          cargo test --workspace
+      - name: Build release binaries
+        run: cargo build --release --workspace
+      - name: Package Linux tar.gz & deb
+        run: bash scripts/package-linux.sh amd64
+      - name: Generate SBOM
+        run: python3 scripts/generate-sbom.py dist/oxidium-linux-x86_64-sbom.cdx.json
+      - name: Upload Linux x86_64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxidium-linux-x86_64
+          path: dist/*
+
+  build-linux-arm64:
+    name: Build & Package (Linux ARM64)
+    runs-on: ubuntu-24.04-arm
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev pkg-config dpkg-dev
+      - name: Build release binaries
+        run: cargo build --release --workspace
+      - name: Package Linux ARM64 tar.gz & deb
+        run: bash scripts/package-linux.sh arm64
+      - name: Upload Linux ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxidium-linux-arm64
+          path: dist/*

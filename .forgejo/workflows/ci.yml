@@ -1,0 +1,34 @@
+name: Oxidium Forgejo CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev pkg-config
+      - name: Format & Clippy
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+      - name: Build MCP binary & Run Tests
+        run: |
+          cargo build -p student-journal-mcp
+          cargo test --workspace
+      - name: Build Release & Package Linux
+        run: |
+          cargo build --release --workspace
+          bash scripts/package-linux.sh amd64
+          python3 scripts/generate-sbom.py dist/oxidium-sbom.cdx.json
