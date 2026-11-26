@@ -5,7 +5,9 @@ members = [
     "crates/journal-storage",
     "crates/journal-app",
     "crates/journal-mcp",
+    "crates/journal-ui",
     "apps/student-journal-mcp",
+    "apps/student-journal",
 ]
 
 [workspace.package]
@@ -14,7 +16,6 @@ edition = "2024"
 rust-version = "1.95"
 license = "MIT"
 repository = "https://github.com/cryals/Oxidium"
-authors = ["Oxidium Contributors"]
 
 [workspace.dependencies]
 journal-domain = { path = "crates/journal-domain" }
@@ -60,7 +61,6 @@ rand = "0.10.4"
 sha2 = "0.11.2"
 subtle = "2.6.1"
 hex = "0.4.3"
-base64 = "0.23.1"
 
 notify-rust = { version = "4.19.0", default-features = false, features = ["z"] }
 tauri-winrt-notification = "0.8.1"

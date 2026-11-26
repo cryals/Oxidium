@@ -1,0 +1,31 @@
+[package]
+name = "journal-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+journal-app.workspace = true
+journal-domain.workspace = true
+journal-mcp.workspace = true
+journal-storage.workspace = true
+png.workspace = true
+rfd.workspace = true
+rust_decimal.workspace = true
+serde_json.workspace = true
+slint.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true
+
+[dev-dependencies]
+i-slint-backend-testing.workspace = true
+tempfile.workspace = true

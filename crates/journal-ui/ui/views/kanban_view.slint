@@ -1,0 +1,828 @@
+import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView } from "@material";
+import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
+import { BoardItem, KanbanColumnModel, KanbanTaskCard, ChecklistRowItem, SubjectItem, UiStrings } from "../types.slint";
+
+export component KanbanView inherits Rectangle {
+    in property <UiStrings> tr;
+    in property <[BoardItem]> boards;
+    in property <string> active_board_id;
+    in property <[KanbanColumnModel]> columns;
+    in property <[SubjectItem]> subjects;
+    in_out property <string> filter_query: "";
+    in_out property <int> filter_mode: 0; // 0=All, 1=Overdue, 2=HighPriority
+
+    // Pointer Drag-and-Drop state
+    in_out property <bool> dragging_task: false;
+    in_out property <string> drag_task_id: "";
+    in_out property <string> drag_task_title: "";
+    in_out property <string> drag_source_col_id: "";
+
+    // Quick create task/column/board dialog states
+    in_out property <bool> new_task_open: false;
+    in_out property <string> new_task_col_id: "";
+    in_out property <string> new_task_title: "";
+    in_out property <string> new_task_desc: "";
+    in_out property <string> new_task_deadline: "";
+    in_out property <int> new_task_priority: 2;
+    in_out property <int> new_task_subject_idx: 0;
+    in_out property <string> new_task_tags: "";
+
+    in_out property <bool> new_column_open: false;
+    in_out property <string> new_column_name: "";
+    in_out property <string> new_column_wip: "";
+    in_out property <bool> new_column_done: false;
+
+    in_out property <bool> new_board_open: false;
+    in_out property <string> new_board_name: "";
+
+    // Task detail drawer state
+    in_out property <bool> detail_open: false;
+    in_out property <string> detail_task_id: "";
+    in_out property <string> detail_title: "";
+    in_out property <string> detail_desc: "";
+    in_out property <string> detail_notes: "";
+    in_out property <string> detail_deadline: "";
+    in_out property <int> detail_priority: 0;
+    in_out property <string> detail_tags_text: "";
+    in_out property <string> detail_new_checklist: "";
+    in_out property <string> detail_new_tag: "";
+    in property <[ChecklistRowItem]> detail_checklist;
+
+    callback select_board(string);
+    callback create_board(string);
+    callback create_column(string, string, bool);
+    callback move_column_delta(string, int);
+    callback toggle_column_collapse(string);
+    callback create_task(string, string, string, string, int, int, string);
+    callback open_task_detail(string);
+    callback save_task_detail(string, string, string, string, string, int);
+    callback move_task_to_column(string, string);
+    callback move_task_step(string, int); // task_id, -1 left / +1 right
+    callback toggle_task_complete(string);
+    callback duplicate_task(string);
+    callback delete_task(string);
+    callback add_checklist_item(string, string);
+    callback toggle_checklist_item(string, bool);
+    callback delete_checklist_item(string);
+    callback add_tag_to_task(string, string);
+    callback filter_changed(string, int);
+
+    background: transparent;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        // Kanban Header & Board Switcher
+        Rectangle {
+            border_radius: 16px;
+            background: MaterialPalette.surface_container_low;
+            border_width: 1px;
+            border_color: OxidiumTheme.cell_border;
+
+            HorizontalLayout {
+                padding: 12px;
+                spacing: 10px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    for b in root.boards : Rectangle {
+                        height: 34px;
+                        border_radius: 17px;
+                        background: b.id == root.active_board_id ? MaterialPalette.primary_container : MaterialPalette.surface;
+                        border_width: 1px;
+                        border_color: b.id == root.active_board_id ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                        HorizontalLayout {
+                            padding_left: 14px;
+                            padding_right: 14px;
+                            Text {
+                                text: b.name;
+                                font_size: 13px;
+                                font_weight: b.id == root.active_board_id ? 600 : 400;
+                                color: b.id == root.active_board_id ? MaterialPalette.on_primary_container : MaterialPalette.on_surface;
+                                vertical_alignment: center;
+                            }
+                        }
+                        TouchArea {
+                            mouse_cursor: pointer;
+                            clicked => { root.select_board(b.id); }
+                        }
+                    }
+
+                    OutlineButton {
+                        text: "+ Доска";
+                        clicked => {
+                            root.new_board_name = "";
+                            root.new_board_open = true;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    // Filter mode chips
+                    for fm[idx] in ["Все", "Просрочено", "Срочные"] : Rectangle {
+                        height: 32px;
+                        border_radius: 16px;
+                        background: root.filter_mode == idx ? MaterialPalette.secondary_container : MaterialPalette.surface;
+                        border_width: 1px;
+                        border_color: MaterialPalette.outline_variant;
+                        HorizontalLayout {
+                            padding_left: 10px;
+                            padding_right: 10px;
+                            Text {
+                                text: fm;
+                                font_size: 11px;
+                                font_weight: root.filter_mode == idx ? 600 : 400;
+                                color: root.filter_mode == idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                vertical_alignment: center;
+                            }
+                        }
+                        TouchArea {
+                            mouse_cursor: pointer;
+                            clicked => {
+                                root.filter_mode = idx;
+                                root.filter_changed(root.filter_query, idx);
+                            }
+                        }
+                    }
+
+                    OutlineButton {
+                        text: root.tr.kanban_new_column;
+                        clicked => {
+                            root.new_column_name = "";
+                            root.new_column_wip = "";
+                            root.new_column_done = false;
+                            root.new_column_open = true;
+                        }
+                    }
+
+                    FilledButton {
+                        text: root.tr.kanban_new_task;
+                        icon: OxidiumIcons.add;
+                        clicked => {
+                            root.new_task_col_id = "";
+                            root.new_task_title = "";
+                            root.new_task_desc = "";
+                            root.new_task_deadline = "";
+                            root.new_task_tags = "";
+                            root.new_task_open = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Dragging Indicator Banner (click any column drop target to complete drag-and-drop)
+        if root.dragging_task : Rectangle {
+            height: 40px;
+            border_radius: 12px;
+            background: MaterialPalette.primary_container;
+            HorizontalLayout {
+                padding_left: 14px;
+                padding_right: 14px;
+                alignment: space-between;
+                Text {
+                    text: "Перемещение задачи «" + root.drag_task_title + "» — нажмите на целевую колонку ниже";
+                    font_size: 13px;
+                    font_weight: 600;
+                    color: MaterialPalette.on_primary_container;
+                    vertical_alignment: center;
+                }
+                TonalButton {
+                    text: "Отмена";
+                    clicked => { root.dragging_task = false; }
+                }
+            }
+        }
+
+        // Horizontal Columns Scroll Area
+        ScrollView {
+            vertical_stretch: 1;
+            viewport_width: max(root.columns.length * 328px + 24px, self.visible_width);
+
+            HorizontalLayout {
+                x: 0px;
+                y: 0px;
+                height: parent.visible_height;
+                spacing: 14px;
+                padding_bottom: 8px;
+                alignment: start;
+
+                for col[c_idx] in root.columns : Rectangle {
+                    width: col.is_collapsed ? 64px : 314px;
+                    vertical_stretch: 1;
+                    border_radius: 18px;
+                    background: MaterialPalette.surface_container_low;
+                    border_width: root.dragging_task && col.id != root.drag_source_col_id ? 2px : 1px;
+                    border_color: root.dragging_task && col.id != root.drag_source_col_id
+                        ? MaterialPalette.primary
+                        : col.over_wip ? OxidiumTheme.danger_color
+                        : OxidiumTheme.cell_border;
+
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+
+                        // Column Header
+                        HorizontalLayout {
+                            spacing: 4px;
+                            alignment: space-between;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                horizontal_stretch: 1;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 10px;
+                                        height: 10px;
+                                        border_radius: 5px;
+                                        background: col.color;
+                                    }
+                                }
+                                if !col.is_collapsed : Text {
+                                    text: col.name;
+                                    font_size: 14px;
+                                    font_weight: 600;
+                                    color: MaterialPalette.on_surface;
+                                    vertical_alignment: center;
+                                    overflow: elide;
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 22px;
+                                        min_width: 26px;
+                                        border_radius: 11px;
+                                        background: col.over_wip ? MaterialPalette.error_container : MaterialPalette.surface_container_highest;
+                                        HorizontalLayout {
+                                            padding_left: 7px;
+                                            padding_right: 7px;
+                                            Text {
+                                                text: col.wip_limit > 0 ? col.task_count + "/" + col.wip_limit : col.task_count;
+                                                font_family: OxidiumTheme.font_mono;
+                                                font_size: 11px;
+                                                font_weight: 700;
+                                                color: col.over_wip ? MaterialPalette.on_error_container : MaterialPalette.on_surface_variant;
+                                                vertical_alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if !col.is_collapsed : HorizontalLayout {
+                                spacing: 2px;
+                                IconButton {
+                                    icon: OxidiumIcons.chevron_left;
+                                    tooltip: "Сдвинуть колонку влево";
+                                    clicked => { root.move_column_delta(col.id, -1); }
+                                }
+                                IconButton {
+                                    icon: OxidiumIcons.chevron_right;
+                                    tooltip: "Сдвинуть колонку вправо";
+                                    clicked => { root.move_column_delta(col.id, 1); }
+                                }
+                                IconButton {
+                                    icon: OxidiumIcons.add;
+                                    tooltip: "Добавить задачу в колонку";
+                                    clicked => {
+                                        root.new_task_col_id = col.id;
+                                        root.new_task_title = "";
+                                        root.new_task_desc = "";
+                                        root.new_task_deadline = "";
+                                        root.new_task_tags = "";
+                                        root.new_task_open = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Drop Zone button when dragging a task
+                        if root.dragging_task && col.id != root.drag_source_col_id && !col.is_collapsed : Rectangle {
+                            height: 36px;
+                            border_radius: 10px;
+                            background: MaterialPalette.primary.with_alpha(18%);
+                            border_width: 1px;
+                            border_color: MaterialPalette.primary;
+                            Text {
+                                text: "Переместить сюда";
+                                font_size: 12px;
+                                font_weight: 600;
+                                color: MaterialPalette.primary;
+                                horizontal_alignment: center;
+                                vertical_alignment: center;
+                            }
+                            TouchArea {
+                                mouse_cursor: pointer;
+                                clicked => {
+                                    root.dragging_task = false;
+                                    root.move_task_to_column(root.drag_task_id, col.id);
+                                }
+                            }
+                        }
+
+                        // Column Task Cards
+                        if !col.is_collapsed : ScrollView {
+                            vertical_stretch: 1;
+                            VerticalLayout {
+                                spacing: 8px;
+                                alignment: start;
+
+                                for task in col.tasks : Rectangle {
+                                    border_radius: 14px;
+                                    background: MaterialPalette.surface_container_lowest;
+                                    border_width: 1px;
+                                    border_color: task.is_overdue ? OxidiumTheme.danger_color : OxidiumTheme.cell_border;
+
+                                    VerticalLayout {
+                                        padding: OxidiumTheme.compact_mode ? 8px : 12px;
+                                        spacing: 6px;
+
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: space-between;
+
+                                            Text {
+                                                horizontal_stretch: 1;
+                                                text: task.title;
+                                                font_size: 13px;
+                                                font_weight: 600;
+                                                color: task.is_completed ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
+                                                wrap: word_wrap;
+                                            }
+
+                                            // Drag handle
+                                            Rectangle {
+                                                width: 24px;
+                                                height: 24px;
+                                                border_radius: 6px;
+                                                background: drag_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
+                                                Icon {
+                                                    source: OxidiumIcons.drag;
+                                                    width: 16px;
+                                                    height: 16px;
+                                                    colorize: MaterialPalette.on_surface_variant;
+                                                }
+                                                drag_ta := TouchArea {
+                                                    mouse_cursor: grab;
+                                                    clicked => {
+                                                        root.dragging_task = true;
+                                                        root.drag_task_id = task.id;
+                                                        root.drag_task_title = task.title;
+                                                        root.drag_source_col_id = col.id;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Subject & Priority Chips
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+
+                                            if task.subject_name != "" : Rectangle {
+                                                height: 22px;
+                                                border_radius: 6px;
+                                                background: task.subject_color.with_alpha(18%);
+                                                HorizontalLayout {
+                                                    padding_left: 7px;
+                                                    padding_right: 7px;
+                                                    Text {
+                                                        text: task.subject_name;
+                                                        font_size: 10px;
+                                                        font_weight: 600;
+                                                        color: task.subject_color;
+                                                        vertical_alignment: center;
+                                                    }
+                                                }
+                                            }
+
+                                            if task.priority_level > 0 : Rectangle {
+                                                height: 22px;
+                                                border_radius: 6px;
+                                                background: task.priority_color.with_alpha(18%);
+                                                HorizontalLayout {
+                                                    padding_left: 7px;
+                                                    padding_right: 7px;
+                                                    Text {
+                                                        text: task.priority_label;
+                                                        font_size: 10px;
+                                                        font_weight: 600;
+                                                        color: task.priority_color;
+                                                        vertical_alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Deadline & Linked Grades
+                                        if task.deadline_text != "" || task.linked_grades_count > 0 : HorizontalLayout {
+                                            spacing: 8px;
+                                            alignment: start;
+                                            if task.deadline_text != "" : Text {
+                                                text: (task.is_overdue ? "⚠ " : "⏰ ") + task.deadline_text;
+                                                font_family: OxidiumTheme.font_mono;
+                                                font_size: 11px;
+                                                font_weight: task.is_overdue ? 700 : 500;
+                                                color: task.is_overdue ? OxidiumTheme.danger_color : MaterialPalette.on_surface_variant;
+                                            }
+                                            if task.linked_grades_count > 0 : Text {
+                                                text: "★ Оценок: " + task.linked_grades_count;
+                                                font_family: OxidiumTheme.font_mono;
+                                                font_size: 10px;
+                                                color: OxidiumTheme.grade_5;
+                                            }
+                                        }
+
+                                        // Tags & Badges
+                                        if task.tags_text != "" || task.badges_text != "" : Text {
+                                            text: (task.tags_text != "" ? "#" + task.tags_text : "") + (task.badges_text != "" ? "  " + task.badges_text : "");
+                                            font_size: 10px;
+                                            color: MaterialPalette.primary;
+                                            overflow: elide;
+                                        }
+
+                                        // Checklist Progress Bar
+                                        if task.checklist_text != "" : VerticalLayout {
+                                            spacing: 3px;
+                                            HorizontalLayout {
+                                                alignment: space-between;
+                                                Text {
+                                                    text: "Чек-лист: " + task.checklist_text;
+                                                    font_family: OxidiumTheme.font_mono;
+                                                    font_size: 10px;
+                                                    color: MaterialPalette.on_surface_variant;
+                                                }
+                                            }
+                                            Rectangle {
+                                                height: 5px;
+                                                border_radius: 3px;
+                                                background: MaterialPalette.surface_container_highest;
+                                                Rectangle {
+                                                    x: 0px;
+                                                    width: parent.width * clamp(task.checklist_ratio, 0.0, 1.0);
+                                                    height: 100%;
+                                                    border_radius: 3px;
+                                                    background: OxidiumTheme.success_color;
+                                                }
+                                            }
+                                        }
+
+                                        // Quick card actions row
+                                        HorizontalLayout {
+                                            alignment: space-between;
+                                            spacing: 4px;
+
+                                            HorizontalLayout {
+                                                spacing: 2px;
+                                                IconButton {
+                                                    icon: OxidiumIcons.chevron_left;
+                                                    tooltip: "В предыдущую колонку";
+                                                    clicked => { root.move_task_step(task.id, -1); }
+                                                }
+                                                IconButton {
+                                                    icon: OxidiumIcons.chevron_right;
+                                                    tooltip: "В следующую колонку";
+                                                    clicked => { root.move_task_step(task.id, 1); }
+                                                }
+                                            }
+
+                                            HorizontalLayout {
+                                                spacing: 2px;
+                                                IconButton {
+                                                    icon: OxidiumIcons.check;
+                                                    tooltip: task.is_completed ? "Переоткрыть" : "Выполнить";
+                                                    clicked => { root.toggle_task_complete(task.id); }
+                                                }
+                                                IconButton {
+                                                    icon: OxidiumIcons.edit;
+                                                    tooltip: "Открыть детали задачи";
+                                                    clicked => { root.open_task_detail(task.id); }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== NEW TASK MODAL =====
+    if root.new_task_open : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000050;
+        TouchArea { clicked => { root.new_task_open = false; } }
+
+        Rectangle {
+            width: 480px;
+            height: 430px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border_radius: 24px;
+            background: MaterialPalette.surface_container_high;
+            border_width: 1px;
+            border_color: MaterialPalette.outline_variant;
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 10px;
+                Text { text: "Новая учебная задача"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+
+                Text { text: "Название задачи"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                Rectangle {
+                    height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_title; color: MaterialPalette.on_surface; }
+                }
+
+                Text { text: "Описание (Markdown)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                Rectangle {
+                    height: 54px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_desc; color: MaterialPalette.on_surface; }
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    VerticalLayout {
+                        horizontal_stretch: 1;
+                        spacing: 4px;
+                        Text { text: "Дедлайн (YYYY-MM-DD)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_deadline; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                        }
+                    }
+                    VerticalLayout {
+                        horizontal_stretch: 1;
+                        spacing: 4px;
+                        Text { text: "Теги (через запятую)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_tags; color: MaterialPalette.on_surface; }
+                        }
+                    }
+                }
+
+                Text { text: "Приоритет"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    for p[idx] in ["Нет", "Низкий", "Средний", "Высокий", "Крит."] : Rectangle {
+                        horizontal_stretch: 1;
+                        height: 30px;
+                        border_radius: 8px;
+                        background: root.new_task_priority == idx ? MaterialPalette.primary : MaterialPalette.surface_container;
+                        Text {
+                            text: p;
+                            font_size: 11px;
+                            color: root.new_task_priority == idx ? MaterialPalette.on_primary : MaterialPalette.on_surface;
+                            horizontal_alignment: center;
+                            vertical_alignment: center;
+                        }
+                        TouchArea { mouse_cursor: pointer; clicked => { root.new_task_priority = idx; } }
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+                    OutlineButton { text: "Отмена"; clicked => { root.new_task_open = false; } }
+                    FilledButton {
+                        text: "Создать";
+                        clicked => {
+                            root.new_task_open = false;
+                            root.create_task(
+                                root.new_task_col_id,
+                                root.new_task_title,
+                                root.new_task_desc,
+                                root.new_task_deadline,
+                                root.new_task_priority,
+                                root.new_task_subject_idx,
+                                root.new_task_tags,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== NEW COLUMN MODAL =====
+    if root.new_column_open : Rectangle {
+        width: 100%; height: 100%; background: #00000050;
+        TouchArea { clicked => { root.new_column_open = false; } }
+        Rectangle {
+            width: 380px; height: 260px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            border_radius: 22px; background: MaterialPalette.surface_container_high;
+            TouchArea {}
+            VerticalLayout {
+                padding: 20px; spacing: 10px;
+                Text { text: "Новая колонка Kanban"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Text { text: "Название"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                Rectangle {
+                    height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_column_name; color: MaterialPalette.on_surface; }
+                }
+                Text { text: "WIP-лимит (пусто = без ограничения)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                Rectangle {
+                    height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_column_wip; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                }
+                HorizontalLayout {
+                    alignment: end; spacing: 8px;
+                    OutlineButton { text: "Отмена"; clicked => { root.new_column_open = false; } }
+                    FilledButton {
+                        text: "Создать";
+                        clicked => {
+                            root.new_column_open = false;
+                            root.create_column(root.new_column_name, root.new_column_wip, root.new_column_done);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== NEW BOARD MODAL =====
+    if root.new_board_open : Rectangle {
+        width: 100%; height: 100%; background: #00000050;
+        TouchArea { clicked => { root.new_board_open = false; } }
+        Rectangle {
+            width: 360px; height: 190px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            border_radius: 22px; background: MaterialPalette.surface_container_high;
+            TouchArea {}
+            VerticalLayout {
+                padding: 20px; spacing: 10px;
+                Text { text: "Новая Kanban-доска"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Rectangle {
+                    height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_board_name; color: MaterialPalette.on_surface; }
+                }
+                HorizontalLayout {
+                    alignment: end; spacing: 8px;
+                    OutlineButton { text: "Отмена"; clicked => { root.new_board_open = false; } }
+                    FilledButton {
+                        text: "Создать";
+                        clicked => {
+                            root.new_board_open = false;
+                            root.create_board(root.new_board_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== TASK DETAIL DRAWER MODAL =====
+    if root.detail_open : Rectangle {
+        width: 100%; height: 100%; background: #00000050;
+        TouchArea { clicked => { root.detail_open = false; } }
+        Rectangle {
+            width: 560px; height: 560px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            border_radius: 24px; background: MaterialPalette.surface_container_high;
+            border_width: 1px; border_color: MaterialPalette.outline_variant;
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 20px; spacing: 10px;
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Детали задачи"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+                    IconButton { icon: OxidiumIcons.close; clicked => { root.detail_open = false; } }
+                }
+
+                Rectangle {
+                    height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_title; font_weight: 600; color: MaterialPalette.on_surface; }
+                }
+
+                Text { text: "Описание и заметки (Markdown)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                Rectangle {
+                    height: 60px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_desc; color: MaterialPalette.on_surface; }
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    VerticalLayout {
+                        horizontal_stretch: 1;
+                        Text { text: "Дедлайн (YYYY-MM-DD)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_deadline; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                        }
+                    }
+                    VerticalLayout {
+                        horizontal_stretch: 1;
+                        Text { text: "Добавить тег (" + root.detail_tags_text + ")"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            Rectangle {
+                                horizontal_stretch: 1; height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_new_tag; color: MaterialPalette.on_surface; }
+                            }
+                            TonalButton {
+                                text: "+";
+                                clicked => {
+                                    root.add_tag_to_task(root.detail_task_id, root.detail_new_tag);
+                                    root.detail_new_tag = "";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Checklist section
+                Text { text: "Чек-лист"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Rectangle {
+                        horizontal_stretch: 1; height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                        TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_new_checklist; color: MaterialPalette.on_surface; }
+                    }
+                    TonalButton {
+                        text: "Добавить пункт";
+                        clicked => {
+                            root.add_checklist_item(root.detail_task_id, root.detail_new_checklist);
+                            root.detail_new_checklist = "";
+                        }
+                    }
+                }
+
+                ScrollView {
+                    vertical_stretch: 1;
+                    VerticalLayout {
+                        spacing: 4px;
+                        for ci in root.detail_checklist : HorizontalLayout {
+                            spacing: 8px;
+                            alignment: space-between;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                IconButton {
+                                    icon: ci.is_completed ? OxidiumIcons.check_box : OxidiumIcons.check;
+                                    clicked => { root.toggle_checklist_item(ci.id, !ci.is_completed); }
+                                }
+                                Text {
+                                    text: ci.title;
+                                    font_size: 13px;
+                                    color: ci.is_completed ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
+                                    vertical_alignment: center;
+                                }
+                            }
+                            IconButton {
+                                icon: OxidiumIcons.delete;
+                                clicked => { root.delete_checklist_item(ci.id); }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        OutlineButton {
+                            text: "Дублировать";
+                            clicked => {
+                                root.detail_open = false;
+                                root.duplicate_task(root.detail_task_id);
+                            }
+                        }
+                        OutlineButton {
+                            text: "Удалить";
+                            clicked => {
+                                root.detail_open = false;
+                                root.delete_task(root.detail_task_id);
+                            }
+                        }
+                    }
+                    FilledButton {
+                        text: "Сохранить";
+                        clicked => {
+                            root.detail_open = false;
+                            root.save_task_detail(
+                                root.detail_task_id,
+                                root.detail_title,
+                                root.detail_desc,
+                                root.detail_notes,
+                                root.detail_deadline,
+                                root.detail_priority,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,1011 @@
+import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView, Switch } from "@material";
+import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
+import {
+    ProfileItem, SubjectItem, PeriodItem, SearchHitItem,
+    ActivityRowItem, NotificationRowItem, UiStrings
+} from "../types.slint";
+
+// ============================================================================
+// Profiles Manager Dialog
+// ============================================================================
+export component ProfilesModal inherits Rectangle {
+    in property <[ProfileItem]> profiles;
+    in_out property <string> new_name: "";
+    in_out property <string> new_institution: "";
+    in_out property <string> new_group: "";
+    in_out property <string> new_year: "2026–2027";
+    in_out property <string> new_color: "#445E91";
+    in property <string> delete_warning_text: "";
+    in_out property <string> pending_delete_id: "";
+
+    callback close();
+    callback switch_profile(string);
+    callback create_profile(string, string, string, string, string);
+    callback duplicate_profile(string);
+    callback archive_profile(string, bool);
+    callback request_delete_profile(string);
+    callback confirm_delete_profile(string);
+
+    width: 100%; height: 100%;
+    background: #00000055;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 620px; height: 560px;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        border_radius: 24px;
+        background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 28px; drop_shadow_color: #00000055;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 22px; spacing: 14px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: "Управление учебными профилями"; font_size: 19px; font_weight: 600; color: MaterialPalette.on_surface; }
+                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+            }
+
+            if root.pending_delete_id != "" : Rectangle {
+                border_radius: 12px;
+                background: MaterialPalette.error_container;
+                HorizontalLayout {
+                    padding: 12px; spacing: 10px; alignment: space-between;
+                    Text {
+                        horizontal_stretch: 1;
+                        text: root.delete_warning_text;
+                        font_size: 12px; font_weight: 500;
+                        color: MaterialPalette.on_error_container;
+                        wrap: word_wrap;
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        OutlineButton { text: "Отмена"; clicked => { root.pending_delete_id = ""; } }
+                        FilledButton {
+                            text: "Удалить навсегда";
+                            clicked => {
+                                root.confirm_delete_profile(root.pending_delete_id);
+                                root.pending_delete_id = "";
+                            }
+                        }
+                    }
+                }
+            }
+
+            ScrollView {
+                vertical_stretch: 1;
+                VerticalLayout {
+                    spacing: 8px;
+                    for p in root.profiles : Rectangle {
+                        border_radius: 14px;
+                        background: p.is_active ? MaterialPalette.primary_container : MaterialPalette.surface_container;
+                        border_width: 1px;
+                        border_color: p.is_active ? MaterialPalette.primary : OxidiumTheme.cell_border;
+
+                        HorizontalLayout {
+                            padding: 12px; spacing: 10px; alignment: space-between;
+                            HorizontalLayout {
+                                spacing: 10px; horizontal_stretch: 1;
+                                Rectangle {
+                                    width: 36px; height: 36px; border_radius: 18px;
+                                    background: p.color;
+                                    Icon { source: OxidiumIcons.person; width: 20px; height: 20px; colorize: #ffffff; }
+                                }
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text {
+                                        text: p.name + (p.is_active ? " (Активный)" : "") + (p.is_archived ? " [Архив]" : "");
+                                        font_size: 14px; font_weight: 600;
+                                        color: p.is_active ? MaterialPalette.on_primary_container : MaterialPalette.on_surface;
+                                    }
+                                    Text {
+                                        text: p.institution + (p.group_name != "" ? " • " + p.group_name : "") + (p.academic_year != "" ? " • " + p.academic_year : "");
+                                        font_size: 11px;
+                                        color: MaterialPalette.on_surface_variant;
+                                    }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 4px;
+                                if !p.is_active && !p.is_archived : TonalButton {
+                                    text: "Выбрать";
+                                    clicked => { root.switch_profile(p.id); }
+                                }
+                                IconButton { icon: OxidiumIcons.copy; tooltip: "Дублировать"; clicked => { root.duplicate_profile(p.id); } }
+                                IconButton {
+                                    icon: p.is_archived ? OxidiumIcons.restore : OxidiumIcons.archive;
+                                    tooltip: p.is_archived ? "Восстановить" : "Архивировать";
+                                    clicked => { root.archive_profile(p.id, !p.is_archived); }
+                                }
+                                IconButton { icon: OxidiumIcons.delete; tooltip: "Удалить профиль"; clicked => { root.request_delete_profile(p.id); } }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: OxidiumTheme.cell_border; }
+
+            Text { text: "Создать новый независимый профиль"; font_size: 14px; font_weight: 600; color: MaterialPalette.on_surface; }
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_name; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_institution; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    horizontal_stretch: 1; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_group; color: MaterialPalette.on_surface; }
+                }
+                FilledButton {
+                    text: "Создать";
+                    clicked => {
+                        root.create_profile(root.new_name, root.new_institution, root.new_group, root.new_year, root.new_color);
+                        root.new_name = "";
+                        root.new_institution = "";
+                        root.new_group = "";
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Subjects Manager Dialog (with reorder, archive, delete impact warning)
+// ============================================================================
+export component SubjectsModal inherits Rectangle {
+    in property <[SubjectItem]> subjects;
+    in_out property <string> new_name: "";
+    in_out property <string> new_short: "";
+    in_out property <string> new_teacher: "";
+    in_out property <string> new_target: "4.5";
+    in_out property <string> new_color: "#2E7D32";
+    in property <string> delete_warning_text: "";
+    in_out property <string> pending_delete_id: "";
+
+    callback close();
+    callback create_subject(string, string, string, string, string);
+    callback move_subject(string, int);
+    callback archive_subject(string, bool);
+    callback request_delete_subject(string);
+    callback confirm_delete_subject(string);
+
+    width: 100%; height: 100%;
+    background: #00000055;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 640px; height: 560px;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        border_radius: 24px;
+        background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 28px; drop_shadow_color: #00000055;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 22px; spacing: 12px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: "Управление предметами"; font_size: 19px; font_weight: 600; color: MaterialPalette.on_surface; }
+                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+            }
+
+            if root.pending_delete_id != "" : Rectangle {
+                border_radius: 12px; background: MaterialPalette.error_container;
+                HorizontalLayout {
+                    padding: 12px; spacing: 8px; alignment: space-between;
+                    Text { horizontal_stretch: 1; text: root.delete_warning_text; font_size: 12px; color: MaterialPalette.on_error_container; wrap: word_wrap; }
+                    OutlineButton { text: "Отмена"; clicked => { root.pending_delete_id = ""; } }
+                    FilledButton {
+                        text: "Удалить";
+                        clicked => {
+                            root.confirm_delete_subject(root.pending_delete_id);
+                            root.pending_delete_id = "";
+                        }
+                    }
+                }
+            }
+
+            ScrollView {
+                vertical_stretch: 1;
+                VerticalLayout {
+                    spacing: 6px;
+                    for s in root.subjects : Rectangle {
+                        border_radius: 12px;
+                        background: MaterialPalette.surface_container;
+                        border_width: 1px; border_color: OxidiumTheme.cell_border;
+                        HorizontalLayout {
+                            padding: 10px; spacing: 8px; alignment: space-between;
+                            HorizontalLayout {
+                                spacing: 10px; horizontal_stretch: 1;
+                                Rectangle { width: 10px; height: 28px; border_radius: 5px; background: s.color; }
+                                VerticalLayout {
+                                    Text {
+                                        text: s.name + (s.short_name != "" ? " (" + s.short_name + ")" : "") + (s.is_archived ? " [Архив]" : "");
+                                        font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface;
+                                    }
+                                    Text {
+                                        text: (s.teacher != "" ? s.teacher : "Преподаватель не указан") + (s.target_average != "" ? " • Цель: " + s.target_average : "");
+                                        font_size: 11px; color: MaterialPalette.on_surface_variant;
+                                    }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 2px;
+                                IconButton { icon: OxidiumIcons.arrow_up; tooltip: "Выше"; clicked => { root.move_subject(s.id, -1); } }
+                                IconButton { icon: OxidiumIcons.arrow_down; tooltip: "Ниже"; clicked => { root.move_subject(s.id, 1); } }
+                                IconButton {
+                                    icon: s.is_archived ? OxidiumIcons.restore : OxidiumIcons.archive;
+                                    tooltip: s.is_archived ? "Восстановить" : "Архивировать";
+                                    clicked => { root.archive_subject(s.id, !s.is_archived); }
+                                }
+                                IconButton { icon: OxidiumIcons.delete; tooltip: "Удалить"; clicked => { root.request_delete_subject(s.id); } }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: OxidiumTheme.cell_border; }
+            Text { text: "Добавить предмет (Название • Сокращение • Преподаватель • Целевой балл)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    horizontal_stretch: 3; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_name; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    horizontal_stretch: 1; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_short; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_teacher; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    width: 68px; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_target; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                }
+                FilledButton {
+                    text: "Добавить";
+                    clicked => {
+                        root.create_subject(root.new_name, root.new_short, root.new_teacher, root.new_target, root.new_color);
+                        root.new_name = "";
+                        root.new_short = "";
+                        root.new_teacher = "";
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Academic Periods Modal
+// ============================================================================
+export component PeriodsModal inherits Rectangle {
+    in property <[PeriodItem]> periods;
+    in_out property <string> new_name: "";
+    in_out property <string> new_start: "2026-09-01";
+    in_out property <string> new_end: "2026-12-31";
+    in_out property <int> new_type_idx: 1; // 0=Year, 1=Semester, 2=Quarter, 3=Trimester, 4=Custom
+
+    callback close();
+    callback create_period(string, int, string, string);
+    callback select_period(string);
+
+    width: 100%; height: 100%;
+    background: #00000055;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 560px; height: 460px;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        border_radius: 24px; background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 22px; spacing: 12px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: "Учебные периоды"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+            }
+
+            ScrollView {
+                vertical_stretch: 1;
+                VerticalLayout {
+                    spacing: 6px;
+                    for per in root.periods : Rectangle {
+                        border_radius: 12px; background: MaterialPalette.surface_container;
+                        HorizontalLayout {
+                            padding: 10px; alignment: space-between;
+                            VerticalLayout {
+                                Text { text: per.name; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: per.start_date + " — " + per.end_date + " (" + per.period_type + ")"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                            }
+                            TonalButton {
+                                text: "Открыть в журнале";
+                                clicked => {
+                                    root.select_period(per.id);
+                                    root.close();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: OxidiumTheme.cell_border; }
+            Text { text: "Новый период (Название • Начало YYYY-MM-DD • Окончание YYYY-MM-DD)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_name; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    width: 110px; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_start; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                }
+                Rectangle {
+                    width: 110px; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_end; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                }
+                FilledButton {
+                    text: "Создать";
+                    clicked => {
+                        root.create_period(root.new_name, root.new_type_idx, root.new_start, root.new_end);
+                        root.new_name = "";
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Global Search Modal (Ctrl+F)
+// ============================================================================
+export component GlobalSearchModal inherits Rectangle {
+    in_out property <string> query: "";
+    in property <[SearchHitItem]> hits;
+
+    callback close();
+    callback search_edited(string);
+    callback hit_selected(string, string); // entity_type, entity_id
+
+    width: 100%; height: 100%;
+    background: #00000050;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 580px; height: 440px;
+        x: (parent.width - self.width) / 2; y: 76px;
+        border_radius: 22px; background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 28px; drop_shadow_color: #00000055;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 16px; spacing: 12px;
+            HorizontalLayout {
+                spacing: 10px;
+                Rectangle {
+                    horizontal_stretch: 1; height: 42px; border_radius: 21px;
+                    background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.primary;
+                    HorizontalLayout {
+                        padding_left: 14px; padding_right: 12px; spacing: 8px;
+                        VerticalLayout { alignment: center; Icon { source: OxidiumIcons.search; width: 18px; height: 18px; colorize: MaterialPalette.primary; } }
+                        TextInput {
+                            horizontal_stretch: 1;
+                            vertical_alignment: center;
+                            text <=> root.query;
+                            color: MaterialPalette.on_surface;
+                            edited => { root.search_edited(self.text); }
+                        }
+                    }
+                }
+                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+            }
+
+            ScrollView {
+                vertical_stretch: 1;
+                VerticalLayout {
+                    spacing: 6px;
+                    if root.hits.length == 0 : Text {
+                        text: root.query == "" ? "Введите запрос для поиска по предметам, оценкам, заметкам, задачам и тегам." : "Ничего не найдено.";
+                        font_size: 13px; color: MaterialPalette.on_surface_variant;
+                    }
+                    for h in root.hits : Rectangle {
+                        border_radius: 12px;
+                        background: hit_ta.has_hover ? MaterialPalette.primary_container.with_alpha(50%) : MaterialPalette.surface_container;
+                        HorizontalLayout {
+                            padding: 10px; spacing: 10px; alignment: space-between;
+                            VerticalLayout {
+                                horizontal_stretch: 1; spacing: 2px;
+                                Text { text: h.title; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                if h.snippet != "" : Text { text: h.snippet; font_size: 11px; color: MaterialPalette.on_surface_variant; overflow: elide; }
+                            }
+                            Text {
+                                text: h.entity_type_label + (h.date_text != "" ? " • " + h.date_text : "");
+                                font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.primary; vertical_alignment: center;
+                            }
+                        }
+                        hit_ta := TouchArea {
+                            mouse_cursor: pointer;
+                            clicked => {
+                                root.hit_selected(h.entity_type, h.entity_id);
+                                root.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Notifications Center Modal
+// ============================================================================
+export component NotificationsModal inherits Rectangle {
+    in property <[NotificationRowItem]> items;
+    in property <string> background_notice;
+
+    callback close();
+    callback mark_all_read();
+    callback dismiss_item(string);
+
+    width: 100%; height: 100%;
+    background: #00000045;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 440px; height: 500px;
+        x: parent.width - self.width - 24px; y: 68px;
+        border_radius: 22px; background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 24px; drop_shadow_color: #00000045;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 18px; spacing: 10px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: "Центр уведомлений"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    TonalButton { text: "Прочитать все"; clicked => { root.mark_all_read(); } }
+                    IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                }
+            }
+
+            Rectangle {
+                border_radius: 10px; background: MaterialPalette.surface_container;
+                HorizontalLayout {
+                    padding: 8px;
+                    Text { text: "ℹ " + root.background_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                }
+            }
+
+            ScrollView {
+                vertical_stretch: 1;
+                VerticalLayout {
+                    spacing: 8px;
+                    if root.items.length == 0 : Text { text: "Новых уведомлений нет."; font_size: 13px; color: MaterialPalette.on_surface_variant; }
+                    for n in root.items : Rectangle {
+                        border_radius: 12px;
+                        background: n.is_read ? MaterialPalette.surface_container : MaterialPalette.primary_container.with_alpha(55%);
+                        HorizontalLayout {
+                            padding: 10px; alignment: space-between; spacing: 8px;
+                            VerticalLayout {
+                                horizontal_stretch: 1; spacing: 2px;
+                                Text { text: n.title; font_size: 13px; font_weight: 600; color: n.is_overdue ? OxidiumTheme.danger_color : MaterialPalette.on_surface; }
+                                if n.body != "" : Text { text: n.body; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                Text { text: n.time_text; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; }
+                            }
+                            IconButton { icon: OxidiumIcons.close; clicked => { root.dismiss_item(n.id); } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Settings & MCP Control Modal (6 Tabs: Appearance, Journal, Kanban, MCP, Data, About)
+// ============================================================================
+export component SettingsModal inherits Rectangle {
+    in_out property <int> active_tab: 0; // 0=Appearance, 1=Journal, 2=Kanban, 3=MCP, 4=Data, 5=About
+    in property <UiStrings> tr;
+
+    // Appearance settings
+    in_out property <int> theme_mode_idx: 2; // 0=Light, 1=Dark, 2=System
+    in_out property <int> lang_idx: 0; // 0=Ru, 1=En
+    in_out property <string> accent_hex: "#445E91";
+    in_out property <bool> compact_mode: false;
+    in_out property <bool> reduced_motion: false;
+    in_out property <int> scale_percent: 100;
+
+    // Journal settings
+    in_out property <int> avg_mode_idx: 0; // 0=Arithmetic, 1=Weighted
+    in_out property <int> avg_precision_idx: 1; // 0=1dp, 1=2dp, 2=3dp
+    in_out property <int> week_start_idx: 0; // 0=Monday, 1=Sunday
+    in_out property <bool> highlight_weekends: true;
+    in_out property <bool> highlight_holidays: true;
+
+    // Kanban & Reminders
+    in_out property <bool> reminders_enabled: true;
+    in_out property <bool> os_notifications_enabled: true;
+
+    // MCP Server panel state
+    in property <string> mcp_status_text: "Остановлен";
+    in property <bool> mcp_http_running: false;
+    in property <string> mcp_endpoint: "http://127.0.0.1:38421/mcp";
+    in_out property <string> mcp_port_text: "38421";
+    in_out property <bool> mcp_autostart: false;
+    in_out property <int> mcp_permission_idx: 1; // 0=ReadOnly, 1=ReadWrite
+    in_out property <bool> mcp_allow_destructive: false;
+    in property <string> mcp_requests_text: "0";
+    in property <string> mcp_errors_text: "0";
+    in property <string> mcp_last_request_text: "—";
+    in property <string> mcp_token_preview: "не создан";
+    in property <string> mcp_stdio_config_preview: "";
+    in property <[ActivityRowItem]> activity_log;
+
+    // Data & About
+    in property <string> db_path_text: "";
+    in property <string> backup_status_text: "";
+    in property <string> about_versions_text: "";
+
+    callback close();
+    callback save_appearance(int, int, string, bool, bool, int);
+    callback save_journal_prefs(int, int, int, bool, bool);
+    callback save_kanban_prefs(bool, bool);
+    callback save_mcp_prefs(string, bool, int, bool);
+    callback mcp_start_http();
+    callback mcp_stop_http();
+    callback mcp_restart_http();
+    callback mcp_rotate_token();
+    callback mcp_undo_activity(string);
+    callback trigger_backup();
+    callback trigger_restore();
+    callback export_data(string); // json, csv, xlsx, md
+    callback import_data(string); // json, csv, telegram
+
+    width: 100%; height: 100%;
+    background: #00000055;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 920px; height: 660px;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        border_radius: 24px; background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 32px; drop_shadow_color: #00000060;
+        clip: true;
+        TouchArea {}
+
+        HorizontalLayout {
+            // Left Settings Sidebar
+            Rectangle {
+                width: 204px;
+                background: MaterialPalette.surface_container;
+                VerticalLayout {
+                    padding: 16px; spacing: 6px;
+                    Text { text: "Настройки"; font_size: 18px; font_weight: 700; color: MaterialPalette.on_surface; }
+                    Rectangle { height: 6px; }
+                    for tab_label[idx] in ["Внешний вид", "Журнал", "Канбан и уведомления", "MCP-сервер", "Данные и бэкапы", "О приложении"] : Rectangle {
+                        height: 38px; border_radius: 12px;
+                        background: root.active_tab == idx ? MaterialPalette.secondary_container : transparent;
+                        HorizontalLayout {
+                            padding_left: 12px; padding_right: 12px;
+                            Text {
+                                text: tab_label; font_size: 13px;
+                                font_weight: root.active_tab == idx ? 600 : 400;
+                                color: root.active_tab == idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                vertical_alignment: center;
+                            }
+                        }
+                        TouchArea { mouse_cursor: pointer; clicked => { root.active_tab = idx; } }
+                    }
+                    Rectangle { vertical_stretch: 1; }
+                    OutlineButton { text: "Закрыть (Esc)"; clicked => { root.close(); } }
+                }
+            }
+
+            // Right Settings Content
+            ScrollView {
+                horizontal_stretch: 1;
+                viewport_width: self.visible_width;
+                VerticalLayout {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.visible_width;
+                    padding: 22px; spacing: 14px;
+
+                    // TAB 0: APPEARANCE
+                    if root.active_tab == 0 : VerticalLayout {
+                        spacing: 14px;
+                        Text { text: "Внешний вид и язык"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+
+                        Text { text: "Тема оформления"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            for th[idx] in ["Светлая", "Тёмная", "Системная"] : Rectangle {
+                                horizontal_stretch: 1; height: 36px; border_radius: 10px;
+                                background: root.theme_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                border_width: 1px; border_color: root.theme_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                Text { text: th; font_size: 13px; font_weight: 600; color: root.theme_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.theme_mode_idx = idx; } }
+                            }
+                        }
+
+                        Text { text: "Язык интерфейса"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            for lg[idx] in ["Русский (основной)", "English"] : Rectangle {
+                                horizontal_stretch: 1; height: 36px; border_radius: 10px;
+                                background: root.lang_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                border_width: 1px; border_color: root.lang_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                Text { text: lg; font_size: 13px; font_weight: 600; color: root.lang_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.lang_idx = idx; } }
+                            }
+                        }
+
+                        Text { text: "Акцентный цвет (Material Design 3)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        HorizontalLayout {
+                            spacing: 10px;
+                            for swatch in [
+                                { hex: "#4A4459", c: #4A4459 },
+                                { hex: "#445E91", c: #445E91 },
+                                { hex: "#0F766E", c: #0F766E },
+                                { hex: "#2E7D32", c: #2E7D32 },
+                                { hex: "#4F46E5", c: #4F46E5 },
+                                { hex: "#B45309", c: #B45309 },
+                                { hex: "#9333EA", c: #9333EA },
+                                { hex: "#BE123C", c: #BE123C },
+                            ] : Rectangle {
+                                width: 34px; height: 34px; border_radius: 17px;
+                                background: swatch.c;
+                                border_width: root.accent_hex == swatch.hex ? 3px : 0px;
+                                border_color: MaterialPalette.on_surface;
+                                TouchArea { mouse_cursor: pointer; clicked => { root.accent_hex = swatch.hex; } }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Компактный режим интерфейса"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            Switch { checked <=> root.compact_mode; }
+                        }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Уменьшить анимации"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            Switch { checked <=> root.reduced_motion; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px; alignment: start;
+                            Text { text: "Масштаб:"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            for sc in [90, 100, 110, 120] : Rectangle {
+                                width: 58px; height: 32px; border_radius: 8px;
+                                background: root.scale_percent == sc ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                Text { text: sc + "%"; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.scale_percent = sc; } }
+                            }
+                        }
+
+                        FilledButton {
+                            text: "Применить и сохранить";
+                            clicked => {
+                                root.save_appearance(root.theme_mode_idx, root.lang_idx, root.accent_hex, root.compact_mode, root.reduced_motion, root.scale_percent);
+                            }
+                        }
+                    }
+
+                    // TAB 1: JOURNAL
+                    if root.active_tab == 1 : VerticalLayout {
+                        spacing: 14px;
+                        Text { text: "Настройки электронного журнала"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+
+                        Text { text: "Режим расчёта среднего балла"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            for am[idx] in ["Арифметическое среднее", "Взвешенное (по весам работ)"] : Rectangle {
+                                horizontal_stretch: 1; height: 38px; border_radius: 10px;
+                                background: root.avg_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                border_width: 1px; border_color: root.avg_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                Text { text: am; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.avg_mode_idx = idx; } }
+                            }
+                        }
+
+                        Text { text: "Точность отображения среднего балла (округление только при показе)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            for pr[idx] in ["1 знак (4.5)", "2 знака (4.50)", "3 знака (4.500)"] : Rectangle {
+                                horizontal_stretch: 1; height: 36px; border_radius: 10px;
+                                background: root.avg_precision_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                border_width: 1px; border_color: root.avg_precision_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                Text { text: pr; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.avg_precision_idx = idx; } }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Подсвечивать выходные дни"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            Switch { checked <=> root.highlight_weekends; }
+                        }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Подсвечивать праздничные дни"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            Switch { checked <=> root.highlight_holidays; }
+                        }
+
+                        FilledButton {
+                            text: "Сохранить настройки журнала";
+                            clicked => {
+                                root.save_journal_prefs(root.avg_mode_idx, root.avg_precision_idx, root.week_start_idx, root.highlight_weekends, root.highlight_holidays);
+                            }
+                        }
+                    }
+
+                    // TAB 2: KANBAN & NOTIFICATIONS
+                    if root.active_tab == 2 : VerticalLayout {
+                        spacing: 14px;
+                        Text { text: "Канбан и уведомления"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Включить напоминания о дедлайнах"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            Switch { checked <=> root.reminders_enabled; }
+                        }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Системные уведомления ОС (Windows / Linux)"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            Switch { checked <=> root.os_notifications_enabled; }
+                        }
+                        Rectangle {
+                            border_radius: 12px; background: MaterialPalette.surface_container;
+                            HorizontalLayout {
+                                padding: 12px;
+                                Text { text: "ℹ " + root.tr.reminders_notice; font_size: 12px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                            }
+                        }
+                        FilledButton {
+                            text: "Сохранить";
+                            clicked => { root.save_kanban_prefs(root.reminders_enabled, root.os_notifications_enabled); }
+                        }
+                    }
+
+                    // TAB 3: MCP SERVER MANAGEMENT & ACTIVITY LOG
+                    if root.active_tab == 3 : VerticalLayout {
+                        spacing: 12px;
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Встроенный MCP-сервер (Model Context Protocol)"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                            Rectangle {
+                                height: 28px; border_radius: 14px;
+                                background: root.mcp_http_running ? OxidiumTheme.success_color.with_alpha(22%) : MaterialPalette.surface_container;
+                                HorizontalLayout {
+                                    padding_left: 12px; padding_right: 12px;
+                                    Text {
+                                        text: root.mcp_status_text;
+                                        font_size: 12px; font_weight: 700;
+                                        color: root.mcp_http_running ? OxidiumTheme.success_color : MaterialPalette.on_surface_variant;
+                                        vertical_alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Embedded Streamable HTTP Status & Controls (distinct from external STDIO!)
+                        Rectangle {
+                            border_radius: 14px; background: MaterialPalette.surface_container;
+                            VerticalLayout {
+                                padding: 12px; spacing: 8px;
+                                Text { text: "Встроенный Streamable HTTP (только loopback 127.0.0.1)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text {
+                                    text: "Endpoint: " + root.mcp_endpoint + "  •  Запросов: " + root.mcp_requests_text + "  •  Ошибок: " + root.mcp_errors_text + "  •  Последний: " + root.mcp_last_request_text;
+                                    font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap;
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Rectangle {
+                                        width: 90px; height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                        TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.mcp_port_text; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                                    }
+                                    if !root.mcp_http_running : FilledButton { text: "Запустить HTTP"; icon: OxidiumIcons.play; clicked => { root.mcp_start_http(); } }
+                                    if root.mcp_http_running : OutlineButton { text: "Остановить"; icon: OxidiumIcons.stop; clicked => { root.mcp_stop_http(); } }
+                                    if root.mcp_http_running : TonalButton { text: "Перезапустить"; icon: OxidiumIcons.refresh; clicked => { root.mcp_restart_http(); } }
+                                    TonalButton { text: "Перевыпустить токен"; icon: OxidiumIcons.lock; clicked => { root.mcp_rotate_token(); } }
+                                }
+                                Text { text: "Bearer токен: " + root.mcp_token_preview + " (хранится в mcp-token.secret, вне SQLite и Git)"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                            }
+                        }
+
+                        // Permissions (enforced server-side in Rust)
+                        Rectangle {
+                            border_radius: 14px; background: MaterialPalette.surface_container;
+                            VerticalLayout {
+                                padding: 12px; spacing: 8px;
+                                Text { text: "Права доступа AI (контролируются на сервере Rust)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for pm[idx] in ["Только чтение (Read-Only)", "Чтение и запись (Read+Write)"] : Rectangle {
+                                        horizontal_stretch: 1; height: 34px; border_radius: 10px;
+                                        background: root.mcp_permission_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                        border_width: 1px; border_color: root.mcp_permission_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                        Text { text: pm; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        TouchArea { mouse_cursor: pointer; clicked => { root.mcp_permission_idx = idx; } }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text { text: "Разрешить деструктивные действия (удаление записей AI)"; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                                    Switch { checked <=> root.mcp_allow_destructive; }
+                                }
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text { text: "Автозапуск встроенного HTTP MCP при старте Oxidium"; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                                    Switch { checked <=> root.mcp_autostart; }
+                                }
+                                Text { text: "⚠ " + root.tr.mcp_privacy_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                FilledButton {
+                                    text: "Сохранить права MCP";
+                                    clicked => { root.save_mcp_prefs(root.mcp_port_text, root.mcp_autostart, root.mcp_permission_idx, root.mcp_allow_destructive); }
+                                }
+                            }
+                        }
+
+                        // External STDIO snippet (honestly separated from embedded HTTP)
+                        Rectangle {
+                            border_radius: 12px; background: MaterialPalette.surface_container;
+                            VerticalLayout {
+                                padding: 10px; spacing: 4px;
+                                Text { text: "Внешний STDIO-процесс (запускается AI-клиентом, например Claude Desktop / Gemini CLI)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; wrap: word_wrap; }
+                                Text { text: root.mcp_stdio_config_preview; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                            }
+                        }
+
+                        // Live MCP Activity Log with Undo
+                        Text { text: "История действий AI (MCP Activity Log)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        for act in root.activity_log : Rectangle {
+                            border_radius: 10px; background: MaterialPalette.surface_container;
+                            HorizontalLayout {
+                                padding: 8px; alignment: space-between; spacing: 8px;
+                                Text {
+                                    horizontal_stretch: 1;
+                                    text: act.time_text + " [" + act.source_label + "] " + act.summary + (act.undone ? " (отменено)" : "");
+                                    font_size: 12px; color: act.undone ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
+                                    wrap: word_wrap; vertical_alignment: center;
+                                }
+                                if act.can_undo && !act.undone : TonalButton {
+                                    text: "Отменить";
+                                    clicked => { root.mcp_undo_activity(act.id); }
+                                }
+                            }
+                        }
+                    }
+
+                    // TAB 4: DATA, BACKUP, IMPORT & EXPORT
+                    if root.active_tab == 4 : VerticalLayout {
+                        spacing: 14px;
+                        Text { text: "Данные, резервное копирование и импорт/экспорт"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        Text { text: "База данных SQLite: " + root.db_path_text; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            FilledButton { text: "Создать резервную копию (.zip)"; icon: OxidiumIcons.backup; clicked => { root.trigger_backup(); } }
+                            OutlineButton { text: "Восстановить из архива"; icon: OxidiumIcons.restore; clicked => { root.trigger_restore(); } }
+                        }
+
+                        Text { text: "Экспорт активного профиля"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            TonalButton { text: "JSON"; icon: OxidiumIcons.download; clicked => { root.export_data("json"); } }
+                            TonalButton { text: "CSV (оценки)"; icon: OxidiumIcons.download; clicked => { root.export_data("csv"); } }
+                            TonalButton { text: "XLSX (Excel)"; icon: OxidiumIcons.download; clicked => { root.export_data("xlsx"); } }
+                            TonalButton { text: "Markdown"; icon: OxidiumIcons.download; clicked => { root.export_data("md"); } }
+                        }
+
+                        Text { text: "Импорт (с проверкой и предпросмотром)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            OutlineButton { text: "Импорт JSON"; icon: OxidiumIcons.upload; clicked => { root.import_data("json"); } }
+                            OutlineButton { text: "Импорт CSV"; icon: OxidiumIcons.upload; clicked => { root.import_data("csv"); } }
+                            OutlineButton { text: "Предпросмотр Telegram export"; icon: OxidiumIcons.upload; clicked => { root.import_data("telegram"); } }
+                        }
+
+                        if root.backup_status_text != "" : Rectangle {
+                            border_radius: 10px; background: MaterialPalette.secondary_container;
+                            HorizontalLayout {
+                                padding: 10px;
+                                Text { text: root.backup_status_text; font_size: 12px; color: MaterialPalette.on_secondary_container; wrap: word_wrap; }
+                            }
+                        }
+                    }
+
+                    // TAB 5: ABOUT
+                    if root.active_tab == 5 : VerticalLayout {
+                        spacing: 12px;
+                        HorizontalLayout {
+                            spacing: 14px;
+                            Image { source: OxidiumIcons.app_logo; width: 56px; height: 56px; image_fit: contain; }
+                            VerticalLayout {
+                                alignment: center;
+                                Text { text: "Oxidium — Электронный журнал ученика"; font_size: 18px; font_weight: 700; color: MaterialPalette.on_surface; }
+                                Text { text: "Бесплатное open-source, local-first, offline-first приложение без рекламы и телеметрии."; font_size: 12px; color: MaterialPalette.on_surface_variant; }
+                            }
+                        }
+                        Rectangle {
+                            border_radius: 14px; background: MaterialPalette.surface_container;
+                            VerticalLayout {
+                                padding: 14px; spacing: 6px;
+                                Text { text: root.about_versions_text; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; wrap: word_wrap; }
+                                Text { text: "Репозиторий: https://github.com/cryals/Oxidium"; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.primary; }
+                                Text { text: "Лицензия кода Oxidium: MIT. Включает Slint UI Toolkit, Material Components (MIT), Google Fonts Roboto/Roboto Flex/Roboto Mono (SIL OFL 1.1), Material Symbols (Apache 2.0), SQLite (Public Domain), rmcp (Apache 2.0)."; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Keyboard Shortcuts Reference Modal
+// ============================================================================
+export component ShortcutsModal inherits Rectangle {
+    callback close();
+    width: 100%; height: 100%; background: #00000050;
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        width: 440px; height: 420px;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        border_radius: 22px; background: MaterialPalette.surface_container_high;
+        border_width: 1px; border_color: MaterialPalette.outline_variant;
+        TouchArea {}
+        VerticalLayout {
+            padding: 20px; spacing: 10px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: "Горячие клавиши"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+            }
+            for sc in [
+                { k: "Ctrl + 1 / 2 / 3", d: "Журнал / Статистика / Канбан" },
+                { k: "Ctrl + N", d: "Создать предмет или задачу в контексте" },
+                { k: "Ctrl + F", d: "Глобальный поиск" },
+                { k: "Ctrl + Z / Ctrl + Shift + Z", d: "Отмена / Повтор действия" },
+                { k: "Ctrl + ,", d: "Открыть настройки" },
+                { k: "Стрелки / Enter", d: "Навигация по таблице / Редактирование ячейки" },
+                { k: "Цифры 1 – 5", d: "Быстрый ввод оценки в активной ячейке" },
+                { k: "Delete / Escape", d: "Удалить выбранное / Закрыть диалог" },
+            ] : HorizontalLayout {
+                alignment: space-between;
+                Text { text: sc.d; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                Rectangle {
+                    height: 24px; border_radius: 6px; background: MaterialPalette.surface_container;
+                    HorizontalLayout {
+                        padding_left: 8px; padding_right: 8px;
+                        Text { text: sc.k; font_family: OxidiumTheme.font_mono; font_size: 11px; font_weight: 600; color: MaterialPalette.primary; vertical_alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+}

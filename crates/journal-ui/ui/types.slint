@@ -1,0 +1,218 @@
+export struct DayHeaderItem {
+    date_iso: string,
+    day_num: string,
+    weekday_short: string,
+    is_today: bool,
+    is_weekend: bool,
+    is_holiday: bool,
+    holiday_name: string,
+}
+
+export struct CellMarkChip {
+    entry_id: string,
+    is_attendance: bool,
+    label: string,
+    color: color,
+    tooltip: string,
+}
+
+export struct JournalCellItem {
+    date_iso: string,
+    day_index: int,
+    is_today: bool,
+    is_weekend: bool,
+    is_holiday: bool,
+    primary_label: string,
+    primary_color: color,
+    secondary_label: string,
+    secondary_color: color,
+    extra_count: int,
+    has_entries: bool,
+    tooltip: string,
+}
+
+export struct JournalRowItem {
+    subject_id: string,
+    subject_name: string,
+    short_name: string,
+    teacher: string,
+    color: color,
+    average_text: string,
+    target_text: string,
+    below_target: bool,
+    grade_count: int,
+    row_index: int,
+    cells: [JournalCellItem],
+}
+
+export struct CellDetailEntry {
+    id: string,
+    is_attendance: bool,
+    label: string,
+    color: color,
+    weight_text: string,
+    work_type_label: string,
+    topic: string,
+    comment: string,
+    source_label: string,
+}
+
+export struct ProfileItem {
+    id: string,
+    name: string,
+    institution: string,
+    group_name: string,
+    academic_year: string,
+    color: color,
+    is_active: bool,
+    is_archived: bool,
+}
+
+export struct SubjectItem {
+    id: string,
+    name: string,
+    short_name: string,
+    teacher: string,
+    color: color,
+    target_average: string,
+    is_archived: bool,
+    sort_order: int,
+}
+
+export struct PeriodItem {
+    id: string,
+    name: string,
+    period_type: string,
+    start_date: string,
+    end_date: string,
+    is_archived: bool,
+}
+
+export struct MarkTypeItem {
+    id: string,
+    code: string,
+    name: string,
+    short_label: string,
+    category: string,
+    color: color,
+    counts_in_average: bool,
+    is_builtin: bool,
+}
+
+export struct StatBarItem {
+    label: string,
+    value_text: string,
+    ratio: float,
+    color: color,
+    extra_text: string,
+    below_target: bool,
+}
+
+export struct HeatmapDayItem {
+    date_iso: string,
+    day_label: string,
+    level: int,
+    tooltip: string,
+}
+
+export struct KanbanTaskCard {
+    id: string,
+    column_id: string,
+    title: string,
+    subject_name: string,
+    subject_color: color,
+    priority_level: int,
+    priority_label: string,
+    priority_color: color,
+    deadline_text: string,
+    is_overdue: bool,
+    is_completed: bool,
+    tags_text: string,
+    badges_text: string,
+    checklist_text: string,
+    checklist_ratio: float,
+    linked_grades_count: int,
+    has_description: bool,
+}
+
+export struct KanbanColumnModel {
+    id: string,
+    name: string,
+    color: color,
+    wip_limit: int,
+    task_count: int,
+    over_wip: bool,
+    is_collapsed: bool,
+    is_completed_column: bool,
+    tasks: [KanbanTaskCard],
+}
+
+export struct BoardItem {
+    id: string,
+    name: string,
+}
+
+export struct ChecklistRowItem {
+    id: string,
+    title: string,
+    is_completed: bool,
+}
+
+export struct SearchHitItem {
+    entity_type: string,
+    entity_type_label: string,
+    entity_id: string,
+    title: string,
+    snippet: string,
+    date_text: string,
+}
+
+export struct ActivityRowItem {
+    id: string,
+    time_text: string,
+    source_label: string,
+    summary: string,
+    can_undo: bool,
+    undone: bool,
+}
+
+export struct NotificationRowItem {
+    id: string,
+    title: string,
+    body: string,
+    time_text: string,
+    is_read: bool,
+    is_overdue: bool,
+}
+
+export struct UiStrings {
+    nav_journal: string,
+    nav_statistics: string,
+    nav_kanban: string,
+    nav_profiles: string,
+    nav_settings: string,
+    nav_mcp: string,
+    journal_subject: string,
+    journal_average: string,
+    journal_today: string,
+    journal_week: string,
+    journal_month: string,
+    journal_semester: string,
+    journal_year: string,
+    journal_add_subject: string,
+    journal_empty: string,
+    search_placeholder: string,
+    stats_overall_avg: string,
+    stats_total_grades: string,
+    stats_absences: string,
+    stats_excused: string,
+    stats_passes: string,
+    stats_completed_tasks: string,
+    stats_overdue_tasks: string,
+    stats_forecast_badge: string,
+    kanban_new_task: string,
+    kanban_new_column: string,
+    kanban_new_board: string,
+    mcp_privacy_notice: string,
+    reminders_notice: string,
+}

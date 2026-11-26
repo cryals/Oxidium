@@ -1,0 +1,91 @@
+import "../../../assets/fonts/Roboto-Regular.ttf";
+import "../../../assets/fonts/Roboto-Medium.ttf";
+import "../../../assets/fonts/Roboto-Bold.ttf";
+import "../../../assets/fonts/RobotoMono-Regular.ttf";
+import "../../../assets/fonts/RobotoMono-Medium.ttf";
+import "../../../assets/fonts/RobotoFlex.ttf";
+
+import { MaterialPalette } from "@material";
+
+export global OxidiumTheme {
+    in_out property <bool> dark_mode: false;
+    in_out property <bool> compact_mode: false;
+    in_out property <bool> reduced_motion: false;
+    in_out property <float> ui_scale: 1.0;
+    in_out property <int> font_size_delta: 0;
+
+    out property <string> font_sans: "Roboto";
+    out property <string> font_mono: "Roboto Mono";
+    out property <duration> anim_fast: root.reduced_motion ? 0ms : 140ms;
+    out property <duration> anim_medium: root.reduced_motion ? 0ms : 220ms;
+
+    // Semantic grade & mark colors (customizable by user, legible in light & dark themes)
+    in_out property <color> grade_5: #2E7D32;
+    in_out property <color> grade_4: #00897B;
+    in_out property <color> grade_3: #D97706;
+    in_out property <color> grade_2: #EA580C;
+    in_out property <color> grade_1: #DC2626;
+    in_out property <color> mark_absent: #E11D48;
+    in_out property <color> mark_excused: #2563EB;
+    in_out property <color> mark_pass: #0D9488;
+    in_out property <color> mark_fail: #B91C1C;
+
+    // Surface & highlight roles
+    out property <color> weekend_tint: root.dark_mode ? #ffffff0b : #0f172a09;
+    out property <color> holiday_tint: root.dark_mode ? #f59e0b1f : #f59e0b1c;
+    out property <color> today_tint: MaterialPalette.primary_container.with_alpha(root.dark_mode ? 45% : 55%);
+    out property <color> cell_border: MaterialPalette.outline_variant.with_alpha(45%);
+    out property <color> success_color: root.dark_mode ? #4ade80 : #15803d;
+    out property <color> warning_color: root.dark_mode ? #fbbf24 : #b45309;
+    out property <color> danger_color: root.dark_mode ? #f87171 : #b91c1c;
+
+    // Spacing & row sizing responding to compact mode & scale
+    out property <length> row_height: (root.compact_mode ? 38px : 46px) * root.ui_scale;
+    out property <length> cell_width: (root.compact_mode ? 40px : 48px) * root.ui_scale;
+    out property <length> subject_col_width: (root.compact_mode ? 185px : 220px) * root.ui_scale;
+    out property <length> avg_col_width: (root.compact_mode ? 84px : 96px) * root.ui_scale;
+}
+
+export global OxidiumIcons {
+    out property <image> app_logo: @image-url("../../../assets/icon/web/icon-192.png");
+    out property <image> journal: @image-url("../../../assets/icons/journal.svg");
+    out property <image> analytics: @image-url("../../../assets/icons/analytics.svg");
+    out property <image> kanban: @image-url("../../../assets/icons/kanban.svg");
+    out property <image> settings: @image-url("../../../assets/icons/settings.svg");
+    out property <image> person: @image-url("../../../assets/icons/person.svg");
+    out property <image> hub: @image-url("../../../assets/icons/hub.svg");
+    out property <image> search: @image-url("../../../assets/icons/search.svg");
+    out property <image> add: @image-url("../../../assets/icons/add.svg");
+    out property <image> edit: @image-url("../../../assets/icons/edit.svg");
+    out property <image> delete: @image-url("../../../assets/icons/delete.svg");
+    out property <image> undo: @image-url("../../../assets/icons/undo.svg");
+    out property <image> redo: @image-url("../../../assets/icons/redo.svg");
+    out property <image> calendar: @image-url("../../../assets/icons/calendar.svg");
+    out property <image> notifications: @image-url("../../../assets/icons/notifications.svg");
+    out property <image> archive: @image-url("../../../assets/icons/archive.svg");
+    out property <image> restore: @image-url("../../../assets/icons/restore.svg");
+    out property <image> copy: @image-url("../../../assets/icons/copy.svg");
+    out property <image> check: @image-url("../../../assets/icons/check.svg");
+    out property <image> close: @image-url("../../../assets/icons/close.svg");
+    out property <image> chevron_left: @image-url("../../../assets/icons/chevron_left.svg");
+    out property <image> chevron_right: @image-url("../../../assets/icons/chevron_right.svg");
+    out property <image> filter: @image-url("../../../assets/icons/filter.svg");
+    out property <image> drag: @image-url("../../../assets/icons/drag.svg");
+    out property <image> tag: @image-url("../../../assets/icons/tag.svg");
+    out property <image> warning: @image-url("../../../assets/icons/warning.svg");
+    out property <image> download: @image-url("../../../assets/icons/download.svg");
+    out property <image> upload: @image-url("../../../assets/icons/upload.svg");
+    out property <image> backup: @image-url("../../../assets/icons/backup.svg");
+    out property <image> keyboard: @image-url("../../../assets/icons/keyboard.svg");
+    out property <image> refresh: @image-url("../../../assets/icons/refresh.svg");
+    out property <image> play: @image-url("../../../assets/icons/play.svg");
+    out property <image> stop: @image-url("../../../assets/icons/stop.svg");
+    out property <image> lock: @image-url("../../../assets/icons/lock.svg");
+    out property <image> dark_mode: @image-url("../../../assets/icons/dark_mode.svg");
+    out property <image> light_mode: @image-url("../../../assets/icons/light_mode.svg");
+    out property <image> palette: @image-url("../../../assets/icons/palette.svg");
+    out property <image> link: @image-url("../../../assets/icons/link.svg");
+    out property <image> check_box: @image-url("../../../assets/icons/check_box.svg");
+    out property <image> arrow_up: @image-url("../../../assets/icons/arrow_up.svg");
+    out property <image> arrow_down: @image-url("../../../assets/icons/arrow_down.svg");
+}

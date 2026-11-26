@@ -1,0 +1,883 @@
+import { MaterialWindow, MaterialPalette, MaterialSchemes, MaterialScheme, IconButton, Icon } from "@material";
+import { Palette } from "std-widgets.slint";
+import { OxidiumTheme, OxidiumIcons } from "theme.slint";
+import {
+    DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
+    PeriodItem, MarkTypeItem, StatBarItem, HeatmapDayItem, KanbanColumnModel,
+    BoardItem, ChecklistRowItem, SearchHitItem, ActivityRowItem, NotificationRowItem, UiStrings
+} from "types.slint";
+import { JournalView } from "views/journal_view.slint";
+import { StatisticsView } from "views/statistics_view.slint";
+import { KanbanView } from "views/kanban_view.slint";
+import {
+    ProfilesModal, SubjectsModal, PeriodsModal, GlobalSearchModal,
+    NotificationsModal, SettingsModal, ShortcutsModal
+} from "dialogs/modals.slint";
+
+export { MaterialPalette, MaterialSchemes, MaterialScheme, OxidiumTheme, OxidiumIcons }
+export {
+    DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
+    PeriodItem, MarkTypeItem, StatBarItem, HeatmapDayItem, KanbanColumnModel,
+    BoardItem, ChecklistRowItem, SearchHitItem, ActivityRowItem, NotificationRowItem, UiStrings
+}
+
+export component MainWindow inherits MaterialWindow {
+    title: "Oxidium — Электронный журнал ученика";
+    icon: OxidiumIcons.app_logo;
+    default_font_family: OxidiumTheme.font_sans;
+    preferred_width: 1380px;
+    preferred_height: 860px;
+    min_width: 820px;
+    min_height: 580px;
+
+    // Theme bridging helper
+    in_out property <int> color_scheme_mode: 2; // 0=Light, 1=Dark, 2=System
+    public function apply_color_scheme(mode: int) {
+        root.color_scheme_mode = mode;
+        if (mode == 0) {
+            Palette.color-scheme = ColorScheme.light;
+            OxidiumTheme.dark_mode = false;
+        } else if (mode == 1) {
+            Palette.color-scheme = ColorScheme.dark;
+            OxidiumTheme.dark_mode = true;
+        } else {
+            Palette.color-scheme = ColorScheme.unknown;
+            OxidiumTheme.dark_mode = (Palette.color-scheme == ColorScheme.dark);
+        }
+    }
+    changed color_scheme_mode => {
+        if (root.color_scheme_mode == 0) {
+            Palette.color-scheme = ColorScheme.light;
+            OxidiumTheme.dark_mode = false;
+        } else if (root.color_scheme_mode == 1) {
+            Palette.color-scheme = ColorScheme.dark;
+            OxidiumTheme.dark_mode = true;
+        } else {
+            Palette.color-scheme = ColorScheme.unknown;
+            OxidiumTheme.dark_mode = (Palette.color-scheme == ColorScheme.dark);
+        }
+    }
+
+    // Navigation: EXACT 3 main sections (0=Journal, 1=Statistics, 2=Kanban)
+    in_out property <int> active_section: 0;
+    in property <UiStrings> tr: {
+        nav_journal: "Журнал",
+        nav_statistics: "Статистика",
+        nav_kanban: "Канбан",
+        nav_profiles: "Профили",
+        nav_settings: "Настройки",
+        nav_mcp: "MCP",
+        journal_subject: "Предмет",
+        journal_average: "Средний",
+        journal_today: "Сегодня",
+        journal_week: "Неделя",
+        journal_month: "Месяц",
+        journal_semester: "Семестр",
+        journal_year: "Год",
+        journal_add_subject: "Предметы",
+        journal_empty: "Нет предметов. Добавьте первый предмет, чтобы начать вести журнал.",
+        search_placeholder: "Поиск (Ctrl+F)...",
+        stats_overall_avg: "Общий средний балл",
+        stats_total_grades: "Всего оценок",
+        stats_absences: "Пропуски (Н/Б)",
+        stats_excused: "Уважительные",
+        stats_passes: "Зачёты",
+        stats_completed_tasks: "Выполнено задач",
+        stats_overdue_tasks: "Просрочено",
+        stats_forecast_badge: "Прогноз — не записывается в журнал",
+        kanban_new_task: "Новая задача",
+        kanban_new_column: "+ Колонка",
+        kanban_new_board: "+ Доска",
+        mcp_privacy_notice: "Подключённый AI-ассистент получает доступ к данным строго в пределах выбранных разрешений.",
+        reminders_notice: "Напоминания доставляются, пока запущен Oxidium. При закрытом приложении уведомления не отправляются.",
+    };
+
+    // Active profile & top bar state
+    in property <string> active_profile_name: "Основной профиль";
+    in property <string> active_profile_sub: "";
+    in property <color> active_profile_color: #445E91;
+    in property <bool> can_undo: false;
+    in property <bool> can_redo: false;
+    in property <int> unread_notifications: 0;
+    in property <string> snackbar_message: "";
+    in_out property <bool> snackbar_visible: false;
+
+    // Auxiliary modals (NOT main tabs!)
+    in_out property <bool> profiles_modal_open: false;
+    in_out property <bool> subjects_modal_open: false;
+    in_out property <bool> periods_modal_open: false;
+    in_out property <bool> search_modal_open: false;
+    in_out property <bool> notifications_modal_open: false;
+    in_out property <bool> settings_modal_open: false;
+    in_out property <int> settings_active_tab: 0;
+    in_out property <bool> shortcuts_modal_open: false;
+
+    property <bool> any_modal_open: root.profiles_modal_open || root.subjects_modal_open
+        || root.periods_modal_open || root.search_modal_open
+        || root.notifications_modal_open || root.settings_modal_open
+        || root.shortcuts_modal_open || journal_view.quick_picker_open
+        || journal_view.cell_detail_open || kanban_view.new_task_open
+        || kanban_view.new_column_open || kanban_view.new_board_open || kanban_view.detail_open;
+
+    // Journal properties
+    in property <string> journal_month_title;
+    in_out property <int> journal_view_mode: 1;
+    in property <string> journal_overall_avg: "—";
+    in property <string> journal_avg_mode_label: "Средний";
+    in property <[DayHeaderItem]> journal_days;
+    in property <[JournalRowItem]> journal_rows;
+    in property <[PeriodItem]> academic_periods;
+    in property <string> active_period_label: "Периоды";
+    in property <[MarkTypeItem]> quick_marks;
+    in property <[CellDetailEntry]> cell_detail_entries;
+    in_out property <bool> journal_cell_detail_open <=> journal_view.cell_detail_open;
+    in_out property <bool> journal_quick_picker_open <=> journal_view.quick_picker_open;
+    in_out property <string> journal_picker_subject_id <=> journal_view.picker_subject_id;
+    in_out property <string> journal_picker_subject_name <=> journal_view.picker_subject_name;
+    in_out property <string> journal_picker_date_iso <=> journal_view.picker_date_iso;
+    in_out property <string> journal_detail_move_date <=> journal_view.detail_move_date;
+
+    // Statistics properties
+    in_out property <int> stats_period_preset: 0;
+    in property <string> stats_overall_avg: "—";
+    in property <string> stats_total_grades: "0";
+    in property <string> stats_grade_counts: "";
+    in property <string> stats_absences: "0";
+    in property <string> stats_excused: "0";
+    in property <string> stats_passes: "0";
+    in property <string> stats_attendance_note: "";
+    in property <string> stats_best_subject: "—";
+    in property <string> stats_lowest_subject: "—";
+    in property <string> stats_completed_tasks: "0";
+    in property <string> stats_overdue_tasks: "0";
+    in property <string> stats_active_tasks: "0";
+    in property <string> stats_comparison_summary: "";
+    in_out property <bool> stats_compare_enabled: false;
+    in property <image> stats_line_chart;
+    in property <image> stats_donut_chart;
+    in property <[StatBarItem]> stats_grade_dist;
+    in property <[StatBarItem]> stats_subject_avgs;
+    in property <[StatBarItem]> stats_attendance_bars;
+    in property <[HeatmapDayItem]> stats_heatmap;
+    in property <[StatBarItem]> stats_task_dynamics;
+    in property <string> forecast_result_text: "";
+    in property <string> forecast_target_result_text: "";
+
+    // Kanban properties
+    in property <[BoardItem]> kanban_boards;
+    in property <string> kanban_active_board_id;
+    in property <[KanbanColumnModel]> kanban_columns;
+    in_out property <bool> kanban_detail_open <=> kanban_view.detail_open;
+    in_out property <string> kanban_detail_task_id <=> kanban_view.detail_task_id;
+    in_out property <string> kanban_detail_title <=> kanban_view.detail_title;
+    in_out property <string> kanban_detail_desc <=> kanban_view.detail_desc;
+    in_out property <string> kanban_detail_notes <=> kanban_view.detail_notes;
+    in_out property <string> kanban_detail_deadline <=> kanban_view.detail_deadline;
+    in_out property <int> kanban_detail_priority <=> kanban_view.detail_priority;
+    in_out property <string> kanban_detail_tags_text <=> kanban_view.detail_tags_text;
+    in property <[ChecklistRowItem]> kanban_detail_checklist;
+
+    // Modals & Settings properties
+    in property <[ProfileItem]> profiles_list;
+    in property <[SubjectItem]> subjects_list;
+    in property <string> profile_delete_warning;
+    in_out property <string> profile_pending_delete_id;
+    in property <string> subject_delete_warning;
+    in_out property <string> subject_pending_delete_id;
+    in property <[SearchHitItem]> search_hits;
+    in property <[NotificationRowItem]> notifications_list;
+    in property <[ActivityRowItem]> activity_log_list;
+
+    in_out property <int> setting_theme_idx: 2;
+    in_out property <int> setting_lang_idx: 0;
+    in_out property <string> setting_accent_hex: "#445E91";
+    in_out property <bool> setting_compact: false;
+    in_out property <bool> setting_reduced_motion: false;
+    in_out property <int> setting_scale_percent: 100;
+    in_out property <int> setting_avg_mode_idx: 0;
+    in_out property <int> setting_avg_precision_idx: 1;
+    in_out property <int> setting_week_start_idx: 0;
+    in_out property <bool> setting_highlight_weekends: true;
+    in_out property <bool> setting_highlight_holidays: true;
+    in_out property <bool> setting_reminders_enabled: true;
+    in_out property <bool> setting_os_notifications: true;
+
+    in property <string> mcp_status_text: "Остановлен";
+    in property <bool> mcp_http_running: false;
+    in property <string> mcp_endpoint: "http://127.0.0.1:38421/mcp";
+    in_out property <string> mcp_port_text: "38421";
+    in_out property <bool> mcp_autostart: false;
+    in_out property <int> mcp_permission_idx: 1;
+    in_out property <bool> mcp_allow_destructive: false;
+    in property <string> mcp_requests_text: "0";
+    in property <string> mcp_errors_text: "0";
+    in property <string> mcp_last_request_text: "—";
+    in property <string> mcp_token_preview: "—";
+    in property <string> mcp_stdio_config_preview: "";
+    in property <string> db_path_text: "";
+    in property <string> backup_status_text: "";
+    in property <string> about_versions_text: "";
+
+    // Callbacks
+    callback section_changed(int);
+    callback undo_clicked();
+    callback redo_clicked();
+    callback journal_prev_period();
+    callback journal_next_period();
+    callback journal_go_today();
+    callback journal_change_view_mode(int);
+    callback journal_select_period(string);
+    callback journal_cell_clicked(string, string, int, int, bool);
+    callback journal_quick_mark(string, string, string);
+    callback journal_open_cell_detail(string, string);
+    callback journal_add_detailed_entry(string, string, string, string, int, string, string);
+    callback journal_delete_entry(string, bool);
+    callback journal_copy_entry(string, string);
+    callback journal_move_entry(string, string);
+    callback journal_subject_open_tasks(string);
+    callback journal_quick_digit_grade(int, int, int); // row, col, grade 1..5
+
+    callback stats_select_preset(int);
+    callback stats_toggle_compare();
+    callback stats_run_forecast(int, string, string, string, string);
+
+    callback kanban_select_board(string);
+    callback kanban_create_board(string);
+    callback kanban_create_column(string, string, bool);
+    callback kanban_move_column_delta(string, int);
+    callback kanban_create_task(string, string, string, string, int, int, string);
+    callback kanban_open_task_detail(string);
+    callback kanban_save_task_detail(string, string, string, string, string, int);
+    callback kanban_move_task_to_column(string, string);
+    callback kanban_move_task_step(string, int);
+    callback kanban_toggle_task_complete(string);
+    callback kanban_duplicate_task(string);
+    callback kanban_delete_task(string);
+    callback kanban_add_checklist(string, string);
+    callback kanban_toggle_checklist(string, bool);
+    callback kanban_delete_checklist(string);
+    callback kanban_add_tag(string, string);
+    callback kanban_filter_changed(string, int);
+
+    callback profile_switch(string);
+    callback profile_create(string, string, string, string, string);
+    callback profile_duplicate(string);
+    callback profile_archive(string, bool);
+    callback profile_request_delete(string);
+    callback profile_confirm_delete(string);
+
+    callback subject_create(string, string, string, string, string);
+    callback subject_move(string, int);
+    callback subject_archive(string, bool);
+    callback subject_request_delete(string);
+    callback subject_confirm_delete(string);
+
+    callback period_create(string, int, string, string);
+    callback search_query_changed(string);
+    callback search_hit_selected(string, string);
+    callback notif_mark_all_read();
+    callback notif_dismiss(string);
+
+    callback save_appearance(int, int, string, bool, bool, int);
+    callback save_journal_prefs(int, int, int, bool, bool);
+    callback save_kanban_prefs(bool, bool);
+    callback save_mcp_prefs(string, bool, int, bool);
+    callback mcp_start_http();
+    callback mcp_stop_http();
+    callback mcp_restart_http();
+    callback mcp_rotate_token();
+    callback mcp_undo_activity(string);
+    callback trigger_backup();
+    callback trigger_restore();
+    callback export_data(string);
+    callback import_data(string);
+
+    forward_focus: key_handler;
+
+    key_handler := FocusScope {
+        width: 100%;
+        height: 100%;
+
+        key_pressed(ev) => {
+            if (ev.text == Key.Escape && root.any_modal_open) {
+                root.profiles_modal_open = false;
+                root.subjects_modal_open = false;
+                root.periods_modal_open = false;
+                root.search_modal_open = false;
+                root.notifications_modal_open = false;
+                root.settings_modal_open = false;
+                root.shortcuts_modal_open = false;
+                journal_view.quick_picker_open = false;
+                journal_view.cell_detail_open = false;
+                kanban_view.new_task_open = false;
+                kanban_view.new_column_open = false;
+                kanban_view.new_board_open = false;
+                kanban_view.detail_open = false;
+                return accept;
+            }
+            // Do not hijack keys while user is editing inside any modal/dialog input
+            if (root.any_modal_open) {
+                return reject;
+            }
+            if (ev.modifiers.control) {
+                if (ev.text == "1") { root.active_section = 0; root.section_changed(0); return accept; }
+                if (ev.text == "2") { root.active_section = 1; root.section_changed(1); return accept; }
+                if (ev.text == "3") { root.active_section = 2; root.section_changed(2); return accept; }
+                if (ev.text == "f" || ev.text == "F" || ev.text == "а" || ev.text == "А") {
+                    root.search_modal_open = true;
+                    return accept;
+                }
+                if (ev.text == ",") {
+                    root.settings_active_tab = 0;
+                    root.settings_modal_open = true;
+                    return accept;
+                }
+                if (ev.text == "n" || ev.text == "N" || ev.text == "т" || ev.text == "Т") {
+                    if (root.active_section == 2) { kanban_view.new_task_open = true; }
+                    else { root.subjects_modal_open = true; }
+                    return accept;
+                }
+                if ((ev.text == "z" || ev.text == "Z" || ev.text == "я" || ev.text == "Я") && ev.modifiers.shift) {
+                    root.redo_clicked();
+                    return accept;
+                }
+                if (ev.text == "z" || ev.text == "Z" || ev.text == "я" || ev.text == "Я") {
+                    root.undo_clicked();
+                    return accept;
+                }
+            }
+            // Journal cell keyboard navigation & quick digits 1-5
+            if (root.active_section == 0 && root.journal_rows.length > 0 && root.journal_days.length > 0) {
+                if (ev.text == Key.RightArrow) {
+                    if (journal_view.active_row < 0) { journal_view.active_row = 0; }
+                    journal_view.active_col = min(root.journal_days.length - 1, journal_view.active_col + 1);
+                    return accept;
+                }
+                if (ev.text == Key.LeftArrow) {
+                    if (journal_view.active_row < 0) { journal_view.active_row = 0; }
+                    journal_view.active_col = max(0, journal_view.active_col - 1);
+                    return accept;
+                }
+                if (ev.text == Key.DownArrow) {
+                    if (journal_view.active_col < 0) { journal_view.active_col = 0; }
+                    journal_view.active_row = min(root.journal_rows.length - 1, journal_view.active_row + 1);
+                    return accept;
+                }
+                if (ev.text == Key.UpArrow) {
+                    if (journal_view.active_col < 0) { journal_view.active_col = 0; }
+                    journal_view.active_row = max(0, journal_view.active_row - 1);
+                    return accept;
+                }
+                if (journal_view.active_row >= 0 && journal_view.active_col >= 0) {
+                    if (ev.text == "1") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 1); return accept; }
+                    if (ev.text == "2") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 2); return accept; }
+                    if (ev.text == "3") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 3); return accept; }
+                    if (ev.text == "4") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 4); return accept; }
+                    if (ev.text == "5") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 5); return accept; }
+                }
+            }
+            reject
+        }
+
+        HorizontalLayout {
+            x: 0px;
+            y: 0px;
+            width: root.width;
+            height: root.height;
+            spacing: 0px;
+
+            // ===== COMPACT ADAPTIVE LEFT NAVIGATION RAIL =====
+            Rectangle {
+                width: root.width < 940px ? 68px : 84px;
+                background: MaterialPalette.surface_container_low;
+
+                VerticalLayout {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    padding_top: 14px;
+                    padding_bottom: 14px;
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    // Top Brand + Exact 3 Primary Navigation Sections
+                    VerticalLayout {
+                        spacing: 12px;
+
+                        // Oxidium Brand Logo
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 44px; height: 44px; border_radius: 14px;
+                                background: #ffffff;
+                                border_width: 1px; border_color: OxidiumTheme.cell_border;
+                                Image {
+                                    source: OxidiumIcons.app_logo;
+                                    width: 30px; height: 30px;
+                                    x: 7px; y: 7px;
+                                    image_fit: contain;
+                                }
+                            }
+                        }
+
+                        // Exact 3 Main Sections: Journal, Statistics, Kanban
+                        for nav[idx] in [
+                            { label: root.tr.nav_journal, icon: OxidiumIcons.journal },
+                            { label: root.tr.nav_statistics, icon: OxidiumIcons.analytics },
+                            { label: root.tr.nav_kanban, icon: OxidiumIcons.kanban },
+                        ] : VerticalLayout {
+                            spacing: 3px;
+                            HorizontalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 56px; height: 34px; border_radius: 17px;
+                                    background: root.active_section == idx
+                                        ? MaterialPalette.secondary_container
+                                        : nav_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+                                    Icon {
+                                        source: nav.icon;
+                                        width: 22px; height: 22px;
+                                        colorize: root.active_section == idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                    }
+                                    nav_ta := TouchArea {
+                                        mouse_cursor: pointer;
+                                        clicked => {
+                                            root.active_section = idx;
+                                            root.section_changed(idx);
+                                        }
+                                    }
+                                }
+                            }
+                            if root.width >= 940px : Text {
+                                text: nav.label;
+                                font_size: 11px;
+                                font_weight: root.active_section == idx ? 700 : 500;
+                                color: root.active_section == idx ? MaterialPalette.on_surface : MaterialPalette.on_surface_variant;
+                                horizontal_alignment: center;
+                            }
+                        }
+                    }
+
+                    // Bottom Rail Utilities: MCP Status, Profiles, Settings (auxiliary dialogs, NOT tabs)
+                    VerticalLayout {
+                        spacing: 8px;
+
+                        // MCP Status Indicator Pill
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 52px; height: 32px; border_radius: 16px;
+                                background: root.mcp_http_running
+                                    ? OxidiumTheme.success_color.with_alpha(20%)
+                                    : MaterialPalette.surface_container_high;
+                                border_width: 1px;
+                                border_color: root.mcp_http_running ? OxidiumTheme.success_color : OxidiumTheme.cell_border;
+                                HorizontalLayout {
+                                    alignment: center; spacing: 4px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 7px; height: 7px; border_radius: 4px;
+                                            background: root.mcp_http_running ? OxidiumTheme.success_color : MaterialPalette.outline;
+                                        }
+                                    }
+                                    Text {
+                                        text: "MCP";
+                                        font_family: OxidiumTheme.font_mono;
+                                        font_size: 10px; font_weight: 700;
+                                        color: root.mcp_http_running ? OxidiumTheme.success_color : MaterialPalette.on_surface_variant;
+                                        vertical_alignment: center;
+                                    }
+                                }
+                                TouchArea {
+                                    mouse_cursor: pointer;
+                                    clicked => {
+                                        root.settings_active_tab = 3;
+                                        root.settings_modal_open = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 42px; height: 42px; border_radius: 21px;
+                                background: root.active_profile_color;
+                                Icon { source: OxidiumIcons.person; width: 20px; height: 20px; colorize: #ffffff; }
+                                TouchArea {
+                                    mouse_cursor: pointer;
+                                    clicked => { root.profiles_modal_open = true; }
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            IconButton {
+                                icon: OxidiumIcons.settings;
+                                tooltip: root.tr.nav_settings + " (Ctrl+,)";
+                                clicked => {
+                                    root.settings_active_tab = 0;
+                                    root.settings_modal_open = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    x: parent.width - 1px; width: 1px; height: 100%;
+                    background: OxidiumTheme.cell_border;
+                }
+            }
+
+            // ===== MAIN CONTENT COLUMN =====
+            VerticalLayout {
+                horizontal_stretch: 1;
+                spacing: 0px;
+
+                // Top App Bar (Profile Pill, Global Search Trigger, Undo/Redo, Notifications, Shortcuts)
+                Rectangle {
+                    height: 54px;
+                    background: MaterialPalette.surface;
+
+                    HorizontalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: parent.width;
+                        height: parent.height;
+                        padding_left: 18px;
+                        padding_right: 16px;
+                        spacing: 12px;
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 10px;
+                            Text {
+                                text: "Oxidium";
+                                font_size: 17px; font_weight: 700;
+                                color: MaterialPalette.on_surface;
+                                vertical_alignment: center;
+                            }
+                            Rectangle {
+                                height: 28px;
+                                y: (parent.height - self.height) / 2;
+                                border_radius: 14px;
+                                background: MaterialPalette.surface_container;
+                                HorizontalLayout {
+                                    padding_left: 10px; padding_right: 10px; spacing: 6px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle { width: 8px; height: 8px; border_radius: 4px; background: root.active_profile_color; }
+                                    }
+                                    Text {
+                                        text: root.active_profile_name + (root.active_profile_sub != "" ? " • " + root.active_profile_sub : "");
+                                        font_size: 12px; font_weight: 500;
+                                        color: MaterialPalette.on_surface;
+                                        vertical_alignment: center;
+                                    }
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.profiles_modal_open = true; } }
+                            }
+                        }
+
+                        // Global Search Bar Trigger
+                        Rectangle {
+                            width: min(360px, max(180px, root.width * 0.28));
+                            height: 36px;
+                            y: (parent.height - self.height) / 2;
+                            border_radius: 18px;
+                            background: MaterialPalette.surface_container_low;
+                            border_width: 1px;
+                            border_color: OxidiumTheme.cell_border;
+                            HorizontalLayout {
+                                padding_left: 12px; padding_right: 12px; spacing: 8px;
+                                VerticalLayout { alignment: center; Icon { source: OxidiumIcons.search; width: 16px; height: 16px; colorize: MaterialPalette.on_surface_variant; } }
+                                Text {
+                                    text: root.tr.search_placeholder;
+                                    font_size: 12px; color: MaterialPalette.on_surface_variant;
+                                    vertical_alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+                            TouchArea { mouse_cursor: pointer; clicked => { root.search_modal_open = true; } }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 4px;
+                            IconButton {
+                                icon: OxidiumIcons.undo;
+                                enabled: root.can_undo;
+                                tooltip: "Отменить (Ctrl+Z)";
+                                clicked => { root.undo_clicked(); }
+                            }
+                            IconButton {
+                                icon: OxidiumIcons.redo;
+                                enabled: root.can_redo;
+                                tooltip: "Повторить (Ctrl+Shift+Z)";
+                                clicked => { root.redo_clicked(); }
+                            }
+                            Rectangle {
+                                width: 40px; height: 40px;
+                                IconButton {
+                                    icon: OxidiumIcons.notifications;
+                                    tooltip: "Уведомления";
+                                    clicked => { root.notifications_modal_open = !root.notifications_modal_open; }
+                                }
+                                if root.unread_notifications > 0 : Rectangle {
+                                    x: 22px; y: 4px; width: 16px; height: 16px; border_radius: 8px;
+                                    background: MaterialPalette.error;
+                                    Text {
+                                        text: root.unread_notifications;
+                                        font_family: OxidiumTheme.font_mono;
+                                        font_size: 9px; font_weight: 700;
+                                        color: MaterialPalette.on_error;
+                                        horizontal_alignment: center; vertical_alignment: center;
+                                    }
+                                }
+                            }
+                            IconButton {
+                                icon: OxidiumIcons.keyboard;
+                                tooltip: "Горячие клавиши";
+                                clicked => { root.shortcuts_modal_open = true; }
+                            }
+                        }
+                    }
+
+                    Rectangle { y: parent.height - 1px; height: 1px; width: 100%; background: OxidiumTheme.cell_border; }
+                }
+
+                // Active Main View Stack
+                Rectangle {
+                    vertical_stretch: 1;
+                    background: MaterialPalette.background;
+
+                    journal_view := JournalView {
+                        visible: root.active_section == 0;
+                        width: 100%; height: 100%;
+                        tr: root.tr;
+                        month_title: root.journal_month_title;
+                        view_mode <=> root.journal_view_mode;
+                        overall_avg_text: root.journal_overall_avg;
+                        average_mode_label: root.journal_avg_mode_label;
+                        days: root.journal_days;
+                        rows: root.journal_rows;
+                        periods: root.academic_periods;
+                        active_period_label: root.active_period_label;
+                        quick_marks: root.quick_marks;
+                        cell_entries: root.cell_detail_entries;
+
+                        prev_period => { root.journal_prev_period(); }
+                        next_period => { root.journal_next_period(); }
+                        go_today => { root.journal_go_today(); }
+                        change_view_mode(m) => { root.journal_change_view_mode(m); }
+                        select_period(p) => { root.journal_select_period(p); }
+                        open_subjects_manager => { root.subjects_modal_open = true; }
+                        open_periods_manager => { root.periods_modal_open = true; }
+                        cell_clicked(sid, d, r, c, has) => { root.journal_cell_clicked(sid, d, r, c, has); }
+                        quick_mark_selected(sid, d, code) => { root.journal_quick_mark(sid, d, code); }
+                        open_cell_detail(sid, d) => { root.journal_open_cell_detail(sid, d); }
+                        add_detailed_entry(sid, d, mk, w, wt, top, com) => { root.journal_add_detailed_entry(sid, d, mk, w, wt, top, com); }
+                        delete_cell_entry(id, is_att) => { root.journal_delete_entry(id, is_att); }
+                        copy_cell_entry(id, dt) => { root.journal_copy_entry(id, dt); }
+                        move_cell_entry(id, dt) => { root.journal_move_entry(id, dt); }
+                        subject_open_tasks(sid) => { root.journal_subject_open_tasks(sid); }
+                    }
+
+                    stats_view := StatisticsView {
+                        visible: root.active_section == 1;
+                        width: 100%; height: 100%;
+                        tr: root.tr;
+                        period_preset <=> root.stats_period_preset;
+                        overall_avg: root.stats_overall_avg;
+                        total_grades_text: root.stats_total_grades;
+                        grade_counts_breakdown: root.stats_grade_counts;
+                        absences_text: root.stats_absences;
+                        excused_text: root.stats_excused;
+                        passes_text: root.stats_passes;
+                        attendance_note: root.stats_attendance_note;
+                        best_subject_text: root.stats_best_subject;
+                        lowest_subject_text: root.stats_lowest_subject;
+                        completed_tasks_text: root.stats_completed_tasks;
+                        overdue_tasks_text: root.stats_overdue_tasks;
+                        active_tasks_text: root.stats_active_tasks;
+                        comparison_summary: root.stats_comparison_summary;
+                        compare_enabled <=> root.stats_compare_enabled;
+                        line_chart_image: root.stats_line_chart;
+                        donut_chart_image: root.stats_donut_chart;
+                        grade_dist_bars: root.stats_grade_dist;
+                        subject_avg_bars: root.stats_subject_avgs;
+                        attendance_bars: root.stats_attendance_bars;
+                        heatmap_days: root.stats_heatmap;
+                        task_dynamics_bars: root.stats_task_dynamics;
+                        subjects: root.subjects_list;
+                        forecast_result_text: root.forecast_result_text;
+                        forecast_target_result_text: root.forecast_target_result_text;
+
+                        select_period_preset(p) => { root.stats_select_preset(p); }
+                        toggle_compare => { root.stats_toggle_compare(); }
+                        run_forecast(si, g, w, t, m) => { root.stats_run_forecast(si, g, w, t, m); }
+                    }
+
+                    kanban_view := KanbanView {
+                        visible: root.active_section == 2;
+                        width: 100%; height: 100%;
+                        tr: root.tr;
+                        boards: root.kanban_boards;
+                        active_board_id: root.kanban_active_board_id;
+                        columns: root.kanban_columns;
+                        subjects: root.subjects_list;
+                        detail_checklist: root.kanban_detail_checklist;
+
+                        select_board(id) => { root.kanban_select_board(id); }
+                        create_board(name) => { root.kanban_create_board(name); }
+                        create_column(name, wip, done) => { root.kanban_create_column(name, wip, done); }
+                        move_column_delta(id, d) => { root.kanban_move_column_delta(id, d); }
+                        create_task(cid, t, d, dl, p, si, tags) => { root.kanban_create_task(cid, t, d, dl, p, si, tags); }
+                        open_task_detail(id) => { root.kanban_open_task_detail(id); }
+                        save_task_detail(id, t, d, n, dl, p) => { root.kanban_save_task_detail(id, t, d, n, dl, p); }
+                        move_task_to_column(tid, cid) => { root.kanban_move_task_to_column(tid, cid); }
+                        move_task_step(tid, d) => { root.kanban_move_task_step(tid, d); }
+                        toggle_task_complete(id) => { root.kanban_toggle_task_complete(id); }
+                        duplicate_task(id) => { root.kanban_duplicate_task(id); }
+                        delete_task(id) => { root.kanban_delete_task(id); }
+                        add_checklist_item(tid, title) => { root.kanban_add_checklist(tid, title); }
+                        toggle_checklist_item(cid, done) => { root.kanban_toggle_checklist(cid, done); }
+                        delete_checklist_item(cid) => { root.kanban_delete_checklist(cid); }
+                        add_tag_to_task(tid, tg) => { root.kanban_add_tag(tid, tg); }
+                        filter_changed(q, m) => { root.kanban_filter_changed(q, m); }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== AUXILIARY MODALS & DRAWERS =====
+    if root.profiles_modal_open : ProfilesModal {
+        profiles: root.profiles_list;
+        delete_warning_text: root.profile_delete_warning;
+        pending_delete_id <=> root.profile_pending_delete_id;
+        close => { root.profiles_modal_open = false; }
+        switch_profile(id) => { root.profile_switch(id); }
+        create_profile(n, i, g, y, c) => { root.profile_create(n, i, g, y, c); }
+        duplicate_profile(id) => { root.profile_duplicate(id); }
+        archive_profile(id, a) => { root.profile_archive(id, a); }
+        request_delete_profile(id) => { root.profile_request_delete(id); }
+        confirm_delete_profile(id) => { root.profile_confirm_delete(id); }
+    }
+
+    if root.subjects_modal_open : SubjectsModal {
+        subjects: root.subjects_list;
+        delete_warning_text: root.subject_delete_warning;
+        pending_delete_id <=> root.subject_pending_delete_id;
+        close => { root.subjects_modal_open = false; }
+        create_subject(n, s, t, tg, c) => { root.subject_create(n, s, t, tg, c); }
+        move_subject(id, d) => { root.subject_move(id, d); }
+        archive_subject(id, a) => { root.subject_archive(id, a); }
+        request_delete_subject(id) => { root.subject_request_delete(id); }
+        confirm_delete_subject(id) => { root.subject_confirm_delete(id); }
+    }
+
+    if root.periods_modal_open : PeriodsModal {
+        periods: root.academic_periods;
+        close => { root.periods_modal_open = false; }
+        create_period(n, t, s, e) => { root.period_create(n, t, s, e); }
+        select_period(id) => { root.journal_select_period(id); }
+    }
+
+    if root.search_modal_open : GlobalSearchModal {
+        hits: root.search_hits;
+        close => { root.search_modal_open = false; }
+        search_edited(q) => { root.search_query_changed(q); }
+        hit_selected(t, id) => { root.search_hit_selected(t, id); }
+    }
+
+    if root.notifications_modal_open : NotificationsModal {
+        items: root.notifications_list;
+        background_notice: root.tr.reminders_notice;
+        close => { root.notifications_modal_open = false; }
+        mark_all_read => { root.notif_mark_all_read(); }
+        dismiss_item(id) => { root.notif_dismiss(id); }
+    }
+
+    if root.settings_modal_open : SettingsModal {
+        active_tab <=> root.settings_active_tab;
+        tr: root.tr;
+        theme_mode_idx <=> root.setting_theme_idx;
+        lang_idx <=> root.setting_lang_idx;
+        accent_hex <=> root.setting_accent_hex;
+        compact_mode <=> root.setting_compact;
+        reduced_motion <=> root.setting_reduced_motion;
+        scale_percent <=> root.setting_scale_percent;
+        avg_mode_idx <=> root.setting_avg_mode_idx;
+        avg_precision_idx <=> root.setting_avg_precision_idx;
+        week_start_idx <=> root.setting_week_start_idx;
+        highlight_weekends <=> root.setting_highlight_weekends;
+        highlight_holidays <=> root.setting_highlight_holidays;
+        reminders_enabled <=> root.setting_reminders_enabled;
+        os_notifications_enabled <=> root.setting_os_notifications;
+        mcp_status_text: root.mcp_status_text;
+        mcp_http_running: root.mcp_http_running;
+        mcp_endpoint: root.mcp_endpoint;
+        mcp_port_text <=> root.mcp_port_text;
+        mcp_autostart <=> root.mcp_autostart;
+        mcp_permission_idx <=> root.mcp_permission_idx;
+        mcp_allow_destructive <=> root.mcp_allow_destructive;
+        mcp_requests_text: root.mcp_requests_text;
+        mcp_errors_text: root.mcp_errors_text;
+        mcp_last_request_text: root.mcp_last_request_text;
+        mcp_token_preview: root.mcp_token_preview;
+        mcp_stdio_config_preview: root.mcp_stdio_config_preview;
+        activity_log: root.activity_log_list;
+        db_path_text: root.db_path_text;
+        backup_status_text: root.backup_status_text;
+        about_versions_text: root.about_versions_text;
+
+        close => { root.settings_modal_open = false; }
+        save_appearance(t, l, a, c, r, s) => { root.save_appearance(t, l, a, c, r, s); }
+        save_journal_prefs(m, p, w, wk, h) => { root.save_journal_prefs(m, p, w, wk, h); }
+        save_kanban_prefs(r, o) => { root.save_kanban_prefs(r, o); }
+        save_mcp_prefs(p, a, pm, d) => { root.save_mcp_prefs(p, a, pm, d); }
+        mcp_start_http => { root.mcp_start_http(); }
+        mcp_stop_http => { root.mcp_stop_http(); }
+        mcp_restart_http => { root.mcp_restart_http(); }
+        mcp_rotate_token => { root.mcp_rotate_token(); }
+        mcp_undo_activity(id) => { root.mcp_undo_activity(id); }
+        trigger_backup => { root.trigger_backup(); }
+        trigger_restore => { root.trigger_restore(); }
+        export_data(fmt) => { root.export_data(fmt); }
+        import_data(fmt) => { root.import_data(fmt); }
+    }
+
+    if root.shortcuts_modal_open : ShortcutsModal {
+        close => { root.shortcuts_modal_open = false; }
+    }
+
+    // Floating Snackbar feedback
+    if root.snackbar_visible && root.snackbar_message != "" : Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 20px;
+        min_width: 280px;
+        max_width: 560px;
+        height: 44px;
+        border_radius: 12px;
+        background: MaterialPalette.inverse_surface;
+        drop_shadow_blur: 16px;
+        drop_shadow_color: #00000045;
+        HorizontalLayout {
+            padding_left: 16px; padding_right: 12px; spacing: 12px; alignment: space-between;
+            Text {
+                text: root.snackbar_message;
+                font_size: 13px; color: MaterialPalette.inverse_on_surface;
+                vertical_alignment: center;
+            }
+            IconButton {
+                icon: OxidiumIcons.close;
+                inverse: true;
+                clicked => { root.snackbar_visible = false; }
+            }
+        }
+    }
+}
