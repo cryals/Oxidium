@@ -569,6 +569,13 @@ export component SettingsModal inherits Rectangle {
     in property <string> backup_status_text: "";
     in property <string> about_versions_text: "";
 
+    // Dynamic Updates (GitHub Releases)
+    in_out property <bool> auto_check_updates: true;
+    in property <bool> update_available: false;
+    in property <bool> update_checking: false;
+    in property <string> update_latest_version: "";
+    in property <string> update_status_text: "";
+
     callback close();
     callback save_appearance(int, int, string, bool, bool, int);
     callback save_journal_prefs(int, int, int, bool, bool);
@@ -584,6 +591,10 @@ export component SettingsModal inherits Rectangle {
     callback export_data(string); // json, csv, xlsx, md
     callback import_data(string); // json, csv, telegram
     callback open_onboarding();
+    callback toggle_auto_updates(bool);
+    callback check_updates();
+    callback open_update_modal();
+    callback open_releases_page();
 
     width: 100%; height: 100%;
     background: #00000055;
@@ -968,6 +979,68 @@ export component SettingsModal inherits Rectangle {
                                 Text { text: root.about_versions_text; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; wrap: word_wrap; }
                                 Text { text: "Репозиторий: https://github.com/cryals/Oxidium"; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.primary; }
                                 Text { text: "Лицензия кода Oxidium: MIT. Включает Slint UI Toolkit, Material Components (MIT), Google Fonts Roboto/Roboto Flex/Roboto Mono (SIL OFL 1.1), Material Symbols (Apache 2.0), SQLite (Public Domain), rmcp (Apache 2.0)."; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                            }
+                        }
+
+                        // Dynamic Semi-Automatic Updates Card (GitHub Releases)
+                        Rectangle {
+                            border_radius: 14px; background: MaterialPalette.surface_container;
+                            VerticalLayout {
+                                padding: 14px; spacing: 10px;
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text { text: "Обновления (GitHub Releases)"; font_size: 14px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                                    if root.update_available : Rectangle {
+                                        height: 26px; border_radius: 13px;
+                                        background: OxidiumTheme.grade_5_bg;
+                                        HorizontalLayout {
+                                            padding_left: 10px; padding_right: 10px;
+                                            Text {
+                                                text: "Доступна " + root.update_latest_version;
+                                                font_family: OxidiumTheme.font_mono; font_size: 11px; font_weight: 700;
+                                                color: OxidiumTheme.grade_5_fg; vertical_alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    VerticalLayout {
+                                        Text { text: "Проверять наличие новых версий при запуске"; font_size: 13px; color: MaterialPalette.on_surface; }
+                                        Text { text: "Источник: github.com/cryals/Oxidium/releases (без телеметрии, работает офлайн)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                                    }
+                                    Switch {
+                                        checked <=> root.auto_check_updates;
+                                        checked_state_changed(v) => { root.toggle_auto_updates(v); }
+                                    }
+                                }
+                                if root.update_status_text != "" : Text {
+                                    text: root.update_status_text;
+                                    font_size: 12px;
+                                    color: root.update_available ? MaterialPalette.primary : MaterialPalette.on_surface_variant;
+                                    wrap: word_wrap;
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    TonalButton {
+                                        text: root.update_checking ? "Проверка..." : "Проверить обновления";
+                                        icon: OxidiumIcons.refresh;
+                                        enabled: !root.update_checking;
+                                        clicked => { root.check_updates(); }
+                                    }
+                                    if root.update_available : FilledButton {
+                                        text: "Обновить до " + root.update_latest_version;
+                                        icon: OxidiumIcons.download;
+                                        clicked => {
+                                            root.close();
+                                            root.open_update_modal();
+                                        }
+                                    }
+                                    OutlineButton {
+                                        text: "Открыть релизы GitHub";
+                                        clicked => { root.open_releases_page(); }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1452,6 +1525,170 @@ export component OnboardingModal inherits Rectangle {
                                 root.mcp_access_idx
                             );
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Dynamic Semi-Automatic Update Modal (GitHub Releases)
+// ============================================================================
+export component UpdateModal inherits Rectangle {
+    in property <string> current_version: "v0.1.0";
+    in property <string> latest_version: "";
+    in property <string> release_name: "";
+    in property <string> published_at: "";
+    in property <string> release_notes: "";
+    in property <string> asset_label: "";
+    in property <string> sha256_label: "";
+    in property <string> status_text: "";
+    in property <bool> downloading: false;
+    in property <bool> has_asset: false;
+
+    callback close();
+    callback download_and_install();
+    callback open_releases_page();
+
+    width: 100%; height: 100%;
+    background: #00000060;
+    TouchArea { clicked => { if (!root.downloading) { root.close(); } } }
+
+    Rectangle {
+        width: 600px;
+        height: 490px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border_radius: 26px;
+        background: MaterialPalette.surface_container_high;
+        border_width: 1px;
+        border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 32px;
+        drop_shadow_color: #00000060;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 14px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                HorizontalLayout {
+                    spacing: 12px;
+                    Rectangle {
+                        width: 42px; height: 42px; border_radius: 14px;
+                        background: MaterialPalette.primary_container;
+                        Icon { source: OxidiumIcons.download; width: 22px; height: 22px; colorize: MaterialPalette.on_primary_container; }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+                        Text {
+                            text: root.release_name != "" ? "Доступно обновление: " + root.release_name : "Доступно обновление Oxidium";
+                            font_family: OxidiumTheme.font_display;
+                            font_size: 18px; font_weight: 600;
+                            color: MaterialPalette.on_surface;
+                        }
+                        Text {
+                            text: root.current_version + "  →  " + root.latest_version + (root.published_at != "" ? "  •  " + root.published_at : "");
+                            font_family: OxidiumTheme.font_mono;
+                            font_size: 12px; font_weight: 600;
+                            color: MaterialPalette.primary;
+                        }
+                    }
+                }
+                IconButton {
+                    icon: OxidiumIcons.close;
+                    enabled: !root.downloading;
+                    clicked => { root.close(); }
+                }
+            }
+
+            // Release notes card
+            Rectangle {
+                vertical_stretch: 1;
+                border_radius: 16px;
+                background: MaterialPalette.surface_container;
+                border_width: 1px;
+                border_color: OxidiumTheme.cell_border;
+                ScrollView {
+                    x: 0px; y: 0px;
+                    width: parent.width; height: parent.height;
+                    viewport_width: self.visible_width;
+                    VerticalLayout {
+                        x: 0px; y: 0px;
+                        width: parent.visible_width;
+                        padding: 14px;
+                        spacing: 6px;
+                        Text { text: "Что нового в релизе"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        Text {
+                            text: root.release_notes != "" ? root.release_notes : "Описание релиза доступно на странице GitHub Releases.";
+                            font_size: 13px;
+                            color: MaterialPalette.on_surface;
+                            wrap: word_wrap;
+                        }
+                    }
+                }
+            }
+
+            // Package & SHA-256 verification summary
+            Rectangle {
+                border_radius: 14px;
+                background: MaterialPalette.surface_container;
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 4px;
+                    Text {
+                        text: root.has_asset ? "Пакет для вашей ОС: " + root.asset_label : "Автоматический пакет для текущей ОС не найден — откройте GitHub Releases.";
+                        font_family: OxidiumTheme.font_mono;
+                        font_size: 11px;
+                        color: MaterialPalette.on_surface;
+                        wrap: word_wrap;
+                    }
+                    Text {
+                        text: root.sha256_label != "" ? "Проверка целостности SHA-256: " + root.sha256_label : "Источник: https://github.com/cryals/Oxidium/releases";
+                        font_family: OxidiumTheme.font_mono;
+                        font_size: 10px;
+                        color: OxidiumTheme.success_color;
+                        wrap: word_wrap;
+                    }
+                }
+            }
+
+            if root.status_text != "" : Rectangle {
+                border_radius: 12px;
+                background: MaterialPalette.secondary_container;
+                HorizontalLayout {
+                    padding: 10px;
+                    Text {
+                        text: root.status_text;
+                        font_size: 12px; font_weight: 500;
+                        color: MaterialPalette.on_secondary_container;
+                        wrap: word_wrap;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: space-between;
+                spacing: 8px;
+                OutlineButton {
+                    text: "Открыть GitHub Releases";
+                    clicked => { root.open_releases_page(); }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    OutlineButton {
+                        text: "Позже";
+                        enabled: !root.downloading;
+                        clicked => { root.close(); }
+                    }
+                    if root.has_asset : FilledButton {
+                        text: root.downloading ? "Загрузка и проверка SHA-256..." : "Скачать и установить";
+                        icon: OxidiumIcons.download;
+                        enabled: !root.downloading;
+                        clicked => { root.download_and_install(); }
                     }
                 }
             }

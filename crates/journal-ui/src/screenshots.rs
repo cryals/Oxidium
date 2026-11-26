@@ -148,6 +148,31 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
     win.invoke_apply_color_scheme(1);
     capture("onboarding.png")?;
 
+    // 9. Dynamic GitHub Releases Update Modal + Top-Bar Update Pill (Dark)
+    win.set_onboarding_open(false);
+    controller.apply_update_info(
+        &win,
+        journal_app::UpdateInfo {
+            current_version: journal_app::CURRENT_APP_VERSION.to_string(),
+            latest_version: "0.2.0".to_string(),
+            tag_name: "v0.2.0".to_string(),
+            release_name: "Oxidium v0.2.0".to_string(),
+            release_notes: "• Ускорена загрузка матрицы оценок на больших базах.\n• Добавлен расширенный экспорт статистики в Markdown и XLSX.\n• Улучшена синхронизация MCP-сервера с Claude Desktop и Gemini CLI.\n• Автоматическая проверка целостности SHA-256 перед установкой.".to_string(),
+            html_url: journal_app::GITHUB_RELEASES_PAGE.to_string(),
+            published_at: "2026-12-01".to_string(),
+            selected_asset: Some(journal_app::ReleaseAssetInfo {
+                name: "Oxidium-0.2.0-windows-x86_64-setup.exe".to_string(),
+                download_url: "https://github.com/cryals/Oxidium/releases/download/v0.2.0/Oxidium-0.2.0-windows-x86_64-setup.exe".to_string(),
+                size_bytes: 16_450_000,
+            }),
+            sha256_expected: Some("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08".to_string()),
+            is_update_available: true,
+        },
+    );
+    win.set_update_modal_open(true);
+    win.invoke_apply_color_scheme(1);
+    capture("update-modal.png")?;
+
     let _ = std::fs::remove_dir_all(&tmp_dir);
     Ok(())
 }

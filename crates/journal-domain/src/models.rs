@@ -955,11 +955,19 @@ impl Default for MarkColorPalette {
     }
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppSettings {
     // Active state
     pub active_profile_id: Option<Uuid>,
     pub language: Language,
+    #[serde(default)]
+    pub onboarding_completed: bool,
+    #[serde(default = "default_true")]
+    pub auto_check_updates: bool,
     // Appearance
     pub theme_mode: ThemeMode,
     pub accent_color: String,
@@ -1002,6 +1010,8 @@ impl Default for AppSettings {
         Self {
             active_profile_id: None,
             language: Language::Ru,
+            onboarding_completed: false,
+            auto_check_updates: true,
             theme_mode: ThemeMode::System,
             accent_color: "#4A4459".into(),
             ui_scale: 1.0,

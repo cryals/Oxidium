@@ -14,6 +14,7 @@ hex.workspace = true
 journal-domain.workspace = true
 journal-storage.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 rust_decimal.workspace = true
 rust_xlsxwriter.workspace = true
 serde.workspace = true
@@ -33,4 +34,5 @@ notify-rust.workspace = true
 tauri-winrt-notification.workspace = true
 
 [dev-dependencies]
+axum.workspace = true
 tempfile.workspace = true

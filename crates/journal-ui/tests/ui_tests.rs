@@ -17,11 +17,19 @@ fn headless_ui_end_to_end_flows() {
     let win = MainWindow::new().expect("create MainWindow");
     controller.bind_to_window(&win);
 
-    // 1. Clean production startup: NO fake/mock subjects, average is "—"
+    // 1. Clean production startup: NO fake/mock subjects, average is "—", first-run onboarding opens once
     assert_eq!(win.get_journal_rows().row_count(), 0);
     assert_eq!(win.get_journal_overall_avg().as_str(), "—");
     assert_eq!(win.get_active_section(), 0);
     assert_eq!(win.get_tr().nav_journal.as_str(), "Журнал");
+    assert!(controller.maybe_open_first_run_onboarding(&win));
+    assert!(win.get_onboarding_open());
+    win.set_onboarding_open(false);
+    win.invoke_onboarding_dismissed();
+    assert!(app.get_settings().expect("settings").onboarding_completed);
+    // Second startup check must NOT reopen onboarding once dismissed
+    assert!(!controller.maybe_open_first_run_onboarding(&win));
+    assert!(!win.get_onboarding_open());
 
     // 2. Create a subject through UI callback (name, short, teacher, target_str, color)
     win.invoke_subject_create(
@@ -197,4 +205,34 @@ fn headless_ui_end_to_end_flows() {
     assert_eq!(win.get_active_profile_name().as_str(), "Алексей Соколов");
     assert_eq!(win.get_active_profile_initials().as_str(), "АС");
     assert_eq!(win.get_journal_rows().row_count(), 102);
+
+    // 11. Dynamic semi-automatic updater UI state & auto_check_updates persistence
+    assert!(!win.get_update_available());
+    win.invoke_toggle_auto_updates(false);
+    assert!(!app.get_settings().expect("settings").auto_check_updates);
+    win.invoke_toggle_auto_updates(true);
+    assert!(app.get_settings().expect("settings").auto_check_updates);
+
+    controller.apply_update_info(
+        &win,
+        journal_app::UpdateInfo {
+            current_version: "0.1.0".into(),
+            latest_version: "0.2.0".into(),
+            tag_name: "v0.2.0".into(),
+            release_name: "Oxidium v0.2.0".into(),
+            release_notes: "Тестовый релиз".into(),
+            html_url: journal_app::GITHUB_RELEASES_PAGE.into(),
+            published_at: "2026-12-01".into(),
+            selected_asset: Some(journal_app::ReleaseAssetInfo {
+                name: "Oxidium-0.2.0-windows-x86_64-setup.exe".into(),
+                download_url: "https://github.com/cryals/Oxidium/releases/download/v0.2.0/Oxidium-0.2.0-windows-x86_64-setup.exe".into(),
+                size_bytes: 12_345_678,
+            }),
+            sha256_expected: Some("a".repeat(64)),
+            is_update_available: true,
+        },
+    );
+    assert!(win.get_update_available());
+    assert_eq!(win.get_update_latest_version().as_str(), "v0.2.0");
+    assert!(win.get_update_has_asset());
 }

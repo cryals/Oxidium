@@ -12,7 +12,7 @@ import { KanbanView } from "views/kanban_view.slint";
 import {
     ProfilesModal, SubjectsModal, PeriodsModal, GlobalSearchModal,
     NotificationsModal, SettingsModal, ShortcutsModal,
-    QuickProfilePopover, OnboardingModal
+    QuickProfilePopover, OnboardingModal, UpdateModal
 } from "dialogs/modals.slint";
 
 export { MaterialPalette, MaterialSchemes, MaterialScheme, OxidiumTheme, OxidiumIcons }
@@ -117,12 +117,14 @@ export component MainWindow inherits MaterialWindow {
     in_out property <bool> settings_modal_open: false;
     in_out property <int> settings_active_tab: 0;
     in_out property <bool> shortcuts_modal_open: false;
+    in_out property <bool> update_modal_open: false;
 
     property <bool> any_modal_open: root.quick_profile_open || root.onboarding_open
         || root.profiles_modal_open || root.subjects_modal_open
         || root.periods_modal_open || root.search_modal_open
         || root.notifications_modal_open || root.settings_modal_open
-        || root.shortcuts_modal_open || journal_view.quick_picker_open
+        || root.shortcuts_modal_open || root.update_modal_open
+        || journal_view.quick_picker_open
         || journal_view.cell_detail_open || kanban_view.new_task_open
         || kanban_view.new_column_open || kanban_view.new_board_open || kanban_view.detail_open;
 
@@ -229,10 +231,30 @@ export component MainWindow inherits MaterialWindow {
     in property <string> backup_status_text: "";
     in property <string> about_versions_text: "";
 
+    // Dynamic GitHub Releases Updater state
+    in_out property <bool> setting_auto_check_updates: true;
+    in property <bool> update_available: false;
+    in property <bool> update_checking: false;
+    in property <bool> update_downloading: false;
+    in property <string> update_current_version: "v0.1.0";
+    in property <string> update_latest_version: "";
+    in property <string> update_release_name: "";
+    in property <string> update_published_at: "";
+    in property <string> update_release_notes: "";
+    in property <string> update_asset_label: "";
+    in property <string> update_sha256_label: "";
+    in property <string> update_status_text: "";
+    in property <bool> update_has_asset: false;
+
     // Callbacks
     callback section_changed(int);
     callback theme_quick_toggle();
     callback onboarding_complete(string, string, string, string, bool, bool, int);
+    callback onboarding_dismissed();
+    callback toggle_auto_updates(bool);
+    callback check_updates_clicked();
+    callback download_and_install_update();
+    callback open_releases_page();
     callback undo_clicked();
     callback redo_clicked();
     callback journal_prev_period();
@@ -316,6 +338,7 @@ export component MainWindow inherits MaterialWindow {
 
         key_pressed(ev) => {
             if (ev.text == Key.Escape && root.any_modal_open) {
+                if (root.onboarding_open) { root.onboarding_dismissed(); }
                 root.quick_profile_open = false;
                 root.onboarding_open = false;
                 root.profiles_modal_open = false;
@@ -325,6 +348,7 @@ export component MainWindow inherits MaterialWindow {
                 root.notifications_modal_open = false;
                 root.settings_modal_open = false;
                 root.shortcuts_modal_open = false;
+                if (!root.update_downloading) { root.update_modal_open = false; }
                 journal_view.quick_picker_open = false;
                 journal_view.cell_detail_open = false;
                 kanban_view.new_task_open = false;
@@ -742,7 +766,37 @@ export component MainWindow inherits MaterialWindow {
                         }
 
                         HorizontalLayout {
-                            spacing: 4px;
+                            spacing: 6px;
+                            if root.update_available : Rectangle {
+                                height: 32px;
+                                y: (parent.height - self.height) / 2;
+                                border_radius: 16px;
+                                background: upd_ta.has_hover ? MaterialPalette.primary : MaterialPalette.primary_container;
+                                border_width: 1px;
+                                border_color: MaterialPalette.primary;
+                                HorizontalLayout {
+                                    padding_left: 11px; padding_right: 12px; spacing: 6px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Icon {
+                                            source: OxidiumIcons.download;
+                                            width: 15px; height: 15px;
+                                            colorize: upd_ta.has_hover ? MaterialPalette.on_primary : MaterialPalette.on_primary_container;
+                                        }
+                                    }
+                                    Text {
+                                        text: "Обновить " + root.update_latest_version;
+                                        font_family: OxidiumTheme.font_display;
+                                        font_size: 12px; font_weight: 600;
+                                        color: upd_ta.has_hover ? MaterialPalette.on_primary : MaterialPalette.on_primary_container;
+                                        vertical_alignment: center;
+                                    }
+                                }
+                                upd_ta := TouchArea {
+                                    mouse_cursor: pointer;
+                                    clicked => { root.update_modal_open = true; }
+                                }
+                            }
                             IconButton {
                                 icon: OxidiumIcons.undo;
                                 enabled: root.can_undo;
@@ -979,6 +1033,11 @@ export component MainWindow inherits MaterialWindow {
         db_path_text: root.db_path_text;
         backup_status_text: root.backup_status_text;
         about_versions_text: root.about_versions_text;
+        auto_check_updates <=> root.setting_auto_check_updates;
+        update_available: root.update_available;
+        update_checking: root.update_checking;
+        update_latest_version: root.update_latest_version;
+        update_status_text: root.update_status_text;
 
         close => { root.settings_modal_open = false; }
         save_appearance(t, l, a, c, r, s) => { root.save_appearance(t, l, a, c, r, s); }
@@ -995,6 +1054,10 @@ export component MainWindow inherits MaterialWindow {
         export_data(fmt) => { root.export_data(fmt); }
         import_data(fmt) => { root.import_data(fmt); }
         open_onboarding => { root.onboarding_step = 1; root.onboarding_open = true; }
+        toggle_auto_updates(en) => { root.toggle_auto_updates(en); }
+        check_updates => { root.check_updates_clicked(); }
+        open_update_modal => { root.update_modal_open = true; }
+        open_releases_page => { root.open_releases_page(); }
     }
 
     if root.quick_profile_open : QuickProfilePopover {
@@ -1008,12 +1071,32 @@ export component MainWindow inherits MaterialWindow {
     if root.onboarding_open : OnboardingModal {
         step <=> root.onboarding_step;
         profile_name: root.active_profile_name;
-        close => { root.onboarding_open = false; }
+        close => {
+            root.onboarding_open = false;
+            root.onboarding_dismissed();
+        }
         toggle_theme => { root.theme_quick_toggle(); }
         complete(pn, inst, grp, scsv, en_mcp, auto_mcp, acc) => {
             root.onboarding_open = false;
             root.onboarding_complete(pn, inst, grp, scsv, en_mcp, auto_mcp, acc);
         }
+    }
+
+    if root.update_modal_open : UpdateModal {
+        current_version: root.update_current_version;
+        latest_version: root.update_latest_version;
+        release_name: root.update_release_name;
+        published_at: root.update_published_at;
+        release_notes: root.update_release_notes;
+        asset_label: root.update_asset_label;
+        sha256_label: root.update_sha256_label;
+        status_text: root.update_status_text;
+        downloading: root.update_downloading;
+        has_asset: root.update_has_asset;
+
+        close => { root.update_modal_open = false; }
+        download_and_install => { root.download_and_install_update(); }
+        open_releases_page => { root.open_releases_page(); }
     }
 
     if root.shortcuts_modal_open : ShortcutsModal {

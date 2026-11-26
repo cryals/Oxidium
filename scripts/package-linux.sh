@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ARCH="${1:-amd64}"
-VERSION="0.1.0"
+VERSION="${2:-0.1.0}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${ROOT_DIR}/dist"
 STAGE_DIR="${DIST_DIR}/stage-linux-${ARCH}"
@@ -55,7 +55,7 @@ Section: education
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: Oxidium Contributors <https://github.com/cryals/Oxidium>
-Depends: libc6, libfontconfig1, libfreetype6, libxkbcommon0
+Depends: libc6, libfontconfig1, libfreetype6, libxkbcommon0, libssl3t64 | libssl3
 Description: Oxidium — Personal Student Journal with built-in MCP server
  Local-first, offline-first personal academic journal, analytics dashboard,
  Kanban task organizer, and Model Context Protocol (MCP) server built with

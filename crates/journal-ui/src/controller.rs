@@ -39,6 +39,7 @@ pub struct UiViewState {
     pub journal_subject_filter: String,
     pub visible_days: Vec<NaiveDate>,
     pub visible_subject_ids: Vec<Uuid>,
+    pub latest_update: Option<journal_app::UpdateInfo>,
 }
 
 impl Default for UiViewState {
@@ -58,6 +59,7 @@ impl Default for UiViewState {
             journal_subject_filter: String::new(),
             visible_days: Vec::new(),
             visible_subject_ids: Vec::new(),
+            latest_update: None,
         }
     }
 }
@@ -197,6 +199,7 @@ impl UiController {
                         }
 
                         if let Ok(mut s) = ctrl.app.get_settings() {
+                            s.onboarding_completed = true;
                             s.mcp_http_autostart = autostart;
                             s.mcp_permission_mode = if acc_idx == 0 {
                                 McpPermissionMode::ReadOnly
@@ -214,6 +217,65 @@ impl UiController {
                     }
                 },
             );
+        }
+
+        // Persist first-run wizard dismissal so it doesn't auto-reopen on next startup
+        {
+            let ctrl = Arc::clone(self);
+            win.on_onboarding_dismissed(move || {
+                if let Ok(mut s) = ctrl.app.get_settings()
+                    && !s.onboarding_completed
+                {
+                    s.onboarding_completed = true;
+                    let _ = ctrl.app.update_settings(&s, RecordSource::Gui);
+                }
+            });
+        }
+
+        // Dynamic GitHub Releases semi-automatic updater callbacks
+        {
+            let ctrl = Arc::clone(self);
+            win.on_toggle_auto_updates(move |enabled| {
+                if let Ok(mut s) = ctrl.app.get_settings() {
+                    s.auto_check_updates = enabled;
+                    let _ = ctrl.app.update_settings(&s, RecordSource::Gui);
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_check_updates_clicked(move || {
+                if let Some(win) = w.upgrade() {
+                    ctrl.spawn_update_check(&win, true);
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_download_and_install_update(move || {
+                if let Some(win) = w.upgrade() {
+                    ctrl.spawn_update_download(&win);
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_open_releases_page(move || {
+                let url = ctrl
+                    .state
+                    .lock()
+                    .ok()
+                    .and_then(|st| st.latest_update.as_ref().map(|u| u.html_url.clone()))
+                    .unwrap_or_else(|| journal_app::GITHUB_RELEASES_PAGE.to_string());
+                if let Err(e) = journal_app::open_url_in_browser(&url)
+                    && let Some(win) = w.upgrade()
+                {
+                    show_toast(&win, &format!("Не удалось открыть ссылку: {e}"));
+                }
+            });
         }
 
         // Inline Journal subject live filter
@@ -1989,6 +2051,8 @@ impl UiController {
         win.set_setting_highlight_holidays(s.highlight_holidays);
         win.set_setting_reminders_enabled(s.reminders_enabled);
         win.set_setting_os_notifications(s.os_notifications_enabled);
+        win.set_setting_auto_check_updates(s.auto_check_updates);
+        win.set_update_current_version(format!("v{}", journal_app::CURRENT_APP_VERSION).into());
         win.set_mcp_port_text(s.mcp_http_port.to_string().into());
         win.set_mcp_autostart(s.mcp_http_autostart);
         win.set_mcp_permission_idx(if s.mcp_permission_mode == McpPermissionMode::ReadOnly {
@@ -3000,6 +3064,185 @@ impl UiController {
             .collect();
         win.set_activity_log_list(ModelRc::new(VecModel::from(rows)));
     }
+
+    /// Automatically opens the 4-step Setup Wizard on brand-new first run
+    /// (when `onboarding_completed == false` and the active profile has no subjects yet).
+    pub fn maybe_open_first_run_onboarding(&self, win: &MainWindow) -> bool {
+        let Ok(settings) = self.app.get_settings() else {
+            return false;
+        };
+        if settings.onboarding_completed {
+            return false;
+        }
+        let has_subjects = self
+            .app
+            .get_active_profile()
+            .ok()
+            .and_then(|p| self.app.list_subjects(p.id, true).ok())
+            .is_some_and(|list| !list.is_empty());
+        if has_subjects {
+            return false;
+        }
+        win.set_onboarding_step(1);
+        win.set_onboarding_open(true);
+        true
+    }
+
+    /// Applies GitHub Releases check output into the Slint UI and stores it in view state.
+    pub fn apply_update_info(&self, win: &MainWindow, info: journal_app::UpdateInfo) {
+        let latest_tag = if info.tag_name.starts_with('v') || info.tag_name.starts_with('V') {
+            info.tag_name.clone()
+        } else {
+            format!("v{}", info.latest_version)
+        };
+        win.set_update_current_version(format!("v{}", info.current_version).into());
+        win.set_update_latest_version(latest_tag.clone().into());
+        win.set_update_available(info.is_update_available);
+        win.set_update_release_name(info.release_name.clone().into());
+        win.set_update_published_at(info.published_at.clone().into());
+        win.set_update_release_notes(info.release_notes.clone().into());
+
+        if let Some(ref asset) = info.selected_asset {
+            win.set_update_has_asset(true);
+            win.set_update_asset_label(
+                format!(
+                    "{} ({})",
+                    asset.name,
+                    journal_app::format_bytes(asset.size_bytes)
+                )
+                .into(),
+            );
+        } else {
+            win.set_update_has_asset(false);
+            win.set_update_asset_label(SharedString::new());
+        }
+
+        if let Some(ref sha) = info.sha256_expected {
+            let short = &sha[..sha.len().min(16)];
+            win.set_update_sha256_label(format!("{short}… (из SHA256SUMS.txt)").into());
+        } else {
+            win.set_update_sha256_label(SharedString::new());
+        }
+
+        if info.is_update_available {
+            win.set_update_status_text(
+                format!("Найдена новая версия {latest_tag} на GitHub Releases.").into(),
+            );
+        } else {
+            win.set_update_status_text(
+                format!("Установлена актуальная версия v{}.", info.current_version).into(),
+            );
+        }
+
+        if let Ok(mut st) = self.state.lock() {
+            st.latest_update = Some(info);
+        }
+    }
+
+    /// Runs a non-blocking GitHub Releases check on the Tokio background runtime.
+    pub fn spawn_update_check(self: &Arc<Self>, win: &MainWindow, manual: bool) {
+        let Some(ref rt) = self.rt_handle else {
+            if manual {
+                win.set_update_status_text(
+                    "Фоновая проверка недоступна в тестовом режиме без Tokio.".into(),
+                );
+            }
+            return;
+        };
+
+        win.set_update_checking(true);
+        if manual {
+            win.set_update_status_text(
+                "Проверка обновлений на github.com/cryals/Oxidium/releases...".into(),
+            );
+        }
+
+        let ctrl = Arc::clone(self);
+        let weak = win.as_weak();
+        rt.spawn(async move {
+            let res = journal_app::check_for_updates(journal_app::CURRENT_APP_VERSION).await;
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(win) = weak.upgrade() {
+                    win.set_update_checking(false);
+                    match res {
+                        Ok(info) => {
+                            let avail = info.is_update_available;
+                            let tag = info.tag_name.clone();
+                            let cur = info.current_version.clone();
+                            ctrl.apply_update_info(&win, info);
+                            if manual {
+                                if avail {
+                                    show_toast(&win, &format!("Доступно обновление {tag}"));
+                                } else {
+                                    show_toast(
+                                        &win,
+                                        &format!("Установлена последняя версия v{cur}"),
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if manual {
+                                win.set_update_status_text(
+                                    format!("Не удалось проверить обновления (офлайн или сеть недоступна): {e}").into(),
+                                );
+                                show_toast(&win, "Нет связи с GitHub Releases");
+                            } else {
+                                win.set_update_status_text(
+                                    "Офлайн-режим: обновления проверяются при наличии сети.".into(),
+                                );
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    /// Downloads the platform release artifact, verifies SHA-256, and launches the installer
+    /// without ever blocking the Slint UI thread.
+    pub fn spawn_update_download(self: &Arc<Self>, win: &MainWindow) {
+        let Some(ref rt) = self.rt_handle else {
+            return;
+        };
+        let info_opt = self
+            .state
+            .lock()
+            .ok()
+            .and_then(|st| st.latest_update.clone());
+        let Some(info) = info_opt else {
+            show_toast(win, "Сначала проверьте наличие обновлений");
+            return;
+        };
+
+        win.set_update_downloading(true);
+        win.set_update_status_text("Загрузка пакета обновления и проверка SHA-256...".into());
+
+        let updates_dir = self.app.data_dir.join("updates");
+        let weak = win.as_weak();
+        rt.spawn(async move {
+            let dl_res = journal_app::download_and_verify_update(&info, &updates_dir).await;
+            let final_res = match dl_res {
+                Ok(path) => journal_app::launch_update_artifact(&path),
+                Err(e) => Err(e),
+            };
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(win) = weak.upgrade() {
+                    win.set_update_downloading(false);
+                    match final_res {
+                        Ok(msg) => {
+                            win.set_update_status_text(msg.clone().into());
+                            show_toast(&win, &msg);
+                        }
+                        Err(e) => {
+                            win.set_update_status_text(format!("Ошибка обновления: {e}").into());
+                            show_toast(&win, &format!("Ошибка обновления: {e}"));
+                        }
+                    }
+                }
+            });
+        });
+    }
 }
 
 fn color_for_mark_code(code: &str, palette: &journal_domain::MarkColorPalette) -> Color {
@@ -3113,6 +3356,28 @@ pub fn run_desktop_app(app: Arc<AppServices>) -> Result<()> {
 
     let win = MainWindow::new()?;
     controller.bind_to_window(&win);
+    controller.maybe_open_first_run_onboarding(&win);
+
+    // Non-blocking background update check on startup (silent when offline)
+    if app
+        .get_settings()
+        .map(|s| s.auto_check_updates)
+        .unwrap_or(true)
+    {
+        let upd_ctrl = Arc::clone(&controller);
+        let upd_win = win.as_weak();
+        rt_handle.spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            if let Ok(info) = journal_app::check_for_updates(journal_app::CURRENT_APP_VERSION).await
+            {
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(win) = upd_win.upgrade() {
+                        upd_ctrl.apply_update_info(&win, info);
+                    }
+                });
+            }
+        });
+    }
 
     // Background cross-process sync watcher (400ms) + reminder ticker (30s) without blocking UI thread!
     let bg_ctrl = Arc::clone(&controller);

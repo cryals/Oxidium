@@ -30,6 +30,9 @@ pub enum AppError {
 
     #[error("Backup/restore error: {0}")]
     Backup(String),
+
+    #[error("Update error: {0}")]
+    Update(String),
 }
 
 pub type AppResult<T> = Result<T, AppError>;

@@ -14,4 +14,5 @@ This project adheres to [Semantic Versioning](https://semver.org/) and [Conventi
 - Statistics screen with 8 real-data visualizations, period comparison, and Grade Forecast Calculator.
 - Full Kanban board with multiple boards per profile, customizable columns (WIP limits, completion flags), drag-and-drop tasks/columns, checklists, tags, custom badges, Markdown notes, and subject/grade links.
 - Local notification center and deadline reminders, JSON/CSV/XLSX/Markdown export, JSON/CSV & Telegram Desktop preview import, and Russian/English localization.
-- CI/CD workflows (GitHub Actions & Forgejo Actions), Windows portable ZIP & installer, Linux packaging scripts, SHA-256 checksums, and CycloneDX SBOM.
+- Dynamic semi-automatic update checker backed by GitHub Releases (`cryals/Oxidium`) with non-intrusive top-bar update pill, release notes modal, automatic `SHA256SUMS.txt` integrity verification, and first-run 4-step expressive Setup Wizard.
+- Automated CI/CD workflows (`.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.forgejo/workflows/ci.yml`), Windows portable ZIP & per-user HKCU installer, Linux `.tar.gz`/`.deb` packaging scripts, unified SHA-256 checksums, and CycloneDX 1.5 SBOM.

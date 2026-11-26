@@ -1,0 +1,153 @@
+name: Release Oxidium
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build & publish (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-windows-x64:
+    name: Release Build (Windows x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Determine release version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          $version = $tag.TrimStart('v')
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Run full workspace tests
+        shell: pwsh
+        run: |
+          cargo build -p student-journal-mcp
+          cargo test --workspace
+      - name: Build release binaries
+        shell: pwsh
+        run: cargo build --release --workspace
+      - name: Package Windows installer, portable ZIP & SBOM
+        shell: pwsh
+        run: pwsh -File scripts/package-windows.ps1 -Version "${{ steps.ver.outputs.version }}"
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: |
+            dist/Oxidium-*-windows-x86_64-setup.exe
+            dist/Oxidium-*-windows-x86_64-portable.zip
+            dist/oxidium-*-sbom.cdx.json
+
+  build-linux-x64:
+    name: Release Build (Linux x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Determine release version
+        id: ver
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Install Linux GUI & TLS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev libssl-dev pkg-config dpkg-dev
+      - name: Run full workspace tests
+        run: |
+          cargo build -p student-journal-mcp
+          cargo test --workspace
+      - name: Build release binaries
+        run: cargo build --release --workspace
+      - name: Package Linux x86_64 (.tar.gz & .deb)
+        run: bash scripts/package-linux.sh amd64 "${{ steps.ver.outputs.version }}"
+      - name: Upload Linux x86_64 release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x64
+          path: |
+            dist/Oxidium-*-linux-amd64.tar.gz
+            dist/oxidium_*_amd64.deb
+
+  build-linux-arm64:
+    name: Release Build (Linux ARM64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Determine release version
+        id: ver
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Install Linux GUI & TLS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev libssl-dev pkg-config dpkg-dev
+      - name: Build release binaries
+        run: cargo build --release --workspace
+      - name: Package Linux ARM64 (.tar.gz & .deb)
+        run: bash scripts/package-linux.sh arm64 "${{ steps.ver.outputs.version }}"
+      - name: Upload Linux ARM64 release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-arm64
+          path: |
+            dist/Oxidium-*-linux-arm64.tar.gz
+            dist/oxidium_*_arm64.deb
+
+  publish-release:
+    name: Publish GitHub Release & Unified SHA256SUMS
+    runs-on: ubuntu-24.04
+    needs: [build-windows-x64, build-linux-x64, build-linux-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Generate unified SHA256SUMS.txt for in-app updater verification
+        run: |
+          cd release-assets
+          rm -f SHA256SUMS.txt
+          LC_ALL=C sha256sum * | sort -k2 > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Resolve tag name
+        id: rel
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - name: Publish or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: "Oxidium ${{ steps.rel.outputs.tag }}"
+          body_path: CHANGELOG.md
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: release-assets/*
