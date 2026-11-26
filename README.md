@@ -1,65 +1,48 @@
-# Material Components for Slint Rust Template
+# Oxidium — Student Journal
 
-A template for a Rust Application using Slint with [material components](https://github.com/slint-ui/slint/tree/master/ui-libraries/material).
+> Русская версия документации: [README.ru.md](README.ru.md)
 
-## About
+**Oxidium** is a free, open-source, local-first, offline-first personal **Student Journal** desktop application built with **Rust**, **Slint (Material Design 3 Expressive)**, **SQLite**, and a full built-in **Model Context Protocol (MCP)** server.
 
-This template helps you get started developing a Rust application with Slint as a toolkit
-for the user interface and the material component set.
+Replace clunky institutional portals, scattered spreadsheets, notes, and Telegram Saved Messages with a fast, native desktop workspace that both you and your AI assistants can use together.
 
-## Usage
+## Highlights
 
-We recommend using an IDE for development, along with our [LSP-based IDE integration for `.slint` files](https://github.com/slint-ui/slint/blob/master/tools/lsp/README.md). You can also load this project directly in [Visual Studio Code](https://code.visualstudio.com) and install our [Slint extension](https://marketplace.visualstudio.com/items?itemName=Slint.slint).
+- **Native Desktop Performance**: 100% native Rust + Slint UI (no Electron, Tauri, WebView, or browser runtime).
+- **Local-First & Offline-First**: Single local SQLite database (WAL + FTS5 + online backup), zero telemetry, zero mandatory registration, zero CDN dependencies.
+- **Electronic Journal**: Synchronized pinned headers and columns, virtualized grid for 100+ subjects, quick grade entry (`1–5`, `Н/Б`, `Уваж.`, `Зач.`, `Н/З`, and custom mark types), multi-grade cells, exact `Decimal` arithmetic & weighted averages, leap-year calendar, and undo/redo.
+- **Multi-Profile Isolation**: Independent academic profiles (University, College, School, Courses) with isolated subjects, periods, grades, attendance, tasks, and analytics.
+- **Statistics & Grade Forecast Calculator**: 8 real-data interactive charts (cumulative average dynamics, grade distribution, subject averages, donut breakdown, attendance, activity heatmap, task completion, weekly/monthly dynamics), two-period comparison, and exact grade forecasting.
+- **Kanban Task Management**: Multiple boards per profile, dynamic columns with WIP limits and completion flags, drag-and-drop, checklists, tags, custom badges, Markdown notes, deadlines, reminders, and subject/grade links.
+- **Production MCP Server (`rmcp`)**: Both **STDIO** (`student-journal-mcp`) and loopback-only **Streamable HTTP** with Bearer token auth, 80+ typed tools, MCP Resources, MCP Prompts, granular permissions (`ReadOnly` / `ReadWrite` / `Destructive`), idempotency keys, activity audit log with Undo, and live cross-process GUI synchronization.
 
-1. Install Rust by following its [getting-started guide](https://www.rust-lang.org/learn/get-started).
-   Once this is done, you should have the `rustc` compiler and the `cargo` build system installed in your `PATH`.
-2. Download and extract the [ZIP archive of this repository](https://github.com/slint-ui/material-rust-template/archive/refs/heads/master.zip).
-
-   ```sh
-   mv material-rust-template-master my-project
-   cd my-project
-   ```
-
-## Run your application on desktop
-
-1. Build with `cargo`:
-    ```
-    cargo build
-    ```
-
-2. Run the application binary:
-
-    ```
-    cargo run
-    ```
-
-## Run your application on a web browser
-
-You can then use wasm-pack (which you may need to obtain with `cargo install wasm-pack`).
-This will generate the wasm in the `./pkg` directory, which the `index.html` file will open.
-Since wasm files cannot be served from `file://` URL, you need to open a wab server to serve
-the content
+## Building & Running
 
 ```sh
-wasm-pack build --release --target web
-python3 -m http.server
+# Build workspace
+cargo build --workspace
+
+# Run desktop GUI
+cargo run -p student-journal
+
+# Run standalone MCP STDIO server
+cargo run -p student-journal-mcp
+
+# Run all checks & tests
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
-## Run your application on Android
+## Documentation
 
-First, [set up your Android environment](https://slint.dev/snapshots/master/docs/rust/slint/android/#building-and-deploying).
-Then, you can run the demo on an Android device with the following command:
+- [Architecture](docs/ARCHITECTURE.md)
+- [Database Schema](docs/DATABASE.md)
+- [MCP Documentation](docs/mcp/QUICKSTART.md)
+- [Testing](docs/TESTING.md)
+- [Production Readiness Report](PRODUCTION-READINESS-REPORT.md)
+- [Security Policy](SECURITY.md)
 
-```sh
-cargo apk run --target aarch64-linux-android --lib
-```
+## License
 
-## Next Steps
-
-We hope that this template helps you get started, and that you enjoy exploring making user interfaces with Slint. To learn more
-about the Slint APIs and the `.slint` markup language, check out our [online documentation](https://slint.dev/docs). Check out
-also the [material components documentation](https://material.slint.dev/getting-started/)
-
-Don't forget to replace the contents of this readme with your own project details.
-(Containing a screenshot of your application if you want to.)
-As well as edit the `name =` field in `Cargo.toml` to match the name of your project.
+Oxidium source code is licensed under the MIT License ([LICENSE.txt](LICENSE.txt)). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled third-party components including Slint, Material Components, Google Fonts (SIL OFL 1.1), and Material Symbols (Apache 2.0).

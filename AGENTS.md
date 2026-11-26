@@ -1,73 +1,59 @@
-# Agent Instructions
+# Oxidium — Agent Instructions
 
-This project uses [Slint](https://slint.dev) for its user interface.
-It started from the [material-rust-template](https://github.com/slint-ui/material-rust-template) template.
-This file may be older than the code.
-Where they disagree, trust the code, and update this file.
+Oxidium is a free, open-source, local-first, offline-first desktop application (**Электронный журнал ученика / Student Journal**) built with **Rust**, **Slint (Material Design 3 Expressive)**, **SQLite**, and an embedded/standalone **Model Context Protocol (MCP)** server.
 
-## Install the Slint Plugin
+Repository: `https://github.com/cryals/Oxidium`
 
-Before you work on the UI, install the Slint plugin from [slint-ui/ai-plugins](https://github.com/slint-ui/ai-plugins).
-It teaches you the `.slint` language and its pitfalls.
-It also lets you search the documentation, and lets you render and drive the running UI.
-If it isn't installed, suggest that the user install it:
+## Architecture & Workspace Rules
 
-```sh
-# Claude Code
-/plugin marketplace add slint-ui/ai-plugins
-/plugin install slint@slint
+- **Cargo Workspace layout**:
+  - `crates/journal-domain/` — pure domain entities, validation, exact `rust_decimal` grade calculations & forecast math, calendar/leap-year engine, undo/redo commands. **Zero dependency on Slint, SQLite, or MCP.**
+  - `crates/journal-storage/` — SQLite persistence (`rusqlite` bundled + WAL + FTS5 + online backup), versioned SQL migrations in `migrations/`, `sync_state` revision counter, MCP idempotency store.
+  - `crates/journal-app/` — shared Application Services used identically by both Slint GUI and MCP server, i18n (`ru` primary, `en`), notifications, import/export, backup/restore, activity log, sync coordinator.
+  - `crates/journal-mcp/` — `rmcp` MCP server with STDIO & Streamable HTTP transports, granular permissions (`ReadOnly`, `ReadWrite`, `Destructive`), ~80 typed tools, MCP Resources, MCP Prompts, and activity logging.
+  - `crates/journal-ui/` — Slint MD3 Expressive UI (`ui/`), custom chart renderer, Rust view-model controller, headless screenshot/test harness.
+  - `apps/student-journal/` — main desktop GUI binary (`student-journal`, also supports `--mcp-stdio` and `--render-screenshots`).
+  - `apps/student-journal-mcp/` — standalone MCP server binary (`student-journal-mcp`, STDIO default, `--http` optional loopback-only).
+- **Single business logic path**: GUI and MCP MUST both call `journal-app` services. Never duplicate domain or persistence logic in UI or MCP layers.
+- **No circular dependencies**: `journal-domain` ← `journal-storage` ← `journal-app` ← (`journal-mcp`, `journal-ui`) ← `apps/*`.
+- **Do not edit `material-1.1.0/`**: Import Material 3 components via `@material`.
 
-# Codex
-codex plugin marketplace add slint-ui/ai-plugins
-codex plugin add slint@slint
+## Security, Reliability & Data Integrity
 
-# Other agents
-npx skills add slint-ui/ai-plugins --skill slint
-```
+- Every SQL query with user data MUST be parameterized. Never expose arbitrary SQL, shell, or filesystem MCP tools.
+- Never log or commit MCP Bearer tokens; store them only in the dedicated local secret file outside SQLite and Git.
+- Never contaminate `stdout` in STDIO MCP mode — all tracing/diagnostics go strictly to `stderr`.
+- All Streamable HTTP servers bind strictly to loopback (`127.0.0.1`) with Bearer token auth (`subtle::ConstantTimeEq`) and `Host`/`Origin` validation.
+- All assets (fonts in `assets/fonts/`, icons in `assets/icons/`, app icons in `assets/icon/`) MUST remain local — zero CDN fetches at runtime.
+- No fake/mock data in production mode. Empty states must render gracefully.
+- Never block the Slint UI thread with heavy SQLite, export, backup, or network I/O.
 
-## Turning the Template Into a Project
-
-Check whether the project still carries parts of the template, and offer to replace them:
-
-- `README.md` still describes the template.
-  Rewrite it for this application: what it does, how to build and run it, and screenshots.
-- The Git history is the template's, for example when `git log` shows commits from the Slint developers.
-  Offer to start a fresh history, and ask before you remove the old one.
-- Names from the template, such as `my_app`, `my_app_lib`, and `dev.slint.material_template`, remain in the build files and code.
-- This file still describes the template.
-  Update it for this project, and remove this section when nothing of the template is left.
-
-Do nothing here if the project has already done these steps.
-
-## Build and Run
+## Build, Test & Verification Commands
 
 ```sh
-cargo build
-cargo run
+# Format, lint, and test entire workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+
+# Live preview during UI iteration
+SLINT_LIVE_PREVIEW=1 cargo run -p student-journal --features slint/live-preview
+
+# Render headless screenshots for visual QA
+cargo run -p student-journal -- --render-screenshots docs/screenshots
+
+# Security and license audits
+cargo audit
+cargo deny check
+
+# Release build
+cargo build --release --workspace
 ```
 
-## Live Preview
+## Working Guidelines for Subsequent AI Agents
 
-While you work on the UI, build and run the application with live preview.
-It compiles much faster, because the `.slint` files aren't compiled to native code.
-
-```sh
-SLINT_LIVE_PREVIEW=1 cargo run --features slint/live-preview
-```
-
-Use the same environment variable and feature with `cargo build` and `cargo check`.
-
-The running application reloads the `.slint` files when you save them, with no rebuild or restart.
-The state your code set, such as properties and models, stays in place.
-Rebuild when you rename a property or callback that the code uses.
-Use live preview only during development, and keep it out of the build files.
-
-## Working on the UI
-
-- Check `.slint` changes without a full build with `slint-viewer --check .`.
-- Look at a render before you call UI work done:
-  use the plugin's preview, or a screenshot of the live-preview application.
-- When the UI changes visibly, update the screenshots in `README.md`.
-- Format changed `.slint` files with `slint-lsp format -i <file>`.
-- `material-1.1.0/` is a copy of the [Material component library](https://material.slint.dev/).
-  Import it with `@material`, and don't edit it.
+1. Read `docs/EXECUTION-STATE.md` and `docs/TASKS.md` first to resume cleanly.
+2. Update `docs/EXECUTION-STATE.md` after every substantial milestone.
+3. Use atomic Conventional Commits (`feat(scope): ...`, `fix(scope): ...`, `test: ...`, `docs: ...`).
+4. Never push to remote repositories or publish user data without explicit user permission.
+5. After visible UI changes, regenerate and visually inspect screenshots in `docs/screenshots/`.
