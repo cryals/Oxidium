@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/journal-domain",
     "crates/journal-storage",
+    "crates/journal-app",
 ]
 
 [workspace.package]
