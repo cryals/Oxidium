@@ -24,6 +24,7 @@ Last updated: 2026-11-26 (Phase 15 — COMPLETE & RELEASED v0.1.0)
 | 12 | Security Hardening & Real Performance Benchmarks | DONE | `cargo audit` (0 vulns across 700 deps), `cargo deny check` (`advisories/bans/licenses/sources ok`), SQL parameterization audited, release 100k-grade / 10k-task benchmarks PASSED |
 | 13 | Comprehensive Testing & Visual Screenshot QA | DONE | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, 26/26 default + 1/1 ignored release scale test PASSED, 9 1440×900 PNGs visually verified |
 | 14 | Dynamic Updater, First-Run Onboarding & Release CI/CD | DONE | Semi-automatic GitHub Releases updater (`updater.rs` + `UpdateModal` + top-bar pill + SHA-256 verification), auto first-run 4-step Setup Wizard (`onboarding_completed`), `.github/workflows/release.yml`, Windows portable ZIP + native HKCU installer + CycloneDX 1.5 SBOM + `SHA256SUMS.txt` |
+| 15 | M3 Expressive UI, Smooth Spline/Donut Charts, Multi-Type Heatmap & Motion | DONE | Fritsch-Carlson spline chart (`charts.rs`), rounded-cap M3 donut with `%` legend, semantic subject bars with target ticks, stacked attendance bars, 5×7 Mon–Sun multi-color split sub-cell heatmap with hover inspector, fixed Settings `Switch`/button stretching and card overflow, unclipped Kanban hints & M3 animations; `clippy -D warnings`, 26/26 tests & all 15 QA PNGs verified |
 
 ## Resume Notes
 - App icons integrated from `assets/icon/` (`web/icon-192.png`, `web/icon-512.png`, `oxidium.ico`).

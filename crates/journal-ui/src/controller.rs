@@ -2609,7 +2609,7 @@ impl UiController {
             win.set_stats_comparison_summary(SharedString::new());
         }
 
-        // Render 2x-DPI AA charts with smart Y-axis labels & target reference line
+        // Render 2x-DPI AA spline dynamics & interactive hover trend points
         let dark = win.global::<OxidiumTheme>().get_dark_mode();
         let primary_c = if dark {
             Color::from_rgb_u8(0xCA, 0xC3, 0xDC)
@@ -2641,30 +2641,114 @@ impl UiController {
             .copied()
             .chain(std::iter::once(mean_target))
             .fold(5.0f32, f32::min);
-        if min_val >= 3.3 {
-            win.set_stats_chart_y_top("5.0".into());
-            win.set_stats_chart_y_mid("4.0".into());
-            win.set_stats_chart_y_bot("3.0".into());
+        let (y_min, y_mid, y_max) = if min_val >= 3.2 {
+            (3.0f32, 4.0f32, 5.0f32)
+        } else if min_val >= 2.2 {
+            (2.0f32, 3.5f32, 5.0f32)
         } else {
-            win.set_stats_chart_y_top("5.0".into());
-            win.set_stats_chart_y_mid("3.0".into());
-            win.set_stats_chart_y_bot("1.0".into());
-        }
+            (1.0f32, 3.0f32, 5.0f32)
+        };
+        win.set_stats_chart_y_top(format!("{y_max:.1}").into());
+        win.set_stats_chart_y_mid(format!("{y_mid:.1}").into());
+        win.set_stats_chart_y_bot(format!("{y_min:.1}").into());
         win.set_stats_chart_target_label(format!("Цель {mean_target:.2}").into());
         win.set_stats_line_chart(render_line_chart(
             &line_pts,
-            760,
-            280,
+            1040,
+            340,
             dark,
             [primary_c.red(), primary_c.green(), primary_c.blue()],
             Some(mean_target),
+            (y_min, y_max),
+            None,
         ));
 
-        let g5_c = color_for_mark_code("grade_5", &settings.mark_colors);
-        let g4_c = color_for_mark_code("grade_4", &settings.mark_colors);
-        let g3_c = color_for_mark_code("grade_3", &settings.mark_colors);
-        let g2_c = color_for_mark_code("grade_2", &settings.mark_colors);
-        let g1_c = color_for_mark_code("grade_1", &settings.mark_colors);
+        let dyn_len = rep.average_dynamics.len();
+        let trend_items: Vec<TrendPointItem> = rep
+            .average_dynamics
+            .iter()
+            .enumerate()
+            .map(|(i, pt)| {
+                let t = if dyn_len <= 1 {
+                    0.5
+                } else {
+                    i as f32 / (dyn_len - 1) as f32
+                };
+                let x_ratio = (18.0 + 1000.0 * t) / 1040.0;
+                TrendPointItem {
+                    date_short: pt.date.format("%d.%m").to_string().into(),
+                    full_date: format_date_long_ru(pt.date).into(),
+                    avg_text: format_average(
+                        Some(pt.cumulative_average),
+                        settings.average_precision,
+                    )
+                    .into(),
+                    grades_count: pt.grade_count_so_far as i32,
+                    x_ratio,
+                }
+            })
+            .collect();
+        win.set_stats_trend_points(ModelRc::new(VecModel::from(trend_items)));
+
+        if let (Some(first), Some(last)) =
+            (rep.average_dynamics.first(), rep.average_dynamics.last())
+        {
+            win.set_stats_chart_x_start(first.date.format("%d.%m").to_string().into());
+            win.set_stats_chart_x_mid(if dyn_len >= 3 {
+                rep.average_dynamics[dyn_len / 2]
+                    .date
+                    .format("%d.%m")
+                    .to_string()
+                    .into()
+            } else {
+                SharedString::new()
+            });
+            win.set_stats_chart_x_end(if dyn_len >= 2 {
+                last.date.format("%d.%m").to_string().into()
+            } else {
+                SharedString::new()
+            });
+            if dyn_len >= 2 {
+                let d = last.cumulative_average - first.cumulative_average;
+                win.set_stats_chart_trend_delta(format!("{:+.2}", d).into());
+                win.set_stats_chart_trend_positive(d >= Decimal::ZERO);
+            } else {
+                win.set_stats_chart_trend_delta(SharedString::new());
+            }
+        } else {
+            win.set_stats_chart_x_start(SharedString::new());
+            win.set_stats_chart_x_mid(SharedString::new());
+            win.set_stats_chart_x_end(SharedString::new());
+            win.set_stats_chart_trend_delta(SharedString::new());
+        }
+
+        // Harmonized grade colors respecting theme mode & readable contrast
+        let g5_c = if dark {
+            Color::from_rgb_u8(0x6D, 0xD5, 0x8C)
+        } else {
+            color_for_mark_code("grade_5", &settings.mark_colors)
+        };
+        let g4_c = if dark {
+            Color::from_rgb_u8(0x4F, 0xD8, 0xC6)
+        } else {
+            color_for_mark_code("grade_4", &settings.mark_colors)
+        };
+        let g3_c = if dark {
+            Color::from_rgb_u8(0xFF, 0xB9, 0x69)
+        } else {
+            color_for_mark_code("grade_3", &settings.mark_colors)
+        };
+        let g2_c = if dark {
+            Color::from_rgb_u8(0xE0, 0x8E, 0x58)
+        } else {
+            Color::from_rgb_u8(0xA1, 0x52, 0x1D)
+        };
+        let g1_c = if dark {
+            Color::from_rgb_u8(0xF2, 0x8B, 0x82)
+        } else {
+            color_for_mark_code("grade_1", &settings.mark_colors)
+        };
+
         win.set_stats_donut_chart(render_donut_chart(
             &[
                 (rep.count_5, [g5_c.red(), g5_c.green(), g5_c.blue()]),
@@ -2673,11 +2757,11 @@ impl UiController {
                 (rep.count_2, [g2_c.red(), g2_c.green(), g2_c.blue()]),
                 (rep.count_1, [g1_c.red(), g1_c.green(), g1_c.blue()]),
             ],
-            280,
+            360,
             dark,
         ));
 
-        // Grade distribution vertical bars
+        // Grade distribution horizontal bars & donut legend
         let max_g = [
             rep.count_5,
             rep.count_4,
@@ -2689,74 +2773,90 @@ impl UiController {
         .max()
         .unwrap_or(1)
         .max(1) as f32;
-        let dist_bars = vec![
-            StatBarItem {
-                label: "5".into(),
-                value_text: rep.count_5.to_string().into(),
-                ratio: rep.count_5 as f32 / max_g,
-                color: g5_c,
-                extra_text: SharedString::new(),
-                below_target: false,
-            },
-            StatBarItem {
-                label: "4".into(),
-                value_text: rep.count_4.to_string().into(),
-                ratio: rep.count_4 as f32 / max_g,
-                color: g4_c,
-                extra_text: SharedString::new(),
-                below_target: false,
-            },
-            StatBarItem {
-                label: "3".into(),
-                value_text: rep.count_3.to_string().into(),
-                ratio: rep.count_3 as f32 / max_g,
-                color: g3_c,
-                extra_text: SharedString::new(),
-                below_target: false,
-            },
-            StatBarItem {
-                label: "2".into(),
-                value_text: rep.count_2.to_string().into(),
-                ratio: rep.count_2 as f32 / max_g,
-                color: g2_c,
-                extra_text: SharedString::new(),
-                below_target: false,
-            },
-            StatBarItem {
-                label: "1".into(),
-                value_text: rep.count_1.to_string().into(),
-                ratio: rep.count_1 as f32 / max_g,
-                color: g1_c,
-                extra_text: SharedString::new(),
-                below_target: false,
-            },
-        ];
-        win.set_stats_grade_dist(ModelRc::new(VecModel::from(dist_bars)));
+        let total_num = rep.numeric_grade_count as f32;
+        let pct_str = |cnt: usize| -> String {
+            if total_num <= 0.0 {
+                "0%".into()
+            } else {
+                format!("{}%", ((cnt as f32 * 100.0) / total_num).round() as usize)
+            }
+        };
 
-        // Subject average horizontal bars
+        let dist_spec = [
+            ("5", "5 · Отл.", rep.count_5, g5_c),
+            ("4", "4 · Хор.", rep.count_4, g4_c),
+            ("3", "3 · Уд.", rep.count_3, g3_c),
+            ("2", "2 · Неуд.", rep.count_2, g2_c),
+            ("1", "1 · Крит.", rep.count_1, g1_c),
+        ];
+        let dist_bars: Vec<StatBarItem> = dist_spec
+            .iter()
+            .map(|&(short_l, _, cnt, col)| StatBarItem {
+                label: short_l.into(),
+                value_text: cnt.to_string().into(),
+                ratio: cnt as f32 / max_g,
+                color: col,
+                extra_text: SharedString::new(),
+                below_target: false,
+                dot_color: col,
+                secondary_ratio: 0.0,
+                target_ratio: 0.0,
+                percent_text: pct_str(cnt).into(),
+            })
+            .collect();
+        let donut_legend_items: Vec<StatBarItem> = dist_spec
+            .iter()
+            .map(|&(_, full_l, cnt, col)| StatBarItem {
+                label: full_l.into(),
+                value_text: cnt.to_string().into(),
+                ratio: cnt as f32 / max_g,
+                color: col,
+                extra_text: SharedString::new(),
+                below_target: false,
+                dot_color: col,
+                secondary_ratio: 0.0,
+                target_ratio: 0.0,
+                percent_text: pct_str(cnt).into(),
+            })
+            .collect();
+        win.set_stats_grade_dist(ModelRc::new(VecModel::from(dist_bars)));
+        win.set_stats_donut_legend(ModelRc::new(VecModel::from(donut_legend_items)));
+
+        // Subject average horizontal bars (subject color dot + semantic performance bar + target tick)
         let subj_bars: Vec<StatBarItem> = rep
             .subject_stats
             .iter()
             .filter(|s| s.average.is_some())
             .map(|s| {
-                let ratio = s
-                    .average
-                    .and_then(|d| d.to_string().parse::<f32>().ok())
+                let avg_val = s.average.unwrap_or(Decimal::ZERO);
+                let ratio = avg_val
+                    .to_string()
+                    .parse::<f32>()
                     .map(|v| (v / 5.0).clamp(0.0, 1.0))
+                    .unwrap_or(0.0);
+                let perf_col = grade_semantic_color(avg_val, dark);
+                let target_ratio = s
+                    .target_average
+                    .and_then(|t| t.to_string().parse::<f32>().ok())
+                    .map(|t| (t / 5.0).clamp(0.0, 1.0))
                     .unwrap_or(0.0);
                 StatBarItem {
                     label: s.subject_name.clone().into(),
                     value_text: s.average_formatted.clone().into(),
                     ratio,
-                    color: parse_hex_color(&s.subject_color, primary_c),
+                    color: perf_col,
                     extra_text: format!("{} оц.", s.numeric_grade_count).into(),
                     below_target: s.below_target,
+                    dot_color: parse_hex_color(&s.subject_color, primary_c),
+                    secondary_ratio: 0.0,
+                    target_ratio,
+                    percent_text: SharedString::new(),
                 }
             })
             .collect();
         win.set_stats_subject_avgs(ModelRc::new(VecModel::from(subj_bars)));
 
-        // Attendance bars
+        // Stacked attendance bars (red Н/Б + blue Уваж.)
         let max_abs = rep
             .attendance_summary
             .by_subject
@@ -2765,46 +2865,62 @@ impl UiController {
             .max()
             .unwrap_or(1)
             .max(1) as f32;
+        let att_red = if dark {
+            Color::from_rgb_u8(0xF2, 0x8B, 0x82)
+        } else {
+            Color::from_rgb_u8(0xD3, 0x2F, 0x2F)
+        };
         let att_bars: Vec<StatBarItem> = rep
             .attendance_summary
             .by_subject
             .iter()
             .map(|a| StatBarItem {
                 label: a.subject_name.clone().into(),
-                value_text: format!("Н/Б: {} • Уваж.: {}", a.absences, a.excused).into(),
-                ratio: (a.absences + a.excused) as f32 / max_abs,
-                color: color_for_mark_code("absent", &settings.mark_colors),
+                value_text: format!("{} н/б · {} ув.", a.absences, a.excused).into(),
+                ratio: a.absences as f32 / max_abs,
+                color: att_red,
                 extra_text: SharedString::new(),
                 below_target: false,
+                dot_color: att_red,
+                secondary_ratio: a.excused as f32 / max_abs,
+                target_ratio: 0.0,
+                percent_text: SharedString::new(),
             })
             .collect();
         win.set_stats_attendance_bars(ModelRc::new(VecModel::from(att_bars)));
 
-        // Activity heatmap (last 35 days)
-        let heat_map: HashMap<NaiveDate, usize> = rep
+        // Multi-type 5x7 Mon-Sun Activity Calendar Heatmap with Sub-Cell Splitting & Hover Details
+        let heat_map: HashMap<NaiveDate, journal_app::ActivityHeatmapDay> = rep
             .activity_heatmap
             .into_iter()
-            .map(|h| (h.date, h.total_activity))
+            .map(|h| (h.date, h))
             .collect();
-        let mut heat_cells = Vec::with_capacity(35);
-        for offset in (0..35).rev() {
-            let d = today - Duration::days(offset);
-            let cnt = heat_map.get(&d).copied().unwrap_or(0);
-            let lvl = match cnt {
-                0 => 0,
-                1 => 1,
-                2 => 2,
-                3..=4 => 3,
-                _ => 4,
-            };
-            heat_cells.push(HeatmapDayItem {
-                date_iso: d.format("%Y-%m-%d").to_string().into(),
-                day_label: format!("{}", d.day()).into(),
-                level: lvl,
-                tooltip: format!("{}: {}", d.format("%d.%m"), cnt).into(),
+        let days_from_mon = today.weekday().num_days_from_monday() as i64;
+        let this_monday = today - Duration::days(days_from_mon);
+        let grid_start = this_monday - Duration::weeks(4);
+
+        let mut week_rows = Vec::with_capacity(5);
+        for w in 0..5 {
+            let mut row_days = Vec::with_capacity(7);
+            for d_off in 0..7 {
+                let d = grid_start + Duration::days(w * 7 + d_off);
+                row_days.push(build_heatmap_day_item(
+                    d,
+                    today,
+                    heat_map.get(&d),
+                    dark,
+                    primary_c,
+                ));
+            }
+            week_rows.push(HeatmapWeekRow {
+                week_label: (grid_start + Duration::days(w * 7))
+                    .format("%d.%m")
+                    .to_string()
+                    .into(),
+                days: ModelRc::new(VecModel::from(row_days)),
             });
         }
-        win.set_stats_heatmap(ModelRc::new(VecModel::from(heat_cells)));
+        win.set_stats_heatmap_weeks(ModelRc::new(VecModel::from(week_rows)));
 
         // Task dynamics
         let dyn_bars: Vec<StatBarItem> = rep
@@ -2818,6 +2934,10 @@ impl UiController {
                 color: primary_c,
                 extra_text: SharedString::new(),
                 below_target: false,
+                dot_color: primary_c,
+                secondary_ratio: 0.0,
+                target_ratio: 0.0,
+                percent_text: SharedString::new(),
             })
             .collect();
         win.set_stats_task_dynamics(ModelRc::new(VecModel::from(dyn_bars)));
@@ -3242,6 +3362,252 @@ impl UiController {
                 }
             });
         });
+    }
+}
+
+fn grade_semantic_color(avg: Decimal, dark: bool) -> Color {
+    if avg >= Decimal::new(45, 1) {
+        if dark {
+            Color::from_rgb_u8(0x6D, 0xD5, 0x8C)
+        } else {
+            Color::from_rgb_u8(0x14, 0x6C, 0x2E)
+        }
+    } else if avg >= Decimal::new(375, 2) {
+        if dark {
+            Color::from_rgb_u8(0x4F, 0xD8, 0xC6)
+        } else {
+            Color::from_rgb_u8(0x00, 0x6A, 0x60)
+        }
+    } else if avg >= Decimal::new(30, 1) {
+        if dark {
+            Color::from_rgb_u8(0xFF, 0xB9, 0x69)
+        } else {
+            Color::from_rgb_u8(0xB2, 0x62, 0x00)
+        }
+    } else if avg >= Decimal::new(225, 2) {
+        if dark {
+            Color::from_rgb_u8(0xD8, 0x8A, 0x56)
+        } else {
+            Color::from_rgb_u8(0xA1, 0x52, 0x1D)
+        }
+    } else if dark {
+        Color::from_rgb_u8(0xF2, 0x8B, 0x82)
+    } else {
+        Color::from_rgb_u8(0xD3, 0x2F, 0x2F)
+    }
+}
+
+fn format_date_long_ru(d: NaiveDate) -> String {
+    let month = match d.month() {
+        1 => "января",
+        2 => "февраля",
+        3 => "марта",
+        4 => "апреля",
+        5 => "мая",
+        6 => "июня",
+        7 => "июля",
+        8 => "августа",
+        9 => "сентября",
+        10 => "октября",
+        11 => "ноября",
+        _ => "декабря",
+    };
+    let wd = match d.weekday() {
+        chrono::Weekday::Mon => "Пн",
+        chrono::Weekday::Tue => "Вт",
+        chrono::Weekday::Wed => "Ср",
+        chrono::Weekday::Thu => "Чт",
+        chrono::Weekday::Fri => "Пт",
+        chrono::Weekday::Sat => "Сб",
+        chrono::Weekday::Sun => "Вс",
+    };
+    format!("{} {}, {}", d.day(), month, wd)
+}
+
+fn build_heatmap_day_item(
+    date: NaiveDate,
+    today: NaiveDate,
+    rec: Option<&journal_app::ActivityHeatmapDay>,
+    dark: bool,
+    task_accent: Color,
+) -> HeatmapDayItem {
+    let is_today = date == today;
+    let is_future = date > today;
+    let empty_bg = if dark {
+        Color::from_rgb_u8(0x2B, 0x29, 0x31)
+    } else {
+        Color::from_rgb_u8(0xEC, 0xE6, 0xF0)
+    };
+    let empty_fg = if dark {
+        Color::from_rgb_u8(0x9E, 0x9A, 0xA8)
+    } else {
+        Color::from_rgb_u8(0x5E, 0x59, 0x69)
+    };
+    let full_date_label = format_date_long_ru(date);
+
+    let Some(r) = rec else {
+        return HeatmapDayItem {
+            date_iso: date.format("%Y-%m-%d").to_string().into(),
+            day_label: format!("{}", date.day()).into(),
+            full_date_label: full_date_label.into(),
+            is_today,
+            is_future,
+            total_count: 0,
+            level: 0,
+            cell_bg: empty_bg,
+            cell_fg: empty_fg,
+            slot_count: 0,
+            slot_0_color: empty_bg,
+            slot_1_color: empty_bg,
+            slot_2_color: empty_bg,
+            slot_3_color: empty_bg,
+            summary_line: "Нет записей за этот день".into(),
+            details_line: String::new().into(),
+            tooltip: String::new().into(),
+        };
+    };
+
+    let good_count = r.count_5 + r.count_4 + r.count_pass;
+    let mid_count = r.count_3;
+    let poor_count = r.count_2 + r.count_1 + r.count_fail;
+    let total = good_count
+        + mid_count
+        + poor_count
+        + r.absent_count
+        + r.excused_count
+        + r.completed_tasks_count;
+
+    // Color scale for each semantic activity category (intensity deepens with count)
+    let green_bg = match (good_count, dark) {
+        (1, false) => Color::from_rgb_u8(0xB8, 0xEB, 0xC6),
+        (1, true) => Color::from_rgb_u8(0x1E, 0x5A, 0x31),
+        (2, false) => Color::from_rgb_u8(0x6D, 0xCE, 0x89),
+        (2, true) => Color::from_rgb_u8(0x27, 0x7A, 0x41),
+        (_, false) => Color::from_rgb_u8(0x2E, 0x9B, 0x4E),
+        (_, true) => Color::from_rgb_u8(0x3E, 0xA8, 0x5D),
+    };
+    let green_fg = if !dark && good_count >= 3 {
+        Color::from_rgb_u8(0xFF, 0xFF, 0xFF)
+    } else if dark {
+        Color::from_rgb_u8(0xE9, 0xFF, 0xEF)
+    } else {
+        Color::from_rgb_u8(0x08, 0x36, 0x16)
+    };
+
+    let amber_bg = if dark {
+        Color::from_rgb_u8(0x94, 0x5C, 0x12)
+    } else {
+        Color::from_rgb_u8(0xF5, 0xB8, 0x62)
+    };
+    let amber_fg = if dark {
+        Color::from_rgb_u8(0xFF, 0xF0, 0xD9)
+    } else {
+        Color::from_rgb_u8(0x3D, 0x21, 0x00)
+    };
+
+    // Grade 2 / 1 / Fail: explicitly brownish / warm terracotta
+    let brown_bg = match (poor_count, dark) {
+        (1, false) => Color::from_rgb_u8(0xD9, 0x9A, 0x6A),
+        (1, true) => Color::from_rgb_u8(0x7B, 0x45, 0x20),
+        (_, false) => Color::from_rgb_u8(0xA6, 0x56, 0x22),
+        (_, true) => Color::from_rgb_u8(0x9B, 0x56, 0x2A),
+    };
+    let brown_fg = if dark || poor_count >= 2 {
+        Color::from_rgb_u8(0xFF, 0xF1, 0xE6)
+    } else {
+        Color::from_rgb_u8(0x3B, 0x1A, 0x06)
+    };
+
+    // Unexcused absence (Н/Б): explicitly red
+    let red_bg = match (r.absent_count, dark) {
+        (1, false) => Color::from_rgb_u8(0xEB, 0x7A, 0x7A),
+        (1, true) => Color::from_rgb_u8(0x8C, 0x2B, 0x2A),
+        (_, false) => Color::from_rgb_u8(0xCC, 0x3A, 0x3A),
+        (_, true) => Color::from_rgb_u8(0xB8, 0x3E, 0x3C),
+    };
+    let red_fg = if dark || r.absent_count >= 2 {
+        Color::from_rgb_u8(0xFF, 0xEB, 0xEE)
+    } else {
+        Color::from_rgb_u8(0x45, 0x09, 0x09)
+    };
+
+    let blue_bg = if dark {
+        Color::from_rgb_u8(0x22, 0x55, 0x8A)
+    } else {
+        Color::from_rgb_u8(0x90, 0xC2, 0xF5)
+    };
+    let blue_fg = if dark {
+        Color::from_rgb_u8(0xE6, 0xF2, 0xFF)
+    } else {
+        Color::from_rgb_u8(0x09, 0x29, 0x4A)
+    };
+
+    let mut slots: Vec<(Color, Color)> = Vec::new();
+    if good_count > 0 {
+        slots.push((green_bg, green_fg));
+    }
+    if mid_count > 0 {
+        slots.push((amber_bg, amber_fg));
+    }
+    if poor_count > 0 {
+        slots.push((brown_bg, brown_fg));
+    }
+    if r.absent_count > 0 {
+        slots.push((red_bg, red_fg));
+    }
+    if r.excused_count > 0 {
+        slots.push((blue_bg, blue_fg));
+    }
+    if r.completed_tasks_count > 0 && slots.len() < 4 {
+        let tfg = if dark {
+            Color::from_rgb_u8(0x1C, 0x16, 0x28)
+        } else {
+            Color::from_rgb_u8(0xFF, 0xFF, 0xFF)
+        };
+        slots.push((task_accent, tfg));
+    }
+
+    let (cell_bg, cell_fg) = slots.first().copied().unwrap_or((empty_bg, empty_fg));
+    let slot_count = slots.len().min(4) as i32;
+
+    let mut summary_parts = Vec::new();
+    if r.grades_count > 0 {
+        summary_parts.push(format!("Оценок: {}", r.grades_count));
+    }
+    if r.absent_count > 0 {
+        summary_parts.push(format!("Н/Б: {}", r.absent_count));
+    }
+    if r.excused_count > 0 {
+        summary_parts.push(format!("Уваж.: {}", r.excused_count));
+    }
+    if r.completed_tasks_count > 0 {
+        summary_parts.push(format!("Задач: {}", r.completed_tasks_count));
+    }
+    let summary_line = if summary_parts.is_empty() {
+        "Нет записей за этот день".to_string()
+    } else {
+        summary_parts.join(" · ")
+    };
+    let details_line = r.details.join(" · ");
+
+    HeatmapDayItem {
+        date_iso: date.format("%Y-%m-%d").to_string().into(),
+        day_label: format!("{}", date.day()).into(),
+        full_date_label: full_date_label.into(),
+        is_today,
+        is_future,
+        total_count: total as i32,
+        level: (total.min(4)) as i32,
+        cell_bg,
+        cell_fg,
+        slot_count,
+        slot_0_color: slots.first().map(|s| s.0).unwrap_or(empty_bg),
+        slot_1_color: slots.get(1).map(|s| s.0).unwrap_or(empty_bg),
+        slot_2_color: slots.get(2).map(|s| s.0).unwrap_or(empty_bg),
+        slot_3_color: slots.get(3).map(|s| s.0).unwrap_or(empty_bg),
+        summary_line: summary_line.into(),
+        details_line: details_line.into(),
+        tooltip: format!("{}: {}", date.format("%d.%m"), total).into(),
     }
 }
 

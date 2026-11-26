@@ -1,6 +1,6 @@
 import { MaterialPalette, FilledButton, TonalButton, OutlineButton, Icon, ScrollView } from "@material";
 import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
-import { StatBarItem, HeatmapDayItem, SubjectItem, UiStrings } from "../types.slint";
+import { StatBarItem, TrendPointItem, HeatmapWeekRow, SubjectItem, UiStrings } from "../types.slint";
 
 component KpiCard inherits Rectangle {
     in property <string> label;
@@ -10,9 +10,14 @@ component KpiCard inherits Rectangle {
     in property <color> icon_color: MaterialPalette.primary;
     in property <color> value_color: MaterialPalette.on_surface;
 
-    min_height: 108px;
+    min_height: 110px;
     border_radius: 20px;
-    background: MaterialPalette.surface_container;
+    background: kpi_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface_container;
+    border_width: 1px;
+    border_color: kpi_ta.has_hover ? MaterialPalette.primary.with_alpha(40%) : OxidiumTheme.cell_border;
+    animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_standard; }
+
+    kpi_ta := TouchArea {}
 
     VerticalLayout {
         padding: 18px;
@@ -78,16 +83,32 @@ export component StatisticsView inherits Rectangle {
     in property <string> chart_y_top: "5.0";
     in property <string> chart_y_mid: "4.0";
     in property <string> chart_y_bot: "3.0";
+    in property <string> chart_x_start: "";
+    in property <string> chart_x_mid: "";
+    in property <string> chart_x_end: "";
     in property <string> chart_target_label: "Цель 4.50";
+    in property <string> chart_trend_delta: "";
+    in property <bool> chart_trend_positive: true;
 
-    // Real-data charts
+    // Real-data charts & interactive hover state
     in property <image> line_chart_image;
     in property <image> donut_chart_image;
+    in property <[TrendPointItem]> trend_points;
     in property <[StatBarItem]> grade_dist_bars;
+    in property <[StatBarItem]> donut_legend;
     in property <[StatBarItem]> subject_avg_bars;
     in property <[StatBarItem]> attendance_bars;
-    in property <[HeatmapDayItem]> heatmap_days;
+    in property <[HeatmapWeekRow]> heatmap_weeks;
     in property <[StatBarItem]> task_dynamics_bars;
+
+    in_out property <int> hovered_trend_idx: -1;
+    in_out property <string> hovered_trend_text: "";
+    in_out property <float> hovered_trend_x: 0.0;
+
+    in_out property <string> hovered_day_key: "";
+    in_out property <string> hovered_day_title: "";
+    in_out property <string> hovered_day_summary: "";
+    in_out property <string> hovered_day_details: "";
 
     // Grade Forecast Calculator (never writes to journal)
     in property <[SubjectItem]> subjects;
@@ -104,19 +125,25 @@ export component StatisticsView inherits Rectangle {
     callback export_report();
     callback run_forecast(int, string, string, string, string);
 
+    public function scroll_to_activity_qa(offset: length) {
+        stats_scroll.viewport_y = offset;
+    }
+
     background: transparent;
 
-    ScrollView {
+    stats_scroll := ScrollView {
         width: 100%;
         height: 100%;
         viewport_width: self.visible_width;
+        viewport_height: max(self.visible_height, stats_body.preferred_height);
 
-        VerticalLayout {
+        stats_body := VerticalLayout {
             x: 0px;
             y: 0px;
             width: parent.visible_width;
-            padding: 16px;
+            padding: 18px;
             spacing: 16px;
+            alignment: start;
 
             // Clean Single-Row Analytics Toolbar
             HorizontalLayout {
@@ -128,9 +155,11 @@ export component StatisticsView inherits Rectangle {
                     for preset[idx] in ["Всё время", "Этот месяц", "Прошлый месяц", "Учебный год"] : Rectangle {
                         height: 36px;
                         border_radius: 18px;
-                        background: root.period_preset == idx ? MaterialPalette.secondary_container : MaterialPalette.surface_container_low;
+                        background: root.period_preset == idx ? MaterialPalette.secondary_container
+                            : pre_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface_container_low;
                         border_width: 1px;
                         border_color: root.period_preset == idx ? transparent : OxidiumTheme.cell_border;
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 14px;
                             padding_right: 14px;
@@ -142,7 +171,7 @@ export component StatisticsView inherits Rectangle {
                                 vertical_alignment: center;
                             }
                         }
-                        TouchArea {
+                        pre_ta := TouchArea {
                             mouse_cursor: pointer;
                             clicked => { root.select_period_preset(idx); }
                         }
@@ -153,10 +182,12 @@ export component StatisticsView inherits Rectangle {
                     spacing: 8px;
                     OutlineButton {
                         text: root.compare_enabled ? "Сравнение: ВКЛ" : "Сравнить периоды";
+                        height: 38px;
                         clicked => { root.toggle_compare(); }
                     }
                     TonalButton {
                         text: "Экспорт отчёта";
+                        height: 38px;
                         icon: OxidiumIcons.download;
                         clicked => { root.export_report(); }
                     }
@@ -215,7 +246,7 @@ export component StatisticsView inherits Rectangle {
                     value: root.absences_text;
                     subtext: "Уважительных: " + root.excused_text;
                     icon: OxidiumIcons.warning;
-                    icon_color: OxidiumTheme.mark_excused;
+                    icon_color: OxidiumTheme.absent_red;
                 }
                 KpiCard {
                     horizontal_stretch: 1;
@@ -234,37 +265,58 @@ export component StatisticsView inherits Rectangle {
                 wrap: word_wrap;
             }
 
-            // Main Asymmetric Charts Grid (2fr Dynamics Line Chart + 1fr Horizontal Pill Distribution)
+            // ===== ROW 1: SMOOTH SPLINE DYNAMICS + GRADE DISTRIBUTION =====
             HorizontalLayout {
                 spacing: 16px;
 
                 Rectangle {
                     horizontal_stretch: 2;
-                    height: 274px;
-                    border_radius: 20px;
+                    height: 292px;
+                    border_radius: 22px;
                     background: MaterialPalette.surface_container_low;
                     border_width: 1px;
                     border_color: OxidiumTheme.cell_border;
+                    clip: true;
 
                     VerticalLayout {
                         padding: 18px;
-                        spacing: 10px;
+                        spacing: 8px;
 
                         HorizontalLayout {
                             alignment: space-between;
                             VerticalLayout {
                                 spacing: 2px;
-                                Text {
-                                    text: "Динамика среднего балла";
-                                    font_family: OxidiumTheme.font_display;
-                                    font_size: 16px;
-                                    font_weight: 600;
-                                    color: MaterialPalette.on_surface;
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    Text {
+                                        text: "Динамика среднего балла";
+                                        font_family: OxidiumTheme.font_display;
+                                        font_size: 16px;
+                                        font_weight: 600;
+                                        color: MaterialPalette.on_surface;
+                                        vertical_alignment: center;
+                                    }
+                                    if root.chart_trend_delta != "" : Rectangle {
+                                        height: 22px; border_radius: 11px;
+                                        background: root.chart_trend_positive ? OxidiumTheme.grade_5_bg : OxidiumTheme.grade_2_brown_bg;
+                                        HorizontalLayout {
+                                            padding_left: 8px; padding_right: 8px;
+                                            Text {
+                                                text: root.chart_trend_delta;
+                                                font_family: OxidiumTheme.font_mono;
+                                                font_size: 10px; font_weight: 700;
+                                                color: root.chart_trend_positive ? OxidiumTheme.grade_5_fg : OxidiumTheme.grade_2_brown;
+                                                vertical_alignment: center;
+                                            }
+                                        }
+                                    }
                                 }
                                 Text {
-                                    text: "Накопительный итог по оценкам · " + root.chart_target_label;
+                                    text: root.hovered_trend_idx >= 0 ? root.hovered_trend_text : "Накопительный итог по оценкам (наведите на график для деталей)";
                                     font_size: 12px;
-                                    color: MaterialPalette.on_surface_variant;
+                                    color: root.hovered_trend_idx >= 0 ? MaterialPalette.primary : MaterialPalette.on_surface_variant;
+                                    overflow: elide;
                                 }
                             }
                             Rectangle {
@@ -290,35 +342,84 @@ export component StatisticsView inherits Rectangle {
                             vertical_stretch: 1;
                             spacing: 8px;
 
-                            // Crisp Y-Axis Mono Tick Labels
+                            // Crisp Y-Axis Mono Tick Labels aligned to plot padding
                             VerticalLayout {
                                 width: 32px;
-                                padding_top: 6px;
-                                padding_bottom: 6px;
+                                padding_top: 8px;
+                                padding_bottom: 8px;
                                 alignment: space-between;
                                 Text { text: root.chart_y_top; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; horizontal_alignment: right; }
                                 Text { text: root.chart_y_mid; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; horizontal_alignment: right; }
                                 Text { text: root.chart_y_bot; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; horizontal_alignment: right; }
                             }
 
-                            Image {
+                            // Plot Area with Zero-Latency Hover Scrubbing
+                            Rectangle {
                                 horizontal_stretch: 1;
                                 vertical_stretch: 1;
-                                source: root.line_chart_image;
-                                image_fit: fill;
+                                clip: true;
+
+                                Image {
+                                    width: 100%;
+                                    height: 100%;
+                                    source: root.line_chart_image;
+                                    image_fit: fill;
+                                }
+
+                                // Live crosshair guideline on hover
+                                if root.hovered_trend_idx >= 0 : Rectangle {
+                                    x: clamp(parent.width * root.hovered_trend_x - 1px, 0px, parent.width - 2px);
+                                    y: 8px;
+                                    width: 2px;
+                                    height: parent.height - 16px;
+                                    border_radius: 1px;
+                                    background: MaterialPalette.primary.with_alpha(55%);
+                                }
+
+                                HorizontalLayout {
+                                    width: 100%;
+                                    height: 100%;
+                                    for pt[p_idx] in root.trend_points : Rectangle {
+                                        horizontal_stretch: 1;
+                                        background: transparent;
+                                        pt_ta := TouchArea {
+                                            mouse_cursor: pointer;
+                                            changed has_hover => {
+                                                if (self.has_hover) {
+                                                    root.hovered_trend_idx = p_idx;
+                                                    root.hovered_trend_x = pt.x_ratio;
+                                                    root.hovered_trend_text = pt.full_date + "  ·  Средний: " + pt.avg_text + "  (" + pt.grades_count + " оц.)";
+                                                } else if (root.hovered_trend_idx == p_idx) {
+                                                    root.hovered_trend_idx = -1;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                        }
+
+                        // X-Axis Date Scale Strip
+                        HorizontalLayout {
+                            padding_left: 40px;
+                            padding_right: 8px;
+                            alignment: space-between;
+                            Text { text: root.chart_x_start; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; }
+                            Text { text: root.chart_x_mid; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; }
+                            Text { text: root.chart_x_end; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; }
                         }
                     }
                 }
 
-                // Horizontal Pill-Track Grade Distribution (Stitch C01 layout)
+                // Horizontal Pill-Track Grade Distribution with % Breakdown
                 Rectangle {
                     horizontal_stretch: 1;
-                    height: 274px;
-                    border_radius: 20px;
+                    height: 292px;
+                    border_radius: 22px;
                     background: MaterialPalette.surface_container_low;
                     border_width: 1px;
                     border_color: OxidiumTheme.cell_border;
+                    clip: true;
 
                     VerticalLayout {
                         padding: 18px;
@@ -344,9 +445,10 @@ export component StatisticsView inherits Rectangle {
                         VerticalLayout {
                             spacing: 12px;
                             for bar in root.grade_dist_bars : HorizontalLayout {
+                                height: 22px;
                                 spacing: 10px;
                                 Text {
-                                    width: 18px;
+                                    width: 16px;
                                     text: bar.label;
                                     font_family: OxidiumTheme.font_mono;
                                     font_size: 13px;
@@ -354,26 +456,29 @@ export component StatisticsView inherits Rectangle {
                                     color: bar.color;
                                     vertical_alignment: center;
                                 }
-                                Rectangle {
+                                VerticalLayout {
                                     horizontal_stretch: 1;
-                                    height: 14px;
-                                    y: (parent.height - self.height) / 2;
-                                    border_radius: 7px;
-                                    background: MaterialPalette.surface_container_highest;
-                                    clip: true;
-                                    if bar.ratio > 0.0 : Rectangle {
-                                        x: 0px;
-                                        width: max(10px, parent.width * clamp(bar.ratio, 0.0, 1.0));
-                                        height: 100%;
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 14px;
                                         border_radius: 7px;
-                                        background: bar.color;
+                                        background: MaterialPalette.surface_container_highest;
+                                        clip: true;
+                                        Rectangle {
+                                            x: 0px;
+                                            width: bar.ratio > 0.0 ? max(12px, parent.width * clamp(bar.ratio, 0.0, 1.0)) : 0px;
+                                            height: 100%;
+                                            border_radius: 7px;
+                                            background: bar.color;
+                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                        }
                                     }
                                 }
                                 Text {
-                                    width: 34px;
-                                    text: bar.value_text;
+                                    width: 68px;
+                                    text: bar.value_text + (bar.percent_text != "" ? " · " + bar.percent_text : "");
                                     font_family: OxidiumTheme.font_mono;
-                                    font_size: 12px;
+                                    font_size: 11px;
                                     font_weight: 600;
                                     color: bar.value_text == "0" ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
                                     horizontal_alignment: right;
@@ -385,21 +490,23 @@ export component StatisticsView inherits Rectangle {
                 }
             }
 
-            // Row 2: Subject Comparison (2fr) + Structure Donut (1fr)
+            // ===== ROW 2: SUBJECT AVERAGES (AUTO-HEIGHT, ZERO OVERFLOW) + ROUNDED DONUT WITH LEGEND =====
             HorizontalLayout {
                 spacing: 16px;
 
                 Rectangle {
                     horizontal_stretch: 2;
-                    min_height: 228px;
-                    border_radius: 20px;
+                    min_height: 248px;
+                    border_radius: 22px;
                     background: MaterialPalette.surface_container_low;
                     border_width: 1px;
                     border_color: OxidiumTheme.cell_border;
+                    clip: true;
 
                     VerticalLayout {
                         padding: 18px;
-                        spacing: 10px;
+                        spacing: 8px;
+                        alignment: start;
 
                         HorizontalLayout {
                             alignment: space-between;
@@ -411,8 +518,7 @@ export component StatisticsView inherits Rectangle {
                                 color: MaterialPalette.on_surface;
                             }
                             Text {
-                                text: "Шкала 0–5.00";
-                                font_family: OxidiumTheme.font_mono;
+                                text: "Цвет отражает успеваемость · засечка = цель";
                                 font_size: 11px;
                                 color: MaterialPalette.on_surface_variant;
                                 vertical_alignment: center;
@@ -426,32 +532,46 @@ export component StatisticsView inherits Rectangle {
                         }
 
                         for sb in root.subject_avg_bars : HorizontalLayout {
-                            spacing: 12px;
+                            height: 28px;
+                            spacing: 10px;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle { width: 8px; height: 8px; border_radius: 4px; background: sb.dot_color; }
+                            }
                             Text {
-                                width: 170px;
+                                width: 172px;
                                 text: sb.label;
                                 font_size: 13px;
                                 color: MaterialPalette.on_surface;
                                 overflow: elide;
                                 vertical_alignment: center;
                             }
-                            Rectangle {
+                            VerticalLayout {
                                 horizontal_stretch: 1;
-                                height: 11px;
-                                y: (parent.height - self.height) / 2;
-                                border_radius: 6px;
-                                background: MaterialPalette.surface_container_highest;
-                                clip: true;
+                                alignment: center;
                                 Rectangle {
-                                    x: 0px;
-                                    width: parent.width * clamp(sb.ratio, 0.0, 1.0);
-                                    height: 100%;
+                                    height: 12px;
                                     border_radius: 6px;
-                                    background: sb.color;
+                                    background: MaterialPalette.surface_container_highest;
+                                    clip: true;
+                                    Rectangle {
+                                        x: 0px;
+                                        width: sb.ratio > 0.0 ? max(8px, parent.width * clamp(sb.ratio, 0.0, 1.0)) : 0px;
+                                        height: 100%;
+                                        border_radius: 6px;
+                                        background: sb.color;
+                                        animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                    }
+                                    if sb.target_ratio > 0.0 : Rectangle {
+                                        x: clamp(parent.width * sb.target_ratio - 1px, 0px, parent.width - 2px);
+                                        width: 2px;
+                                        height: 100%;
+                                        background: MaterialPalette.on_surface.with_alpha(65%);
+                                    }
                                 }
                             }
                             Text {
-                                width: 92px;
+                                width: 104px;
                                 text: sb.value_text + (sb.extra_text != "" ? " (" + sb.extra_text + ")" : "");
                                 font_family: OxidiumTheme.font_mono;
                                 font_size: 12px;
@@ -466,15 +586,18 @@ export component StatisticsView inherits Rectangle {
 
                 Rectangle {
                     horizontal_stretch: 1;
-                    min_height: 228px;
-                    border_radius: 20px;
+                    min_height: 248px;
+                    border_radius: 22px;
                     background: MaterialPalette.surface_container_low;
                     border_width: 1px;
                     border_color: OxidiumTheme.cell_border;
+                    clip: true;
 
                     VerticalLayout {
                         padding: 18px;
-                        spacing: 8px;
+                        spacing: 12px;
+                        alignment: start;
+
                         Text {
                             text: "Структура оценок";
                             font_family: OxidiumTheme.font_display;
@@ -482,103 +605,193 @@ export component StatisticsView inherits Rectangle {
                             font_weight: 600;
                             color: MaterialPalette.on_surface;
                         }
-                        Rectangle {
+
+                        HorizontalLayout {
                             vertical_stretch: 1;
-                            Image {
-                                width: 168px;
-                                height: 168px;
-                                x: (parent.width - self.width) / 2;
-                                y: (parent.height - self.height) / 2;
-                                source: root.donut_chart_image;
-                                image_fit: contain;
+                            spacing: 14px;
+                            alignment: space-between;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 158px;
+                                    height: 158px;
+                                    Image {
+                                        width: 100%;
+                                        height: 100%;
+                                        source: root.donut_chart_image;
+                                        image_fit: contain;
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 0px;
+                                        Text {
+                                            text: root.overall_avg;
+                                            font_family: OxidiumTheme.font_mono;
+                                            font_size: 22px;
+                                            font_weight: 700;
+                                            color: MaterialPalette.on_surface;
+                                            horizontal_alignment: center;
+                                        }
+                                        Text {
+                                            text: "средний";
+                                            font_size: 10px;
+                                            color: MaterialPalette.on_surface_variant;
+                                            horizontal_alignment: center;
+                                        }
+                                    }
+                                }
                             }
-                            Text {
-                                text: root.overall_avg;
-                                font_family: OxidiumTheme.font_mono;
-                                font_size: 20px;
-                                font_weight: 700;
-                                color: MaterialPalette.on_surface;
-                                horizontal_alignment: center;
-                                vertical_alignment: center;
+
+                            VerticalLayout {
+                                horizontal_stretch: 1;
+                                alignment: center;
+                                spacing: 7px;
+                                for leg in root.donut_legend : HorizontalLayout {
+                                    height: 22px;
+                                    spacing: 6px;
+                                    alignment: space-between;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle { width: 9px; height: 9px; border_radius: 4.5px; background: leg.color; }
+                                        }
+                                        Text { text: leg.label; font_size: 12px; font_weight: 500; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                                    }
+                                    Text {
+                                        text: leg.value_text + " (" + leg.percent_text + ")";
+                                        font_family: OxidiumTheme.font_mono;
+                                        font_size: 11px;
+                                        font_weight: 600;
+                                        color: leg.value_text == "0" ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
+                                        vertical_alignment: center;
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Row 3: Attendance + Activity Heatmap (with green 4-level legend) & Task Dynamics
+            // ===== ROW 3: STACKED ATTENDANCE + MULTI-TYPE 5x7 ACTIVITY HEATMAP WITH HOVER INSPECTOR =====
             HorizontalLayout {
                 spacing: 16px;
 
                 Rectangle {
                     horizontal_stretch: 1;
-                    min_height: 176px;
-                    border_radius: 20px;
+                    min_height: 310px;
+                    border_radius: 22px;
                     background: MaterialPalette.surface_container_low;
                     border_width: 1px;
                     border_color: OxidiumTheme.cell_border;
+                    clip: true;
 
                     VerticalLayout {
                         padding: 18px;
-                        spacing: 10px;
-                        Text {
-                            text: "Посещаемость (пропуски по предметам)";
-                            font_family: OxidiumTheme.font_display;
-                            font_size: 15px;
-                            font_weight: 600;
-                            color: MaterialPalette.on_surface;
+                        spacing: 9px;
+                        alignment: start;
+
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text {
+                                text: "Посещаемость (пропуски по предметам)";
+                                font_family: OxidiumTheme.font_display;
+                                font_size: 15px;
+                                font_weight: 600;
+                                color: MaterialPalette.on_surface;
+                            }
+                            HorizontalLayout {
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border_radius: 4px; background: OxidiumTheme.absent_red; } }
+                                    Text { text: "Н/Б"; font_size: 10px; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                                }
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border_radius: 4px; background: OxidiumTheme.mark_excused; } }
+                                    Text { text: "Уваж."; font_size: 10px; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                                }
+                            }
                         }
+
                         if root.attendance_bars.length == 0 : Text {
                             text: "Пропуски не зарегистрированы.";
                             font_size: 12px;
                             color: MaterialPalette.on_surface_variant;
                         }
+
                         for ab in root.attendance_bars : HorizontalLayout {
-                            spacing: 8px;
+                            height: 26px;
+                            spacing: 10px;
                             Text {
-                                width: 130px;
+                                width: 138px;
                                 text: ab.label;
                                 font_size: 12px;
                                 color: MaterialPalette.on_surface;
                                 overflow: elide;
                                 vertical_alignment: center;
                             }
-                            Rectangle {
+                            VerticalLayout {
                                 horizontal_stretch: 1;
-                                height: 10px;
-                                y: (parent.height - self.height) / 2;
-                                border_radius: 5px;
-                                background: MaterialPalette.surface_container_highest;
+                                alignment: center;
                                 Rectangle {
-                                    x: 0px;
-                                    width: parent.width * clamp(ab.ratio, 0.06, 1.0);
-                                    height: 100%;
-                                    border_radius: 5px;
-                                    background: OxidiumTheme.mark_absent;
+                                    height: 11px;
+                                    border_radius: 5.5px;
+                                    background: MaterialPalette.surface_container_highest;
+                                    clip: true;
+                                    HorizontalLayout {
+                                        x: 0px;
+                                        y: 0px;
+                                        width: 100%;
+                                        height: 100%;
+                                        spacing: 2px;
+                                        alignment: start;
+                                        if ab.ratio > 0.0 : Rectangle {
+                                            width: max(8px, (parent.width - 2px) * clamp(ab.ratio, 0.0, 1.0));
+                                            height: 100%;
+                                            border_radius: 5.5px;
+                                            background: OxidiumTheme.absent_red;
+                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                        }
+                                        if ab.secondary_ratio > 0.0 : Rectangle {
+                                            width: max(8px, (parent.width - 2px) * clamp(ab.secondary_ratio, 0.0, 1.0));
+                                            height: 100%;
+                                            border_radius: 5.5px;
+                                            background: OxidiumTheme.mark_excused;
+                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                        }
+                                    }
                                 }
                             }
                             Text {
+                                width: 92px;
                                 text: ab.value_text;
                                 font_family: OxidiumTheme.font_mono;
                                 font_size: 11px;
                                 color: MaterialPalette.on_surface_variant;
+                                horizontal_alignment: right;
                                 vertical_alignment: center;
                             }
                         }
                     }
                 }
 
+                // Multi-type 5x7 Mon-Sun Activity Calendar with Sub-Cell Splitting & Hover Inspector
                 Rectangle {
                     horizontal_stretch: 1;
-                    min_height: 176px;
-                    border_radius: 20px;
+                    min_height: 310px;
+                    border_radius: 22px;
                     background: MaterialPalette.surface_container_low;
                     border_width: 1px;
                     border_color: OxidiumTheme.cell_border;
+                    clip: true;
 
                     VerticalLayout {
                         padding: 18px;
-                        spacing: 10px;
+                        spacing: 8px;
+                        alignment: start;
 
                         HorizontalLayout {
                             alignment: space-between;
@@ -590,53 +803,190 @@ export component StatisticsView inherits Rectangle {
                                 color: MaterialPalette.on_surface;
                             }
                             HorizontalLayout {
-                                spacing: 4px;
-                                Text { text: "0"; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
-                                Rectangle { width: 11px; height: 11px; y: 4px; border_radius: 3px; background: MaterialPalette.surface_container_highest; }
-                                Rectangle { width: 11px; height: 11px; y: 4px; border_radius: 3px; background: OxidiumTheme.grade_5_bg; }
-                                Rectangle { width: 11px; height: 11px; y: 4px; border_radius: 3px; background: OxidiumTheme.grade_5.with_alpha(65%); }
-                                Rectangle { width: 11px; height: 11px; y: 4px; border_radius: 3px; background: OxidiumTheme.grade_5; }
-                                Text { text: "4+"; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                                spacing: 7px;
+                                for hleg in [
+                                    { l: "5/4", c: OxidiumTheme.grade_5 },
+                                    { l: "3", c: OxidiumTheme.grade_3 },
+                                    { l: "2", c: OxidiumTheme.grade_2_brown },
+                                    { l: "Н/Б", c: OxidiumTheme.absent_red },
+                                    { l: "Ув.", c: OxidiumTheme.mark_excused },
+                                ] : HorizontalLayout {
+                                    spacing: 3px;
+                                    VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border_radius: 2.5px; background: hleg.c; } }
+                                    Text { text: hleg.l; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                                }
                             }
                         }
 
+                        // Mon..Sun weekday labels
                         HorizontalLayout {
-                            spacing: 4px;
-                            for h in root.heatmap_days : Rectangle {
+                            spacing: 5px;
+                            for wd in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] : Text {
                                 horizontal_stretch: 1;
-                                height: 24px;
-                                border_radius: 4px;
-                                background: h.level == 0 ? MaterialPalette.surface_container_highest
-                                    : h.level == 1 ? OxidiumTheme.grade_5_bg
-                                    : h.level == 2 ? OxidiumTheme.grade_5.with_alpha(55%)
-                                    : h.level == 3 ? OxidiumTheme.grade_5.with_alpha(80%)
-                                    : OxidiumTheme.grade_5;
-                            }
-                        }
-
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: start;
-                            Text {
-                                text: "Выполнено задач:";
-                                font_size: 12px;
+                                text: wd;
+                                font_size: 10px;
                                 font_weight: 600;
                                 color: MaterialPalette.on_surface_variant;
-                                vertical_alignment: center;
+                                horizontal_alignment: center;
                             }
-                            for td in root.task_dynamics_bars : Rectangle {
-                                height: 26px;
-                                border_radius: 13px;
-                                background: MaterialPalette.primary_container;
-                                HorizontalLayout {
-                                    padding_left: 10px;
-                                    padding_right: 10px;
-                                    Text {
-                                        text: td.label + ": " + td.value_text;
+                        }
+
+                        // 5x7 Matrix: single-type tinted OR multi-type split sub-cells (2x1 / 2x2 mosaic)
+                        VerticalLayout {
+                            spacing: 5px;
+                            for wk in root.heatmap_weeks : HorizontalLayout {
+                                spacing: 5px;
+                                for d in wk.days : Rectangle {
+                                    horizontal_stretch: 1;
+                                    height: 34px;
+                                    border_radius: 9px;
+                                    background: d.slot_count <= 1 ? d.cell_bg : MaterialPalette.surface_container_highest;
+                                    opacity: d.is_future ? 0.35 : 1.0;
+                                    border_width: h_ta.has_hover ? 2px : (d.is_today ? 1.5px : 1px);
+                                    border_color: h_ta.has_hover || d.is_today ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                                    clip: true;
+                                    animate border_width, border_color { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+
+                                    // 2 distinct event types -> crisp left/right split
+                                    if d.slot_count == 2 : HorizontalLayout {
+                                        spacing: 2px;
+                                        Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
+                                        Rectangle { horizontal_stretch: 1; background: d.slot_1_color; }
+                                    }
+
+                                    // 3 distinct event types -> left half + right top/bottom split
+                                    if d.slot_count == 3 : HorizontalLayout {
+                                        spacing: 2px;
+                                        Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
+                                        VerticalLayout {
+                                            horizontal_stretch: 1;
+                                            spacing: 2px;
+                                            Rectangle { vertical_stretch: 1; background: d.slot_1_color; }
+                                            Rectangle { vertical_stretch: 1; background: d.slot_2_color; }
+                                        }
+                                    }
+
+                                    // 4+ distinct event types -> clean 2x2 quad mosaic
+                                    if d.slot_count >= 4 : VerticalLayout {
+                                        spacing: 2px;
+                                        HorizontalLayout {
+                                            vertical_stretch: 1; spacing: 2px;
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_1_color; }
+                                        }
+                                        HorizontalLayout {
+                                            vertical_stretch: 1; spacing: 2px;
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_2_color; }
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_3_color; }
+                                        }
+                                    }
+
+                                    // Crisp centered date pill (framed on split cells for effortless legibility)
+                                    if d.slot_count >= 2 : Rectangle {
+                                        width: 22px; height: 16px;
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        border_radius: 6px;
+                                        background: OxidiumTheme.dark_mode ? #141218D8 : #FFFFFFE2;
+                                        Text {
+                                            text: d.day_label;
+                                            font_family: OxidiumTheme.font_mono;
+                                            font_size: 10px; font_weight: 700;
+                                            color: MaterialPalette.on_surface;
+                                            horizontal_alignment: center; vertical_alignment: center;
+                                        }
+                                    }
+
+                                    if d.slot_count < 2 : Text {
+                                        text: d.day_label;
                                         font_family: OxidiumTheme.font_mono;
-                                        font_size: 11px;
-                                        color: MaterialPalette.on_primary_container;
+                                        font_size: 11px; font_weight: d.total_count > 0 || d.is_today ? 700 : 500;
+                                        color: d.cell_fg;
+                                        horizontal_alignment: center;
                                         vertical_alignment: center;
+                                    }
+
+                                    h_ta := TouchArea {
+                                        mouse_cursor: pointer;
+                                        changed has_hover => {
+                                            if (self.has_hover) {
+                                                root.hovered_day_key = d.date_iso;
+                                                root.hovered_day_title = d.full_date_label;
+                                                root.hovered_day_summary = d.summary_line;
+                                                root.hovered_day_details = d.details_line;
+                                            } else if (root.hovered_day_key == d.date_iso) {
+                                                root.hovered_day_key = "";
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Dedicated Interactive Hover Detail Box (replaces vague raw tooltip & empty row)
+                        Rectangle {
+                            min_height: 56px;
+                            border_radius: 14px;
+                            background: MaterialPalette.surface_container;
+                            border_width: 1px;
+                            border_color: root.hovered_day_key != "" ? MaterialPalette.primary.with_alpha(55%) : OxidiumTheme.cell_border;
+                            animate border_color { duration: OxidiumTheme.anim_instant; }
+
+                            VerticalLayout {
+                                padding: 10px;
+                                spacing: 3px;
+                                alignment: center;
+
+                                if root.hovered_day_key == "" : HorizontalLayout {
+                                    alignment: space-between;
+                                    spacing: 8px;
+                                    Text {
+                                        horizontal_stretch: 1;
+                                        text: "Наведите на любую ячейку дня, чтобы увидеть подробности оценок и пропусков";
+                                        font_size: 11px;
+                                        color: MaterialPalette.on_surface_variant;
+                                        wrap: word_wrap;
+                                        vertical_alignment: center;
+                                    }
+                                    Rectangle {
+                                        height: 24px; border_radius: 12px;
+                                        background: MaterialPalette.primary_container;
+                                        HorizontalLayout {
+                                            padding_left: 10px; padding_right: 10px;
+                                            Text {
+                                                text: "Задач выполнено: " + root.completed_tasks_text;
+                                                font_family: OxidiumTheme.font_mono;
+                                                font_size: 10px; font_weight: 600;
+                                                color: MaterialPalette.on_primary_container;
+                                                vertical_alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if root.hovered_day_key != "" : VerticalLayout {
+                                    spacing: 2px;
+                                    HorizontalLayout {
+                                        alignment: space-between;
+                                        spacing: 8px;
+                                        Text {
+                                            text: root.hovered_day_title;
+                                            font_family: OxidiumTheme.font_display;
+                                            font_size: 12px; font_weight: 700;
+                                            color: MaterialPalette.on_surface;
+                                        }
+                                        Text {
+                                            text: root.hovered_day_summary;
+                                            font_family: OxidiumTheme.font_mono;
+                                            font_size: 11px; font_weight: 600;
+                                            color: MaterialPalette.primary;
+                                        }
+                                    }
+                                    if root.hovered_day_details != "" : Text {
+                                        text: root.hovered_day_details;
+                                        font_size: 11px;
+                                        color: MaterialPalette.on_surface_variant;
+                                        wrap: word_wrap;
                                     }
                                 }
                             }
@@ -645,9 +995,9 @@ export component StatisticsView inherits Rectangle {
                 }
             }
 
-            // ===== GRADE FORECAST CALCULATOR =====
+            // ===== ROW 4: GRADE FORECAST CALCULATOR =====
             Rectangle {
-                border_radius: 20px;
+                border_radius: 22px;
                 background: MaterialPalette.surface_container_low;
                 border_width: 1px;
                 border_color: MaterialPalette.primary.with_alpha(45%);
@@ -685,21 +1035,22 @@ export component StatisticsView inherits Rectangle {
 
                     HorizontalLayout {
                         spacing: 10px;
+                        alignment: start;
                         VerticalLayout {
-                            width: 110px;
+                            width: 116px;
                             spacing: 4px;
                             Text { text: "Оценка (1–5)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                             Rectangle {
-                                height: 36px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                                 TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.forecast_add_grade; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                             }
                         }
                         VerticalLayout {
-                            width: 100px;
+                            width: 104px;
                             spacing: 4px;
                             Text { text: "Вес работы"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                             Rectangle {
-                                height: 36px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                                 TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.forecast_weight; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                             }
                         }
@@ -708,16 +1059,16 @@ export component StatisticsView inherits Rectangle {
                             spacing: 4px;
                             Text { text: "Целевой балл"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                             Rectangle {
-                                height: 36px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                                 TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.forecast_target_avg; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                             }
                         }
                         VerticalLayout {
-                            width: 120px;
+                            width: 114px;
                             spacing: 4px;
                             Text { text: "Макс. работ"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                             Rectangle {
-                                height: 36px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                                 TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.forecast_max_works; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                             }
                         }
@@ -725,6 +1076,7 @@ export component StatisticsView inherits Rectangle {
                             alignment: end;
                             FilledButton {
                                 text: "Рассчитать прогноз";
+                                height: 40px;
                                 clicked => {
                                     root.run_forecast(
                                         root.forecast_subject_idx,
@@ -738,30 +1090,42 @@ export component StatisticsView inherits Rectangle {
                         }
                     }
 
-                    HorizontalLayout {
-                        spacing: 6px;
-                        Rectangle {
-                            height: 28px; border_radius: 14px;
-                            background: root.forecast_subject_idx == 0 ? MaterialPalette.primary_container : MaterialPalette.surface;
-                            HorizontalLayout {
-                                padding_left: 10px; padding_right: 10px;
-                                Text { text: "Все предметы"; font_size: 11px; color: root.forecast_subject_idx == 0 ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                    // Horizontal Scrollable Subject Selector Pills (clean even with 12+ subjects)
+                    ScrollView {
+                        height: 36px;
+                        viewport_width: max(self.visible_width, chips_row.preferred_width);
+                        chips_row := HorizontalLayout {
+                            x: 0px;
+                            y: 0px;
+                            spacing: 6px;
+                            alignment: start;
+                            Rectangle {
+                                height: 30px; border_radius: 15px;
+                                background: root.forecast_subject_idx == 0 ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                border_width: 1px; border_color: root.forecast_subject_idx == 0 ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                                animate background, border_color { duration: OxidiumTheme.anim_fast; }
+                                HorizontalLayout {
+                                    padding_left: 12px; padding_right: 12px;
+                                    Text { text: "Все предметы"; font_size: 11px; font_weight: 600; color: root.forecast_subject_idx == 0 ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.forecast_subject_idx = 0; } }
                             }
-                            TouchArea { mouse_cursor: pointer; clicked => { root.forecast_subject_idx = 0; } }
-                        }
-                        for subj[s_idx] in root.subjects : Rectangle {
-                            height: 28px; border_radius: 14px;
-                            background: root.forecast_subject_idx == (s_idx + 1) ? MaterialPalette.primary_container : MaterialPalette.surface;
-                            HorizontalLayout {
-                                padding_left: 10px; padding_right: 10px;
-                                Text { text: subj.short_name != "" ? subj.short_name : subj.name; font_size: 11px; color: root.forecast_subject_idx == (s_idx + 1) ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                            for subj[s_idx] in root.subjects : Rectangle {
+                                height: 30px; border_radius: 15px;
+                                background: root.forecast_subject_idx == (s_idx + 1) ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                border_width: 1px; border_color: root.forecast_subject_idx == (s_idx + 1) ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                                animate background, border_color { duration: OxidiumTheme.anim_fast; }
+                                HorizontalLayout {
+                                    padding_left: 12px; padding_right: 12px;
+                                    Text { text: subj.short_name != "" ? subj.short_name : subj.name; font_size: 11px; font_weight: 500; color: root.forecast_subject_idx == (s_idx + 1) ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.forecast_subject_idx = s_idx + 1; } }
                             }
-                            TouchArea { mouse_cursor: pointer; clicked => { root.forecast_subject_idx = s_idx + 1; } }
                         }
                     }
 
                     Rectangle {
-                        border_radius: 12px;
+                        border_radius: 14px;
                         background: MaterialPalette.surface_container;
                         VerticalLayout {
                             padding: 12px;

@@ -3,8 +3,9 @@ import { Palette } from "std-widgets.slint";
 import { OxidiumTheme, OxidiumIcons } from "theme.slint";
 import {
     DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
-    PeriodItem, MarkTypeItem, StatBarItem, HeatmapDayItem, KanbanColumnModel,
-    BoardItem, ChecklistRowItem, SearchHitItem, ActivityRowItem, NotificationRowItem, UiStrings
+    PeriodItem, MarkTypeItem, StatBarItem, TrendPointItem, HeatmapWeekRow,
+    KanbanColumnModel, BoardItem, ChecklistRowItem, SearchHitItem,
+    ActivityRowItem, NotificationRowItem, UiStrings
 } from "types.slint";
 import { JournalView } from "views/journal_view.slint";
 import { StatisticsView } from "views/statistics_view.slint";
@@ -18,8 +19,9 @@ import {
 export { MaterialPalette, MaterialSchemes, MaterialScheme, OxidiumTheme, OxidiumIcons }
 export {
     DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
-    PeriodItem, MarkTypeItem, StatBarItem, HeatmapDayItem, KanbanColumnModel,
-    BoardItem, ChecklistRowItem, SearchHitItem, ActivityRowItem, NotificationRowItem, UiStrings
+    PeriodItem, MarkTypeItem, StatBarItem, TrendPointItem, HeatmapWeekRow,
+    KanbanColumnModel, BoardItem, ChecklistRowItem, SearchHitItem,
+    ActivityRowItem, NotificationRowItem, UiStrings
 }
 
 export component MainWindow inherits MaterialWindow {
@@ -45,6 +47,14 @@ export component MainWindow inherits MaterialWindow {
             Palette.color-scheme = ColorScheme.unknown;
             OxidiumTheme.dark_mode = (Palette.color-scheme == ColorScheme.dark);
         }
+    }
+
+    public function qa_scroll_stats_activity(offset: length, hov_key: string, hov_title: string, hov_sum: string, hov_det: string) {
+        stats_view.scroll_to_activity_qa(offset);
+        stats_view.hovered_day_key = hov_key;
+        stats_view.hovered_day_title = hov_title;
+        stats_view.hovered_day_summary = hov_sum;
+        stats_view.hovered_day_details = hov_det;
     }
     changed color_scheme_mode => {
         if (root.color_scheme_mode == 0) {
@@ -165,13 +175,20 @@ export component MainWindow inherits MaterialWindow {
     in property <string> stats_chart_y_top: "5.0";
     in property <string> stats_chart_y_mid: "4.0";
     in property <string> stats_chart_y_bot: "3.0";
+    in property <string> stats_chart_x_start: "";
+    in property <string> stats_chart_x_mid: "";
+    in property <string> stats_chart_x_end: "";
     in property <string> stats_chart_target_label: "Цель 4.50";
+    in property <string> stats_chart_trend_delta: "";
+    in property <bool> stats_chart_trend_positive: true;
     in property <image> stats_line_chart;
     in property <image> stats_donut_chart;
+    in property <[TrendPointItem]> stats_trend_points;
     in property <[StatBarItem]> stats_grade_dist;
+    in property <[StatBarItem]> stats_donut_legend;
     in property <[StatBarItem]> stats_subject_avgs;
     in property <[StatBarItem]> stats_attendance_bars;
-    in property <[HeatmapDayItem]> stats_heatmap;
+    in property <[HeatmapWeekRow]> stats_heatmap_weeks;
     in property <[StatBarItem]> stats_task_dynamics;
     in property <string> forecast_result_text: "";
     in property <string> forecast_target_result_text: "";
@@ -432,6 +449,8 @@ export component MainWindow inherits MaterialWindow {
             Rectangle {
                 width: root.rail_expanded ? 212px : (root.width < 940px ? 72px : 92px);
                 background: MaterialPalette.surface_container;
+                clip: true;
+                animate width { duration: OxidiumTheme.anim_emphasized; easing: OxidiumTheme.ease_emphasized; }
 
                 VerticalLayout {
                     x: 0px;
@@ -503,6 +522,7 @@ export component MainWindow inherits MaterialWindow {
                             background: root.rail_expanded && root.active_section == idx
                                 ? MaterialPalette.secondary_container
                                 : root.rail_expanded && nav_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
+                            animate background, height { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
 
                             if !root.rail_expanded : VerticalLayout {
                                 spacing: 3px;
@@ -510,10 +530,11 @@ export component MainWindow inherits MaterialWindow {
                                 HorizontalLayout {
                                     alignment: center;
                                     Rectangle {
-                                        width: 56px; height: 32px; border_radius: 16px;
+                                        width: root.active_section == idx ? 56px : 44px; height: 32px; border_radius: 16px;
                                         background: root.active_section == idx
                                             ? MaterialPalette.secondary_container
                                             : nav_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
+                                        animate width, background { duration: OxidiumTheme.anim_medium; easing: OxidiumTheme.ease_emphasized; }
                                         Icon {
                                             source: nav.icon;
                                             width: 22px; height: 22px;
@@ -901,13 +922,20 @@ export component MainWindow inherits MaterialWindow {
                         chart_y_top: root.stats_chart_y_top;
                         chart_y_mid: root.stats_chart_y_mid;
                         chart_y_bot: root.stats_chart_y_bot;
+                        chart_x_start: root.stats_chart_x_start;
+                        chart_x_mid: root.stats_chart_x_mid;
+                        chart_x_end: root.stats_chart_x_end;
                         chart_target_label: root.stats_chart_target_label;
+                        chart_trend_delta: root.stats_chart_trend_delta;
+                        chart_trend_positive: root.stats_chart_trend_positive;
                         line_chart_image: root.stats_line_chart;
                         donut_chart_image: root.stats_donut_chart;
+                        trend_points: root.stats_trend_points;
                         grade_dist_bars: root.stats_grade_dist;
+                        donut_legend: root.stats_donut_legend;
                         subject_avg_bars: root.stats_subject_avgs;
                         attendance_bars: root.stats_attendance_bars;
-                        heatmap_days: root.stats_heatmap;
+                        heatmap_weeks: root.stats_heatmap_weeks;
                         task_dynamics_bars: root.stats_task_dynamics;
                         subjects: root.subjects_list;
                         forecast_result_text: root.forecast_result_text;
@@ -1103,17 +1131,22 @@ export component MainWindow inherits MaterialWindow {
         close => { root.shortcuts_modal_open = false; }
     }
 
-    // Floating Snackbar feedback
-    if root.snackbar_visible && root.snackbar_message != "" : Rectangle {
+    // Floating Snackbar feedback with smooth M3 slide + fade animation
+    Rectangle {
         x: (parent.width - self.width) / 2;
-        y: parent.height - self.height - 20px;
+        y: root.snackbar_visible && root.snackbar_message != "" ? (parent.height - self.height - 20px) : (parent.height + 16px);
         min_width: 280px;
         max_width: 560px;
         height: 44px;
-        border_radius: 12px;
+        border_radius: 14px;
         background: MaterialPalette.inverse_surface;
+        opacity: root.snackbar_visible && root.snackbar_message != "" ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
         drop_shadow_blur: 16px;
         drop_shadow_color: #00000045;
+        animate opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_standard; }
+        animate y { duration: OxidiumTheme.anim_emphasized; easing: OxidiumTheme.ease_emphasized; }
+
         HorizontalLayout {
             padding_left: 16px; padding_right: 12px; spacing: 12px; alignment: space-between;
             Text {

@@ -524,6 +524,75 @@ export component NotificationsModal inherits Rectangle {
 }
 
 // ============================================================================
+// Reusable M3 Expressive Settings Card & Fixed-Size Switch Row Helpers
+// ============================================================================
+component SettingsSectionCard inherits Rectangle {
+    border_radius: 18px;
+    background: MaterialPalette.surface_container;
+    border_width: 1px;
+    border_color: OxidiumTheme.cell_border;
+}
+
+component SettingsToggleRow inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in_out property <bool> checked: false;
+    callback toggled(bool);
+
+    min_height: root.subtitle != "" ? 54px : 44px;
+    border_radius: 12px;
+    background: row_ta.has_hover ? MaterialPalette.surface_container_high.with_alpha(65%) : transparent;
+    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+
+    row_ta := TouchArea {
+        mouse_cursor: pointer;
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+
+    HorizontalLayout {
+        padding_left: 8px;
+        padding_right: 8px;
+        padding_top: 6px;
+        padding_bottom: 6px;
+        spacing: 16px;
+        alignment: space-between;
+
+        VerticalLayout {
+            horizontal_stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            Text {
+                text: root.title;
+                font_size: 13px;
+                font_weight: 500;
+                color: MaterialPalette.on_surface;
+                wrap: word_wrap;
+            }
+            if root.subtitle != "" : Text {
+                text: root.subtitle;
+                font_size: 11px;
+                color: MaterialPalette.on_surface_variant;
+                wrap: word_wrap;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            width: 52px;
+            Switch {
+                width: 52px;
+                height: 32px;
+                checked <=> root.checked;
+                checked_state_changed(v) => { root.toggled(v); }
+            }
+        }
+    }
+}
+
+// ============================================================================
 // Settings & MCP Control Modal (6 Tabs: Appearance, Journal, Kanban, MCP, Data, About)
 // ============================================================================
 export component SettingsModal inherits Rectangle {
@@ -620,7 +689,9 @@ export component SettingsModal inherits Rectangle {
                     Rectangle { height: 6px; }
                     for tab_label[idx] in ["Внешний вид", "Журнал", "Канбан и уведомления", "MCP-сервер", "Данные и бэкапы", "О приложении"] : Rectangle {
                         height: 38px; border_radius: 12px;
-                        background: root.active_tab == idx ? MaterialPalette.secondary_container : transparent;
+                        background: root.active_tab == idx ? MaterialPalette.secondary_container
+                            : tab_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
+                        animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 12px; padding_right: 12px;
                             Text {
@@ -630,10 +701,10 @@ export component SettingsModal inherits Rectangle {
                                 vertical_alignment: center;
                             }
                         }
-                        TouchArea { mouse_cursor: pointer; clicked => { root.active_tab = idx; } }
+                        tab_ta := TouchArea { mouse_cursor: pointer; clicked => { root.active_tab = idx; } }
                     }
                     Rectangle { vertical_stretch: 1; }
-                    OutlineButton { text: "Закрыть (Esc)"; clicked => { root.close(); } }
+                    OutlineButton { text: "Закрыть (Esc)"; height: 40px; clicked => { root.close(); } }
                 }
             }
 
@@ -641,94 +712,122 @@ export component SettingsModal inherits Rectangle {
             ScrollView {
                 horizontal_stretch: 1;
                 viewport_width: self.visible_width;
-                VerticalLayout {
+                viewport_height: max(self.visible_height, settings_scroll_body.preferred_height);
+                settings_scroll_body := VerticalLayout {
                     x: 0px;
                     y: 0px;
                     width: parent.visible_width;
                     padding: 22px; spacing: 14px;
+                    alignment: start;
 
                     // TAB 0: APPEARANCE
                     if root.active_tab == 0 : VerticalLayout {
                         spacing: 14px;
-                        Text { text: "Внешний вид и язык"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        alignment: start;
+                        Text { text: "Внешний вид и язык"; font_family: OxidiumTheme.font_display; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
 
-                        Text { text: "Тема оформления"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            for th[idx] in ["Светлая", "Тёмная", "Системная"] : Rectangle {
-                                horizontal_stretch: 1; height: 36px; border_radius: 10px;
-                                background: root.theme_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
-                                border_width: 1px; border_color: root.theme_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                Text { text: th; font_size: 13px; font_weight: 600; color: root.theme_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
-                                TouchArea { mouse_cursor: pointer; clicked => { root.theme_mode_idx = idx; } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px; spacing: 10px; alignment: start;
+                                Text { text: "Тема оформления"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for th[idx] in ["Светлая", "Тёмная", "Системная"] : Rectangle {
+                                        horizontal_stretch: 1; height: 38px; border_radius: 12px;
+                                        background: root.theme_mode_idx == idx ? MaterialPalette.primary_container
+                                            : th_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface;
+                                        border_width: 1px; border_color: root.theme_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        Text { text: th; font_size: 13px; font_weight: 600; color: root.theme_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        th_ta := TouchArea { mouse_cursor: pointer; clicked => { root.theme_mode_idx = idx; } }
+                                    }
+                                }
+
+                                Text { text: "Язык интерфейса"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for lg[idx] in ["Русский (основной)", "English"] : Rectangle {
+                                        horizontal_stretch: 1; height: 38px; border_radius: 12px;
+                                        background: root.lang_idx == idx ? MaterialPalette.primary_container
+                                            : lg_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface;
+                                        border_width: 1px; border_color: root.lang_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        Text { text: lg; font_size: 13px; font_weight: 600; color: root.lang_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        lg_ta := TouchArea { mouse_cursor: pointer; clicked => { root.lang_idx = idx; } }
+                                    }
+                                }
+
+                                Text { text: "Акцентный цвет (Material Design 3)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    alignment: start;
+                                    for swatch in [
+                                        { hex: "#4A4459", c: #4A4459 },
+                                        { hex: "#445E91", c: #445E91 },
+                                        { hex: "#0F766E", c: #0F766E },
+                                        { hex: "#2E7D32", c: #2E7D32 },
+                                        { hex: "#4F46E5", c: #4F46E5 },
+                                        { hex: "#B45309", c: #B45309 },
+                                        { hex: "#9333EA", c: #9333EA },
+                                        { hex: "#BE123C", c: #BE123C },
+                                    ] : Rectangle {
+                                        width: 34px; height: 34px; border_radius: 17px;
+                                        background: swatch.c;
+                                        border_width: root.accent_hex == swatch.hex ? 3px : (sw_ta.has_hover ? 2px : 0px);
+                                        border_color: MaterialPalette.on_surface;
+                                        animate border_width { duration: OxidiumTheme.anim_instant; }
+                                        sw_ta := TouchArea { mouse_cursor: pointer; clicked => { root.accent_hex = swatch.hex; } }
+                                    }
+                                }
                             }
                         }
 
-                        Text { text: "Язык интерфейса"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            for lg[idx] in ["Русский (основной)", "English"] : Rectangle {
-                                horizontal_stretch: 1; height: 36px; border_radius: 10px;
-                                background: root.lang_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
-                                border_width: 1px; border_color: root.lang_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                Text { text: lg; font_size: 13px; font_weight: 600; color: root.lang_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
-                                TouchArea { mouse_cursor: pointer; clicked => { root.lang_idx = idx; } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 12px; spacing: 6px; alignment: start;
+                                SettingsToggleRow {
+                                    title: "Компактный режим интерфейса";
+                                    subtitle: "Уменьшает высоту строк таблицы и отступы карточек";
+                                    checked <=> root.compact_mode;
+                                }
+                                SettingsToggleRow {
+                                    title: "Уменьшить анимации";
+                                    subtitle: "Отключает плавные переходы интерфейса и графиков";
+                                    checked <=> root.reduced_motion;
+                                }
+                                HorizontalLayout {
+                                    padding_left: 8px; padding_right: 8px; padding_top: 4px;
+                                    spacing: 8px; alignment: space-between;
+                                    Text { text: "Масштаб элементов"; font_size: 13px; font_weight: 500; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        for sc in [90, 100, 110, 120] : Rectangle {
+                                            width: 56px; height: 32px; border_radius: 10px;
+                                            background: root.scale_percent == sc ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                            border_width: 1px;
+                                            border_color: root.scale_percent == sc ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                                            animate background, border_color { duration: OxidiumTheme.anim_fast; }
+                                            Text { text: sc + "%"; font_family: OxidiumTheme.font_mono; font_size: 12px; font_weight: 600; color: root.scale_percent == sc ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                            TouchArea { mouse_cursor: pointer; clicked => { root.scale_percent = sc; } }
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        Text { text: "Акцентный цвет (Material Design 3)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
                         HorizontalLayout {
                             spacing: 10px;
-                            for swatch in [
-                                { hex: "#4A4459", c: #4A4459 },
-                                { hex: "#445E91", c: #445E91 },
-                                { hex: "#0F766E", c: #0F766E },
-                                { hex: "#2E7D32", c: #2E7D32 },
-                                { hex: "#4F46E5", c: #4F46E5 },
-                                { hex: "#B45309", c: #B45309 },
-                                { hex: "#9333EA", c: #9333EA },
-                                { hex: "#BE123C", c: #BE123C },
-                            ] : Rectangle {
-                                width: 34px; height: 34px; border_radius: 17px;
-                                background: swatch.c;
-                                border_width: root.accent_hex == swatch.hex ? 3px : 0px;
-                                border_color: MaterialPalette.on_surface;
-                                TouchArea { mouse_cursor: pointer; clicked => { root.accent_hex = swatch.hex; } }
-                            }
-                        }
-
-                        HorizontalLayout {
-                            alignment: space-between;
-                            Text { text: "Компактный режим интерфейса"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            Switch { checked <=> root.compact_mode; }
-                        }
-                        HorizontalLayout {
-                            alignment: space-between;
-                            Text { text: "Уменьшить анимации"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            Switch { checked <=> root.reduced_motion; }
-                        }
-
-                        HorizontalLayout {
-                            spacing: 8px; alignment: start;
-                            Text { text: "Масштаб:"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            for sc in [90, 100, 110, 120] : Rectangle {
-                                width: 58px; height: 32px; border_radius: 8px;
-                                background: root.scale_percent == sc ? MaterialPalette.primary_container : MaterialPalette.surface;
-                                Text { text: sc + "%"; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
-                                TouchArea { mouse_cursor: pointer; clicked => { root.scale_percent = sc; } }
-                            }
-                        }
-
-                        HorizontalLayout {
-                            spacing: 10px;
+                            alignment: start;
                             FilledButton {
                                 text: "Применить и сохранить";
+                                height: 40px;
                                 clicked => {
                                     root.save_appearance(root.theme_mode_idx, root.lang_idx, root.accent_hex, root.compact_mode, root.reduced_motion, root.scale_percent);
                                 }
                             }
                             OutlineButton {
                                 text: "Запустить мастер настройки";
+                                height: 40px;
                                 clicked => {
                                     root.close();
                                     root.open_onboarding();
@@ -740,47 +839,64 @@ export component SettingsModal inherits Rectangle {
                     // TAB 1: JOURNAL
                     if root.active_tab == 1 : VerticalLayout {
                         spacing: 14px;
-                        Text { text: "Настройки электронного журнала"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+                        alignment: start;
+                        Text { text: "Настройки электронного журнала"; font_family: OxidiumTheme.font_display; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
 
-                        Text { text: "Режим расчёта среднего балла"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            for am[idx] in ["Арифметическое среднее", "Взвешенное (по весам работ)"] : Rectangle {
-                                horizontal_stretch: 1; height: 38px; border_radius: 10px;
-                                background: root.avg_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
-                                border_width: 1px; border_color: root.avg_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                Text { text: am; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
-                                TouchArea { mouse_cursor: pointer; clicked => { root.avg_mode_idx = idx; } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px; spacing: 10px; alignment: start;
+                                Text { text: "Режим расчёта среднего балла"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for am[idx] in ["Арифметическое среднее", "Взвешенное (по весам работ)"] : Rectangle {
+                                        horizontal_stretch: 1; height: 38px; border_radius: 12px;
+                                        background: root.avg_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                        border_width: 1px; border_color: root.avg_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        Text { text: am; font_size: 12px; font_weight: 600; color: root.avg_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        TouchArea { mouse_cursor: pointer; clicked => { root.avg_mode_idx = idx; } }
+                                    }
+                                }
+
+                                Text { text: "Точность отображения среднего балла (округление только при показе)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for pr[idx] in ["1 знак (4.5)", "2 знака (4.50)", "3 знака (4.500)"] : Rectangle {
+                                        horizontal_stretch: 1; height: 36px; border_radius: 12px;
+                                        background: root.avg_precision_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                        border_width: 1px; border_color: root.avg_precision_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        Text { text: pr; font_family: OxidiumTheme.font_mono; font_size: 12px; font_weight: 600; color: root.avg_precision_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        TouchArea { mouse_cursor: pointer; clicked => { root.avg_precision_idx = idx; } }
+                                    }
+                                }
                             }
                         }
 
-                        Text { text: "Точность отображения среднего балла (округление только при показе)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            for pr[idx] in ["1 знак (4.5)", "2 знака (4.50)", "3 знака (4.500)"] : Rectangle {
-                                horizontal_stretch: 1; height: 36px; border_radius: 10px;
-                                background: root.avg_precision_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
-                                border_width: 1px; border_color: root.avg_precision_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                Text { text: pr; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
-                                TouchArea { mouse_cursor: pointer; clicked => { root.avg_precision_idx = idx; } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 10px; spacing: 4px; alignment: start;
+                                SettingsToggleRow {
+                                    title: "Подсвечивать выходные дни";
+                                    subtitle: "Мягкая тонировка субботы и воскресенья в сетке";
+                                    checked <=> root.highlight_weekends;
+                                }
+                                SettingsToggleRow {
+                                    title: "Подсвечивать праздничные дни";
+                                    subtitle: "Отмечает календарные праздники и нерабочие даты";
+                                    checked <=> root.highlight_holidays;
+                                }
                             }
                         }
 
                         HorizontalLayout {
-                            alignment: space-between;
-                            Text { text: "Подсвечивать выходные дни"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            Switch { checked <=> root.highlight_weekends; }
-                        }
-                        HorizontalLayout {
-                            alignment: space-between;
-                            Text { text: "Подсвечивать праздничные дни"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            Switch { checked <=> root.highlight_holidays; }
-                        }
-
-                        FilledButton {
-                            text: "Сохранить настройки журнала";
-                            clicked => {
-                                root.save_journal_prefs(root.avg_mode_idx, root.avg_precision_idx, root.week_start_idx, root.highlight_weekends, root.highlight_holidays);
+                            alignment: start;
+                            FilledButton {
+                                text: "Сохранить настройки журнала";
+                                height: 40px;
+                                clicked => {
+                                    root.save_journal_prefs(root.avg_mode_idx, root.avg_precision_idx, root.week_start_idx, root.highlight_weekends, root.highlight_holidays);
+                                }
                             }
                         }
                     }
@@ -788,45 +904,62 @@ export component SettingsModal inherits Rectangle {
                     // TAB 2: KANBAN & NOTIFICATIONS
                     if root.active_tab == 2 : VerticalLayout {
                         spacing: 14px;
-                        Text { text: "Канбан и уведомления"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
-                        HorizontalLayout {
-                            alignment: space-between;
-                            Text { text: "Включить напоминания о дедлайнах"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            Switch { checked <=> root.reminders_enabled; }
-                        }
-                        HorizontalLayout {
-                            alignment: space-between;
-                            Text { text: "Системные уведомления ОС (Windows / Linux)"; font_size: 13px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                            Switch { checked <=> root.os_notifications_enabled; }
-                        }
-                        Rectangle {
-                            border_radius: 12px; background: MaterialPalette.surface_container;
-                            HorizontalLayout {
-                                padding: 12px;
-                                Text { text: "ℹ " + root.tr.reminders_notice; font_size: 12px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                        alignment: start;
+                        Text { text: "Канбан и уведомления"; font_family: OxidiumTheme.font_display; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
+
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 12px; spacing: 6px; alignment: start;
+                                SettingsToggleRow {
+                                    title: "Включить напоминания о дедлайнах";
+                                    subtitle: "Учитывать сроки выполнения задач и уведомлять заранее";
+                                    checked <=> root.reminders_enabled;
+                                }
+                                SettingsToggleRow {
+                                    title: "Системные уведомления ОС (Windows / Linux)";
+                                    subtitle: "Показывать нативные всплывающие уведомления системы";
+                                    checked <=> root.os_notifications_enabled;
+                                }
                             }
                         }
-                        FilledButton {
-                            text: "Сохранить";
-                            clicked => { root.save_kanban_prefs(root.reminders_enabled, root.os_notifications_enabled); }
+
+                        SettingsSectionCard {
+                            HorizontalLayout {
+                                padding: 14px; spacing: 10px; alignment: start;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Icon { source: OxidiumIcons.notifications; width: 18px; height: 18px; colorize: MaterialPalette.primary; }
+                                }
+                                Text { horizontal_stretch: 1; text: root.tr.reminders_notice; font_size: 12px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; vertical_alignment: center; }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: start;
+                            FilledButton {
+                                text: "Сохранить";
+                                height: 40px;
+                                clicked => { root.save_kanban_prefs(root.reminders_enabled, root.os_notifications_enabled); }
+                            }
                         }
                     }
 
                     // TAB 3: MCP SERVER MANAGEMENT & ACTIVITY LOG
                     if root.active_tab == 3 : VerticalLayout {
                         spacing: 12px;
+                        alignment: start;
                         HorizontalLayout {
                             alignment: space-between;
-                            Text { text: "Встроенный MCP-сервер (Model Context Protocol)"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                            Text { text: "Встроенный MCP-сервер (Model Context Protocol)"; font_family: OxidiumTheme.font_display; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
                             Rectangle {
                                 height: 28px; border_radius: 14px;
-                                background: root.mcp_http_running ? OxidiumTheme.success_color.with_alpha(22%) : MaterialPalette.surface_container;
+                                background: root.mcp_http_running ? OxidiumTheme.grade_5_bg : MaterialPalette.surface_container;
                                 HorizontalLayout {
                                     padding_left: 12px; padding_right: 12px;
                                     Text {
                                         text: root.mcp_status_text;
                                         font_size: 12px; font_weight: 700;
-                                        color: root.mcp_http_running ? OxidiumTheme.success_color : MaterialPalette.on_surface_variant;
+                                        color: root.mcp_http_running ? OxidiumTheme.grade_5_fg : MaterialPalette.on_surface_variant;
                                         vertical_alignment: center;
                                     }
                                 }
@@ -834,10 +967,9 @@ export component SettingsModal inherits Rectangle {
                         }
 
                         // Embedded Streamable HTTP Status & Controls (distinct from external STDIO!)
-                        Rectangle {
-                            border_radius: 14px; background: MaterialPalette.surface_container;
+                        SettingsSectionCard {
                             VerticalLayout {
-                                padding: 12px; spacing: 8px;
+                                padding: 14px; spacing: 8px; alignment: start;
                                 Text { text: "Встроенный Streamable HTTP (только loopback 127.0.0.1)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
                                 Text {
                                     text: "Endpoint: " + root.mcp_endpoint + "  •  Запросов: " + root.mcp_requests_text + "  •  Ошибок: " + root.mcp_errors_text + "  •  Последний: " + root.mcp_last_request_text;
@@ -845,58 +977,60 @@ export component SettingsModal inherits Rectangle {
                                 }
                                 HorizontalLayout {
                                     spacing: 8px;
+                                    alignment: start;
                                     Rectangle {
-                                        width: 90px; height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
-                                        TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.mcp_port_text; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                                        width: 88px; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                        TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; text <=> root.mcp_port_text; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                                     }
-                                    if !root.mcp_http_running : FilledButton { text: "Запустить HTTP"; icon: OxidiumIcons.play; clicked => { root.mcp_start_http(); } }
-                                    if root.mcp_http_running : OutlineButton { text: "Остановить"; icon: OxidiumIcons.stop; clicked => { root.mcp_stop_http(); } }
-                                    if root.mcp_http_running : TonalButton { text: "Перезапустить"; icon: OxidiumIcons.refresh; clicked => { root.mcp_restart_http(); } }
-                                    TonalButton { text: "Перевыпустить токен"; icon: OxidiumIcons.lock; clicked => { root.mcp_rotate_token(); } }
+                                    if !root.mcp_http_running : FilledButton { text: "Запустить HTTP"; height: 38px; icon: OxidiumIcons.play; clicked => { root.mcp_start_http(); } }
+                                    if root.mcp_http_running : OutlineButton { text: "Остановить"; height: 38px; icon: OxidiumIcons.stop; clicked => { root.mcp_stop_http(); } }
+                                    if root.mcp_http_running : TonalButton { text: "Перезапустить"; height: 38px; icon: OxidiumIcons.refresh; clicked => { root.mcp_restart_http(); } }
+                                    TonalButton { text: "Перевыпустить токен"; height: 38px; icon: OxidiumIcons.lock; clicked => { root.mcp_rotate_token(); } }
                                 }
                                 Text { text: "Bearer токен: " + root.mcp_token_preview + " (хранится в mcp-token.secret, вне SQLite и Git)"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
                             }
                         }
 
                         // Permissions (enforced server-side in Rust)
-                        Rectangle {
-                            border_radius: 14px; background: MaterialPalette.surface_container;
+                        SettingsSectionCard {
                             VerticalLayout {
-                                padding: 12px; spacing: 8px;
+                                padding: 14px; spacing: 8px; alignment: start;
                                 Text { text: "Права доступа AI (контролируются на сервере Rust)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
                                 HorizontalLayout {
                                     spacing: 8px;
                                     for pm[idx] in ["Только чтение (Read-Only)", "Чтение и запись (Read+Write)"] : Rectangle {
-                                        horizontal_stretch: 1; height: 34px; border_radius: 10px;
+                                        horizontal_stretch: 1; height: 36px; border_radius: 10px;
                                         background: root.mcp_permission_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.mcp_permission_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        Text { text: pm; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; }
+                                        Text { text: pm; font_size: 12px; font_weight: 600; color: root.mcp_permission_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         TouchArea { mouse_cursor: pointer; clicked => { root.mcp_permission_idx = idx; } }
                                     }
                                 }
-                                HorizontalLayout {
-                                    alignment: space-between;
-                                    Text { text: "Разрешить деструктивные действия (удаление записей AI)"; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                                    Switch { checked <=> root.mcp_allow_destructive; }
+                                SettingsToggleRow {
+                                    title: "Разрешить деструктивные действия (удаление записей AI)";
+                                    checked <=> root.mcp_allow_destructive;
                                 }
-                                HorizontalLayout {
-                                    alignment: space-between;
-                                    Text { text: "Автозапуск встроенного HTTP MCP при старте Oxidium"; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
-                                    Switch { checked <=> root.mcp_autostart; }
+                                SettingsToggleRow {
+                                    title: "Автозапуск встроенного HTTP MCP при старте Oxidium";
+                                    checked <=> root.mcp_autostart;
                                 }
                                 Text { text: "⚠ " + root.tr.mcp_privacy_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
-                                FilledButton {
-                                    text: "Сохранить права MCP";
-                                    clicked => { root.save_mcp_prefs(root.mcp_port_text, root.mcp_autostart, root.mcp_permission_idx, root.mcp_allow_destructive); }
+                                HorizontalLayout {
+                                    alignment: start;
+                                    FilledButton {
+                                        text: "Сохранить права MCP";
+                                        height: 40px;
+                                        clicked => { root.save_mcp_prefs(root.mcp_port_text, root.mcp_autostart, root.mcp_permission_idx, root.mcp_allow_destructive); }
+                                    }
                                 }
                             }
                         }
 
                         // External STDIO snippet (honestly separated from embedded HTTP)
-                        Rectangle {
-                            border_radius: 12px; background: MaterialPalette.surface_container;
+                        SettingsSectionCard {
                             VerticalLayout {
-                                padding: 10px; spacing: 4px;
+                                padding: 12px; spacing: 4px; alignment: start;
                                 Text { text: "Внешний STDIO-процесс (запускается AI-клиентом, например Claude Desktop / Gemini CLI)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; wrap: word_wrap; }
                                 Text { text: root.mcp_stdio_config_preview; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
                             }
@@ -905,18 +1039,22 @@ export component SettingsModal inherits Rectangle {
                         // Live MCP Activity Log with Undo
                         Text { text: "История действий AI (MCP Activity Log)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
                         for act in root.activity_log : Rectangle {
-                            border_radius: 10px; background: MaterialPalette.surface_container;
+                            border_radius: 12px; background: MaterialPalette.surface_container;
                             HorizontalLayout {
-                                padding: 8px; alignment: space-between; spacing: 8px;
+                                padding: 10px; alignment: space-between; spacing: 8px;
                                 Text {
                                     horizontal_stretch: 1;
                                     text: act.time_text + " [" + act.source_label + "] " + act.summary + (act.undone ? " (отменено)" : "");
                                     font_size: 12px; color: act.undone ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
                                     wrap: word_wrap; vertical_alignment: center;
                                 }
-                                if act.can_undo && !act.undone : TonalButton {
-                                    text: "Отменить";
-                                    clicked => { root.mcp_undo_activity(act.id); }
+                                if act.can_undo && !act.undone : VerticalLayout {
+                                    alignment: center;
+                                    TonalButton {
+                                        text: "Отменить";
+                                        height: 34px;
+                                        clicked => { root.mcp_undo_activity(act.id); }
+                                    }
                                 }
                             }
                         }
@@ -925,36 +1063,56 @@ export component SettingsModal inherits Rectangle {
                     // TAB 4: DATA, BACKUP, IMPORT & EXPORT
                     if root.active_tab == 4 : VerticalLayout {
                         spacing: 14px;
-                        Text { text: "Данные, резервное копирование и импорт/экспорт"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
-                        Text { text: "База данных SQLite: " + root.db_path_text; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                        alignment: start;
+                        Text { text: "Данные, резервное копирование и импорт/экспорт"; font_family: OxidiumTheme.font_display; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
 
-                        HorizontalLayout {
-                            spacing: 8px;
-                            FilledButton { text: "Создать резервную копию (.zip)"; icon: OxidiumIcons.backup; clicked => { root.trigger_backup(); } }
-                            OutlineButton { text: "Восстановить из архива"; icon: OxidiumIcons.restore; clicked => { root.trigger_restore(); } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px; spacing: 10px; alignment: start;
+                                Text { text: "База данных SQLite (WAL + FTS5)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: root.db_path_text; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    FilledButton { text: "Создать резервную копию (.zip)"; height: 40px; icon: OxidiumIcons.backup; clicked => { root.trigger_backup(); } }
+                                    OutlineButton { text: "Восстановить из архива"; height: 40px; icon: OxidiumIcons.restore; clicked => { root.trigger_restore(); } }
+                                }
+                            }
                         }
 
-                        Text { text: "Экспорт активного профиля"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            TonalButton { text: "JSON"; icon: OxidiumIcons.download; clicked => { root.export_data("json"); } }
-                            TonalButton { text: "CSV (оценки)"; icon: OxidiumIcons.download; clicked => { root.export_data("csv"); } }
-                            TonalButton { text: "XLSX (Excel)"; icon: OxidiumIcons.download; clicked => { root.export_data("xlsx"); } }
-                            TonalButton { text: "Markdown"; icon: OxidiumIcons.download; clicked => { root.export_data("md"); } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px; spacing: 10px; alignment: start;
+                                Text { text: "Экспорт активного профиля"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    TonalButton { text: "JSON"; height: 38px; icon: OxidiumIcons.download; clicked => { root.export_data("json"); } }
+                                    TonalButton { text: "CSV (оценки)"; height: 38px; icon: OxidiumIcons.download; clicked => { root.export_data("csv"); } }
+                                    TonalButton { text: "XLSX (Excel)"; height: 38px; icon: OxidiumIcons.download; clicked => { root.export_data("xlsx"); } }
+                                    TonalButton { text: "Markdown"; height: 38px; icon: OxidiumIcons.download; clicked => { root.export_data("md"); } }
+                                }
+                            }
                         }
 
-                        Text { text: "Импорт (с проверкой и предпросмотром)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            OutlineButton { text: "Импорт JSON"; icon: OxidiumIcons.upload; clicked => { root.import_data("json"); } }
-                            OutlineButton { text: "Импорт CSV"; icon: OxidiumIcons.upload; clicked => { root.import_data("csv"); } }
-                            OutlineButton { text: "Предпросмотр Telegram export"; icon: OxidiumIcons.upload; clicked => { root.import_data("telegram"); } }
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px; spacing: 10px; alignment: start;
+                                Text { text: "Импорт (с проверкой и предпросмотром)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    OutlineButton { text: "Импорт JSON"; height: 38px; icon: OxidiumIcons.upload; clicked => { root.import_data("json"); } }
+                                    OutlineButton { text: "Импорт CSV"; height: 38px; icon: OxidiumIcons.upload; clicked => { root.import_data("csv"); } }
+                                    OutlineButton { text: "Предпросмотр Telegram export"; height: 38px; icon: OxidiumIcons.upload; clicked => { root.import_data("telegram"); } }
+                                }
+                            }
                         }
 
                         if root.backup_status_text != "" : Rectangle {
-                            border_radius: 10px; background: MaterialPalette.secondary_container;
+                            border_radius: 12px; background: MaterialPalette.secondary_container;
                             HorizontalLayout {
-                                padding: 10px;
+                                padding: 12px;
                                 Text { text: root.backup_status_text; font_size: 12px; color: MaterialPalette.on_secondary_container; wrap: word_wrap; }
                             }
                         }
@@ -962,20 +1120,21 @@ export component SettingsModal inherits Rectangle {
 
                     // TAB 5: ABOUT
                     if root.active_tab == 5 : VerticalLayout {
-                        spacing: 12px;
+                        spacing: 14px;
+                        alignment: start;
                         HorizontalLayout {
                             spacing: 14px;
                             Image { source: OxidiumIcons.app_logo; width: 56px; height: 56px; image_fit: contain; }
                             VerticalLayout {
                                 alignment: center;
-                                Text { text: "Oxidium — Электронный журнал ученика"; font_size: 18px; font_weight: 700; color: MaterialPalette.on_surface; }
-                                Text { text: "Бесплатное open-source, local-first, offline-first приложение без рекламы и телеметрии."; font_size: 12px; color: MaterialPalette.on_surface_variant; }
+                                Text { text: "Oxidium — Электронный журнал ученика"; font_family: OxidiumTheme.font_display; font_size: 18px; font_weight: 700; color: MaterialPalette.on_surface; }
+                                Text { text: "Бесплатное open-source, local-first, offline-first приложение без рекламы и телеметрии."; font_size: 12px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
                             }
                         }
-                        Rectangle {
-                            border_radius: 14px; background: MaterialPalette.surface_container;
+
+                        SettingsSectionCard {
                             VerticalLayout {
-                                padding: 14px; spacing: 6px;
+                                padding: 14px; spacing: 6px; alignment: start;
                                 Text { text: root.about_versions_text; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.on_surface; wrap: word_wrap; }
                                 Text { text: "Репозиторий: https://github.com/cryals/Oxidium"; font_family: OxidiumTheme.font_mono; font_size: 12px; color: MaterialPalette.primary; }
                                 Text { text: "Лицензия кода Oxidium: MIT. Включает Slint UI Toolkit, Material Components (MIT), Google Fonts Roboto/Roboto Flex/Roboto Mono (SIL OFL 1.1), Material Symbols (Apache 2.0), SQLite (Public Domain), rmcp (Apache 2.0)."; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
@@ -983,10 +1142,9 @@ export component SettingsModal inherits Rectangle {
                         }
 
                         // Dynamic Semi-Automatic Updates Card (GitHub Releases)
-                        Rectangle {
-                            border_radius: 14px; background: MaterialPalette.surface_container;
+                        SettingsSectionCard {
                             VerticalLayout {
-                                padding: 14px; spacing: 10px;
+                                padding: 14px; spacing: 10px; alignment: start;
                                 HorizontalLayout {
                                     alignment: space-between;
                                     Text { text: "Обновления (GitHub Releases)"; font_size: 14px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
@@ -1003,16 +1161,11 @@ export component SettingsModal inherits Rectangle {
                                         }
                                     }
                                 }
-                                HorizontalLayout {
-                                    alignment: space-between;
-                                    VerticalLayout {
-                                        Text { text: "Проверять наличие новых версий при запуске"; font_size: 13px; color: MaterialPalette.on_surface; }
-                                        Text { text: "Источник: github.com/cryals/Oxidium/releases (без телеметрии, работает офлайн)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
-                                    }
-                                    Switch {
-                                        checked <=> root.auto_check_updates;
-                                        checked_state_changed(v) => { root.toggle_auto_updates(v); }
-                                    }
+                                SettingsToggleRow {
+                                    title: "Проверять наличие новых версий при запуске";
+                                    subtitle: "Источник: github.com/cryals/Oxidium/releases (без телеметрии, работает офлайн)";
+                                    checked <=> root.auto_check_updates;
+                                    toggled(v) => { root.toggle_auto_updates(v); }
                                 }
                                 if root.update_status_text != "" : Text {
                                     text: root.update_status_text;
@@ -1022,14 +1175,17 @@ export component SettingsModal inherits Rectangle {
                                 }
                                 HorizontalLayout {
                                     spacing: 8px;
+                                    alignment: start;
                                     TonalButton {
                                         text: root.update_checking ? "Проверка..." : "Проверить обновления";
+                                        height: 40px;
                                         icon: OxidiumIcons.refresh;
                                         enabled: !root.update_checking;
                                         clicked => { root.check_updates(); }
                                     }
                                     if root.update_available : FilledButton {
                                         text: "Обновить до " + root.update_latest_version;
+                                        height: 40px;
                                         icon: OxidiumIcons.download;
                                         clicked => {
                                             root.close();
@@ -1038,6 +1194,7 @@ export component SettingsModal inherits Rectangle {
                                     }
                                     OutlineButton {
                                         text: "Открыть релизы GitHub";
+                                        height: 40px;
                                         clicked => { root.open_releases_page(); }
                                     }
                                 }
@@ -1292,6 +1449,7 @@ export component OnboardingModal inherits Rectangle {
                             height: 10px;
                             border_radius: 5px;
                             background: root.step == s ? MaterialPalette.primary : MaterialPalette.surface_container_highest;
+                            animate width, background { duration: OxidiumTheme.anim_emphasized; easing: OxidiumTheme.ease_emphasized; }
                         }
                     }
                 }
@@ -1470,22 +1628,16 @@ export component OnboardingModal inherits Rectangle {
                 Rectangle {
                     border_radius: 16px; background: MaterialPalette.surface_container;
                     VerticalLayout {
-                        padding: 14px; spacing: 10px;
-                        HorizontalLayout {
-                            alignment: space-between;
-                            VerticalLayout {
-                                Text { text: "Запустить встроенный HTTP MCP сейчас"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
-                                Text { text: "Локальный доступ по 127.0.0.1:38421"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
-                            }
-                            Switch { checked <=> root.mcp_enable_http; }
+                        padding: 12px; spacing: 6px; alignment: start;
+                        SettingsToggleRow {
+                            title: "Запустить встроенный HTTP MCP сейчас";
+                            subtitle: "Локальный доступ по 127.0.0.1:38421";
+                            checked <=> root.mcp_enable_http;
                         }
-                        HorizontalLayout {
-                            alignment: space-between;
-                            VerticalLayout {
-                                Text { text: "Автозапуск при открытии Oxidium"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
-                                Text { text: "Поднимать локальный сервер автоматически"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
-                            }
-                            Switch { checked <=> root.mcp_autostart; }
+                        SettingsToggleRow {
+                            title: "Автозапуск при открытии Oxidium";
+                            subtitle: "Поднимать локальный сервер автоматически";
+                            checked <=> root.mcp_autostart;
                         }
                     }
                 }
@@ -1497,6 +1649,7 @@ export component OnboardingModal inherits Rectangle {
                         horizontal_stretch: 1; height: 42px; border_radius: 12px;
                         background: root.mcp_access_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface_container;
                         border_width: 1px; border_color: root.mcp_access_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                         Text {
                             text: perm; font_size: 11px; font_weight: 600;
                             color: root.mcp_access_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface;
@@ -1510,9 +1663,10 @@ export component OnboardingModal inherits Rectangle {
 
                 HorizontalLayout {
                     alignment: space-between;
-                    OutlineButton { text: "Назад"; clicked => { root.step = 3; } }
+                    OutlineButton { text: "Назад"; height: 40px; clicked => { root.step = 3; } }
                     FilledButton {
                         text: "Открыть журнал";
+                        height: 40px;
                         icon: OxidiumIcons.check;
                         clicked => {
                             root.complete(

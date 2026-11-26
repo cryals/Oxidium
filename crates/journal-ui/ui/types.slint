@@ -112,13 +112,43 @@ export struct StatBarItem {
     color: color,
     extra_text: string,
     below_target: bool,
+    dot_color: color,
+    secondary_ratio: float,
+    target_ratio: float,
+    percent_text: string,
+}
+
+export struct TrendPointItem {
+    date_short: string,
+    full_date: string,
+    avg_text: string,
+    grades_count: int,
+    x_ratio: float,
 }
 
 export struct HeatmapDayItem {
     date_iso: string,
     day_label: string,
+    full_date_label: string,
+    is_today: bool,
+    is_future: bool,
+    total_count: int,
     level: int,
+    cell_bg: color,
+    cell_fg: color,
+    slot_count: int,
+    slot_0_color: color,
+    slot_1_color: color,
+    slot_2_color: color,
+    slot_3_color: color,
+    summary_line: string,
+    details_line: string,
     tooltip: string,
+}
+
+export struct HeatmapWeekRow {
+    week_label: string,
+    days: [HeatmapDayItem],
 }
 
 export struct KanbanTaskCard {

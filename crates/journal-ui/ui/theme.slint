@@ -17,8 +17,22 @@ export global OxidiumTheme {
     out property <string> font_sans: "Roboto";
     out property <string> font_display: "Roboto Flex";
     out property <string> font_mono: "Roboto Mono";
-    out property <duration> anim_fast: root.reduced_motion ? 0ms : 120ms;
-    out property <duration> anim_medium: root.reduced_motion ? 0ms : 220ms;
+
+    // M3 Expressive motion tokens (respects reduced_motion accessibility setting)
+    out property <duration> anim_instant: root.reduced_motion ? 0ms : 90ms;
+    out property <duration> anim_fast: root.reduced_motion ? 0ms : 160ms;
+    out property <duration> anim_medium: root.reduced_motion ? 0ms : 260ms;
+    out property <duration> anim_emphasized: root.reduced_motion ? 0ms : 380ms;
+    out property <duration> anim_chart: root.reduced_motion ? 0ms : 460ms;
+    out property <easing> ease_emphasized: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+    out property <easing> ease_standard: cubic-bezier(0.2, 0.0, 0.0, 1.0);
+
+    // Semantic heatmap & grade highlight tokens
+    out property <color> grade_2_brown: root.dark_mode ? #D88A56 : #A1521D;
+    out property <color> grade_2_brown_bg: root.dark_mode ? #5A3117 : #F4DFCF;
+    out property <color> absent_red: root.dark_mode ? #F28B82 : #D32F2F;
+    out property <color> absent_red_bg: root.dark_mode ? #6E2120 : #FADCD9;
+    out property <color> task_accent: root.dark_mode ? #C8B6FF : #6750A4;
 
     // Semantic grade & mark accents (customizable by user, paired with high-contrast Light/Dark containers)
     in_out property <color> grade_5: root.dark_mode ? #8CD99E : #146C2E;

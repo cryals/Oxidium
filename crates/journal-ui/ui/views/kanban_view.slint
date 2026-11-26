@@ -2,6 +2,39 @@ import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, 
 import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
 import { BoardItem, KanbanColumnModel, KanbanTaskCard, ChecklistRowItem, SubjectItem, UiStrings } from "../types.slint";
 
+component KanbanMicroButton inherits Rectangle {
+    in property <image> icon;
+    in property <color> icon_color: MaterialPalette.on_surface_variant;
+    in property <string> hint_text;
+    in_out property <string> hover_target;
+    callback clicked();
+
+    width: 30px;
+    height: 30px;
+    border_radius: 15px;
+    background: mb_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+
+    Icon {
+        source: root.icon;
+        width: 16px;
+        height: 16px;
+        colorize: mb_ta.has_hover ? MaterialPalette.primary : root.icon_color;
+    }
+
+    mb_ta := TouchArea {
+        mouse_cursor: pointer;
+        clicked => { root.clicked(); }
+        changed has_hover => {
+            if (self.has_hover && root.hint_text != "") {
+                root.hover_target = root.hint_text;
+            } else if (!self.has_hover && root.hover_target == root.hint_text) {
+                root.hover_target = "";
+            }
+        }
+    }
+}
+
 export component KanbanView inherits Rectangle {
     in property <UiStrings> tr;
     in property <[BoardItem]> boards;
@@ -11,6 +44,7 @@ export component KanbanView inherits Rectangle {
     in_out property <string> filter_query: "";
     in_out property <int> filter_mode: 0; // 0=All, 1=Overdue, 2=HighPriority
     in_out property <bool> hand_mode: false;
+    in_out property <string> hover_hint: "";
     property <length> pan_start_x: 0px;
     property <length> pan_start_vx: 0px;
     property <bool> is_panning: false;
@@ -92,11 +126,12 @@ export component KanbanView inherits Rectangle {
                 HorizontalLayout {
                     spacing: 6px;
                     for b in root.boards : Rectangle {
-                        height: 34px;
-                        border_radius: 17px;
+                        height: 36px;
+                        border_radius: 18px;
                         background: b.id == root.active_board_id ? MaterialPalette.primary_container : MaterialPalette.surface;
                         border_width: 1px;
                         border_color: b.id == root.active_board_id ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 14px;
                             padding_right: 14px;
@@ -116,6 +151,7 @@ export component KanbanView inherits Rectangle {
 
                     OutlineButton {
                         text: "+ Доска";
+                        height: 36px;
                         clicked => {
                             root.new_board_name = "";
                             root.new_board_open = true;
@@ -137,6 +173,7 @@ export component KanbanView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.cursor;
                                     width: 16px; height: 16px;
@@ -147,6 +184,7 @@ export component KanbanView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.hand;
                                     width: 16px; height: 16px;
@@ -191,11 +229,12 @@ export component KanbanView inherits Rectangle {
 
                     // Filter mode chips
                     for fm[idx] in ["Все", "Просрочено", "Срочные"] : Rectangle {
-                        height: 34px;
-                        border_radius: 17px;
+                        height: 36px;
+                        border_radius: 18px;
                         background: root.filter_mode == idx ? MaterialPalette.secondary_container : MaterialPalette.surface;
                         border_width: 1px;
                         border_color: root.filter_mode == idx ? transparent : MaterialPalette.outline_variant;
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 11px;
                             padding_right: 11px;
@@ -218,6 +257,7 @@ export component KanbanView inherits Rectangle {
 
                     OutlineButton {
                         text: root.tr.kanban_new_column;
+                        height: 36px;
                         clicked => {
                             root.new_column_name = "";
                             root.new_column_wip = "";
@@ -228,6 +268,7 @@ export component KanbanView inherits Rectangle {
 
                     FilledButton {
                         text: root.tr.kanban_new_task;
+                        height: 36px;
                         icon: OxidiumIcons.add;
                         clicked => {
                             root.new_task_col_id = "";
@@ -292,6 +333,7 @@ export component KanbanView inherits Rectangle {
                             ? MaterialPalette.primary
                             : col.over_wip ? OxidiumTheme.danger_color
                             : OxidiumTheme.cell_border;
+                        animate width, border_color { duration: OxidiumTheme.anim_medium; easing: OxidiumTheme.ease_emphasized; }
 
                     VerticalLayout {
                         padding: 12px;
@@ -303,7 +345,7 @@ export component KanbanView inherits Rectangle {
                             alignment: space-between;
 
                             HorizontalLayout {
-                                spacing: 6px;
+                                spacing: 7px;
                                 horizontal_stretch: 1;
                                 VerticalLayout {
                                     alignment: center;
@@ -332,12 +374,14 @@ export component KanbanView inherits Rectangle {
                                         HorizontalLayout {
                                             padding_left: 7px;
                                             padding_right: 7px;
+                                            alignment: center;
                                             Text {
                                                 text: col.wip_limit > 0 ? col.task_count + "/" + col.wip_limit : col.task_count;
                                                 font_family: OxidiumTheme.font_mono;
                                                 font_size: 11px;
                                                 font_weight: 700;
                                                 color: col.over_wip ? MaterialPalette.on_error_container : MaterialPalette.on_surface_variant;
+                                                horizontal_alignment: center;
                                                 vertical_alignment: center;
                                             }
                                         }
@@ -347,19 +391,22 @@ export component KanbanView inherits Rectangle {
 
                             if !col.is_collapsed : HorizontalLayout {
                                 spacing: 2px;
-                                IconButton {
+                                KanbanMicroButton {
                                     icon: OxidiumIcons.chevron_left;
-                                    tooltip: "Сдвинуть колонку влево";
+                                    hint_text: "Сдвинуть колонку влево";
+                                    hover_target <=> root.hover_hint;
                                     clicked => { root.move_column_delta(col.id, -1); }
                                 }
-                                IconButton {
+                                KanbanMicroButton {
                                     icon: OxidiumIcons.chevron_right;
-                                    tooltip: "Сдвинуть колонку вправо";
+                                    hint_text: "Сдвинуть колонку вправо";
+                                    hover_target <=> root.hover_hint;
                                     clicked => { root.move_column_delta(col.id, 1); }
                                 }
-                                IconButton {
+                                KanbanMicroButton {
                                     icon: OxidiumIcons.add;
-                                    tooltip: "Добавить задачу в колонку";
+                                    hint_text: "Добавить задачу в колонку";
+                                    hover_target <=> root.hover_hint;
                                     clicked => {
                                         root.new_task_col_id = col.id;
                                         root.new_task_title = "";
@@ -396,19 +443,55 @@ export component KanbanView inherits Rectangle {
                             }
                         }
 
-                        // Column Task Cards
+                        // Column Task Cards (or crisp empty placeholder)
                         if !col.is_collapsed : ScrollView {
                             vertical_stretch: 1;
-                            VerticalLayout {
+                            viewport_width: self.visible_width;
+                            viewport_height: max(self.visible_height, col_cards_list.preferred_height);
+                            col_cards_list := VerticalLayout {
+                                x: 0px;
+                                y: 0px;
+                                width: parent.visible_width;
                                 spacing: 8px;
                                 alignment: start;
 
+                                if col.tasks.length == 0 : Rectangle {
+                                    height: 84px;
+                                    border_radius: 14px;
+                                    background: MaterialPalette.surface_container_low.with_alpha(55%);
+                                    border_width: 1px;
+                                    border_color: OxidiumTheme.cell_border;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 2px;
+                                        padding: 12px;
+                                        Text {
+                                            text: "Нет задач";
+                                            font_size: 12px; font_weight: 600;
+                                            color: MaterialPalette.on_surface_variant;
+                                            horizontal_alignment: center;
+                                        }
+                                        Text {
+                                            text: "Нажмите «+» сверху или перетащите карточку";
+                                            font_size: 10px;
+                                            color: MaterialPalette.on_surface_variant.with_alpha(75%);
+                                            horizontal_alignment: center;
+                                            wrap: word_wrap;
+                                        }
+                                    }
+                                }
+
                                 for task in col.tasks : Rectangle {
                                     border_radius: 16px;
-                                    background: MaterialPalette.surface_container_low;
+                                    background: card_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface_container_low;
                                     border_width: 1px;
-                                    border_color: task.is_overdue && !task.is_completed ? OxidiumTheme.danger_color : OxidiumTheme.cell_border;
+                                    border_color: task.is_overdue && !task.is_completed ? OxidiumTheme.danger_color
+                                        : card_ta.has_hover ? MaterialPalette.primary.with_alpha(45%)
+                                        : OxidiumTheme.cell_border;
                                     opacity: task.is_completed ? 0.78 : 1.0;
+                                    animate background, border_color, opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_standard; }
+
+                                    card_ta := TouchArea {}
 
                                     VerticalLayout {
                                         padding: OxidiumTheme.compact_mode ? 10px : 14px;
@@ -561,39 +644,44 @@ export component KanbanView inherits Rectangle {
                                                     height: 100%;
                                                     border_radius: 3px;
                                                     background: OxidiumTheme.success_color;
+                                                    animate width { duration: OxidiumTheme.anim_medium; easing: OxidiumTheme.ease_emphasized; }
                                                 }
                                             }
                                         }
 
-                                        // Quick card actions row
+                                        // Quick card actions row (hover hints rendered outside clipped ScrollView!)
                                         HorizontalLayout {
                                             alignment: space-between;
                                             spacing: 4px;
 
                                             HorizontalLayout {
                                                 spacing: 2px;
-                                                IconButton {
+                                                KanbanMicroButton {
                                                     icon: OxidiumIcons.chevron_left;
-                                                    tooltip: "В предыдущую колонку";
+                                                    hint_text: "В предыдущую колонку";
+                                                    hover_target <=> root.hover_hint;
                                                     clicked => { root.move_task_step(task.id, -1); }
                                                 }
-                                                IconButton {
+                                                KanbanMicroButton {
                                                     icon: OxidiumIcons.chevron_right;
-                                                    tooltip: "В следующую колонку";
+                                                    hint_text: "В следующую колонку";
+                                                    hover_target <=> root.hover_hint;
                                                     clicked => { root.move_task_step(task.id, 1); }
                                                 }
                                             }
 
                                             HorizontalLayout {
                                                 spacing: 2px;
-                                                IconButton {
+                                                KanbanMicroButton {
                                                     icon: OxidiumIcons.check;
-                                                    tooltip: task.is_completed ? "Переоткрыть" : "Выполнить";
+                                                    hint_text: task.is_completed ? "Переоткрыть задачу" : "Отметить выполненной";
+                                                    hover_target <=> root.hover_hint;
                                                     clicked => { root.toggle_task_complete(task.id); }
                                                 }
-                                                IconButton {
+                                                KanbanMicroButton {
                                                     icon: OxidiumIcons.edit;
-                                                    tooltip: "Открыть детали задачи";
+                                                    hint_text: "Открыть детали задачи";
+                                                    hover_target <=> root.hover_hint;
                                                     clicked => { root.open_task_detail(task.id); }
                                                 }
                                             }
@@ -628,6 +716,33 @@ export component KanbanView inherits Rectangle {
                             min(0px, kanban_scroll.visible_width - kanban_scroll.viewport_width),
                             0px
                         );
+                    }
+                }
+            }
+
+            // Floating M3 Expressive Unclipped Hint Pill (above all ScrollViews)
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: root.hover_hint != "" ? (parent.height - self.height - 10px) : (parent.height + 16px);
+                height: 30px;
+                border_radius: 15px;
+                background: MaterialPalette.inverse_surface;
+                opacity: root.hover_hint != "" ? 1.0 : 0.0;
+                visible: self.opacity > 0.01;
+                drop_shadow_blur: 14px;
+                drop_shadow_color: #00000040;
+                animate opacity { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+                animate y { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+
+                HorizontalLayout {
+                    padding_left: 14px;
+                    padding_right: 14px;
+                    Text {
+                        text: root.hover_hint;
+                        font_size: 12px;
+                        font_weight: 500;
+                        color: MaterialPalette.inverse_on_surface;
+                        vertical_alignment: center;
                     }
                 }
             }
@@ -713,9 +828,10 @@ export component KanbanView inherits Rectangle {
                 HorizontalLayout {
                     alignment: end;
                     spacing: 8px;
-                    OutlineButton { text: "Отмена"; clicked => { root.new_task_open = false; } }
+                    OutlineButton { text: "Отмена"; height: 38px; clicked => { root.new_task_open = false; } }
                     FilledButton {
                         text: "Создать";
+                        height: 38px;
                         clicked => {
                             root.new_task_open = false;
                             root.create_task(
@@ -758,9 +874,10 @@ export component KanbanView inherits Rectangle {
                 }
                 HorizontalLayout {
                     alignment: end; spacing: 8px;
-                    OutlineButton { text: "Отмена"; clicked => { root.new_column_open = false; } }
+                    OutlineButton { text: "Отмена"; height: 38px; clicked => { root.new_column_open = false; } }
                     FilledButton {
                         text: "Создать";
+                        height: 38px;
                         clicked => {
                             root.new_column_open = false;
                             root.create_column(root.new_column_name, root.new_column_wip, root.new_column_done);
@@ -789,9 +906,10 @@ export component KanbanView inherits Rectangle {
                 }
                 HorizontalLayout {
                     alignment: end; spacing: 8px;
-                    OutlineButton { text: "Отмена"; clicked => { root.new_board_open = false; } }
+                    OutlineButton { text: "Отмена"; height: 38px; clicked => { root.new_board_open = false; } }
                     FilledButton {
                         text: "Создать";
+                        height: 38px;
                         clicked => {
                             root.new_board_open = false;
                             root.create_board(root.new_board_name);
@@ -913,6 +1031,7 @@ export component KanbanView inherits Rectangle {
                         spacing: 6px;
                         OutlineButton {
                             text: "Дублировать";
+                            height: 38px;
                             clicked => {
                                 root.detail_open = false;
                                 root.duplicate_task(root.detail_task_id);
@@ -920,6 +1039,7 @@ export component KanbanView inherits Rectangle {
                         }
                         OutlineButton {
                             text: "Удалить";
+                            height: 38px;
                             clicked => {
                                 root.detail_open = false;
                                 root.delete_task(root.detail_task_id);
@@ -928,6 +1048,7 @@ export component KanbanView inherits Rectangle {
                     }
                     FilledButton {
                         text: "Сохранить";
+                        height: 38px;
                         clicked => {
                             root.detail_open = false;
                             root.save_task_detail(

@@ -124,6 +124,7 @@ export component JournalView inherits Rectangle {
 
                     TonalButton {
                         text: root.tr.journal_today;
+                        height: 36px;
                         clicked => { root.go_today(); }
                     }
                 }
@@ -145,6 +146,7 @@ export component JournalView inherits Rectangle {
                             "Год"
                         ] : Rectangle {
                             background: root.view_mode == idx ? MaterialPalette.secondary_container : transparent;
+                            animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                             TouchArea {
                                 mouse_cursor: pointer;
                                 clicked => { root.change_view_mode(idx); }
@@ -181,6 +183,7 @@ export component JournalView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.cursor;
                                     width: 16px; height: 16px;
@@ -191,6 +194,7 @@ export component JournalView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.hand;
                                     width: 16px; height: 16px;
@@ -261,11 +265,13 @@ export component JournalView inherits Rectangle {
 
                     OutlineButton {
                         text: root.active_period_label;
+                        height: 36px;
                         clicked => { root.open_periods_manager(); }
                     }
 
                     FilledButton {
                         text: "Предметы";
+                        height: 36px;
                         icon: OxidiumIcons.add;
                         clicked => { root.open_subjects_manager(); }
                     }
@@ -608,22 +614,23 @@ export component JournalView inherits Rectangle {
                                             : transparent;
                                         border_width: (root.active_row == row.row_index && root.active_col == cell.day_index) ? 2px : 0px;
                                         border_color: MaterialPalette.primary;
+                                        animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
 
                                         if cell.has_entries : HorizontalLayout {
                                             alignment: center;
                                             spacing: 2px;
-                                            padding: 3px;
+                                            padding: 2px;
 
                                             Rectangle {
                                                 height: cell.secondary_label == "" ? 28px : 22px;
-                                                min_width: cell.secondary_label == "" ? 28px : 19px;
+                                                min_width: cell.secondary_label == "" ? 28px : 17px;
                                                 y: (parent.height - self.height) / 2;
-                                                border_radius: 8px;
+                                                border_radius: cell.secondary_label == "" ? 8px : 6px;
                                                 background: cell.primary_bg;
 
                                                 HorizontalLayout {
-                                                    padding_left: 5px;
-                                                    padding_right: 5px;
+                                                    padding_left: cell.secondary_label == "" ? 5px : 4px;
+                                                    padding_right: cell.secondary_label == "" ? 5px : 4px;
                                                     Text {
                                                         text: cell.primary_label;
                                                         font_family: OxidiumTheme.font_mono;
@@ -638,7 +645,7 @@ export component JournalView inherits Rectangle {
 
                                             if cell.secondary_label != "" : Rectangle {
                                                 height: 22px;
-                                                min_width: 18px;
+                                                min_width: 16px;
                                                 y: (parent.height - self.height) / 2;
                                                 border_radius: 6px;
                                                 background: cell.secondary_bg;
@@ -648,7 +655,7 @@ export component JournalView inherits Rectangle {
                                                     Text {
                                                         text: cell.secondary_label;
                                                         font_family: OxidiumTheme.font_mono;
-                                                        font_size: 10px;
+                                                        font_size: 9px;
                                                         font_weight: 700;
                                                         color: cell.secondary_fg;
                                                         horizontal_alignment: center;
@@ -930,6 +937,7 @@ export component JournalView inherits Rectangle {
                     ] : Rectangle {
                         horizontal_stretch: 1;
                         height: 44px;
+                        border_radius: 10px;
                         border_top_left_radius: g_idx == 0 ? 22px : 8px;
                         border_bottom_left_radius: g_idx == 0 ? 22px : 8px;
                         border_top_right_radius: g_idx == 4 ? 22px : 8px;
@@ -937,6 +945,7 @@ export component JournalView inherits Rectangle {
                         background: g.bg;
                         border_width: g_ta.has_hover ? 2px : 0px;
                         border_color: g.fg;
+                        animate border_width { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
                         Text {
                             text: g.label;
                             font_family: OxidiumTheme.font_mono;
@@ -994,6 +1003,7 @@ export component JournalView inherits Rectangle {
                     alignment: space-between;
                     OutlineButton {
                         text: "Очистить";
+                        height: 38px;
                         clicked => {
                             root.quick_picker_open = false;
                             root.clear_cell_entries(root.picker_subject_id, root.picker_date_iso);
@@ -1001,6 +1011,7 @@ export component JournalView inherits Rectangle {
                     }
                     TonalButton {
                         text: "Подробнее →";
+                        height: 38px;
                         clicked => {
                             root.quick_picker_open = false;
                             root.open_cell_detail(root.picker_subject_id, root.picker_date_iso);

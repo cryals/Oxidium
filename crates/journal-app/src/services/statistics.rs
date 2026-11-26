@@ -45,13 +45,61 @@ pub struct AverageTrendPoint {
     pub grade_count_so_far: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ActivityHeatmapDay {
     pub date: NaiveDate,
     pub grades_count: usize,
     pub attendance_count: usize,
     pub tasks_count: usize,
     pub total_activity: usize,
+    #[serde(default)]
+    pub count_5: usize,
+    #[serde(default)]
+    pub count_4: usize,
+    #[serde(default)]
+    pub count_3: usize,
+    #[serde(default)]
+    pub count_2: usize,
+    #[serde(default)]
+    pub count_1: usize,
+    #[serde(default)]
+    pub count_pass: usize,
+    #[serde(default)]
+    pub count_fail: usize,
+    #[serde(default)]
+    pub absent_count: usize,
+    #[serde(default)]
+    pub excused_count: usize,
+    #[serde(default)]
+    pub completed_tasks_count: usize,
+    #[serde(default)]
+    pub details: Vec<String>,
+}
+
+#[derive(Default)]
+struct DayHeatAcc {
+    grades_count: usize,
+    attendance_count: usize,
+    tasks_count: usize,
+    count_5: usize,
+    count_4: usize,
+    count_3: usize,
+    count_2: usize,
+    count_1: usize,
+    count_pass: usize,
+    count_fail: usize,
+    absent_count: usize,
+    excused_count: usize,
+    completed_tasks_count: usize,
+    details: Vec<String>,
+}
+
+impl DayHeatAcc {
+    fn push_detail(&mut self, item: String) {
+        if self.details.len() < 12 {
+            self.details.push(item);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,11 +192,26 @@ impl AppServices {
         }
 
         let settings = self.db.load_settings()?;
-        let all_subjects = self.db.list_subjects(filter.profile_id, false)?;
+        let all_subjects_inc_arch = self.db.list_subjects(filter.profile_id, true)?;
+        let subject_short_map: HashMap<Uuid, String> = all_subjects_inc_arch
+            .iter()
+            .map(|s| {
+                let label = if s.short_name.trim().is_empty() {
+                    s.name.clone()
+                } else {
+                    s.short_name.clone()
+                };
+                (s.id, label)
+            })
+            .collect();
+        let active_subjects: Vec<_> = all_subjects_inc_arch
+            .into_iter()
+            .filter(|s| !s.is_archived)
+            .collect();
         let subjects: Vec<_> = if filter.subject_ids.is_empty() {
-            all_subjects
+            active_subjects
         } else {
-            all_subjects
+            active_subjects
                 .into_iter()
                 .filter(|s| filter.subject_ids.contains(&s.id))
                 .collect()
@@ -355,13 +418,66 @@ impl AppServices {
             None
         };
 
-        // Calendar activity heatmap (grades + attendance + tasks with due/completed dates)
-        let mut heat: BTreeMap<NaiveDate, (usize, usize, usize)> = BTreeMap::new();
+        // Calendar activity heatmap (grades by value + attendance breakdown + tasks)
+        let mut heat: BTreeMap<NaiveDate, DayHeatAcc> = BTreeMap::new();
         for g in &grades {
-            heat.entry(g.date).or_insert((0, 0, 0)).0 += 1;
+            let acc = heat.entry(g.date).or_default();
+            acc.grades_count += 1;
+            match g.mark_code.as_str() {
+                "grade_5" => acc.count_5 += 1,
+                "grade_4" => acc.count_4 += 1,
+                "grade_3" => acc.count_3 += 1,
+                "grade_2" => acc.count_2 += 1,
+                "grade_1" => acc.count_1 += 1,
+                "pass" => acc.count_pass += 1,
+                "fail" => acc.count_fail += 1,
+                _ => {
+                    if g.counts_in_average
+                        && let Some(v) = g.numeric_value
+                    {
+                        if v == Decimal::from(5) {
+                            acc.count_5 += 1;
+                        } else if v == Decimal::from(4) {
+                            acc.count_4 += 1;
+                        } else if v == Decimal::from(3) {
+                            acc.count_3 += 1;
+                        } else if v == Decimal::from(2) {
+                            acc.count_2 += 1;
+                        } else if v == Decimal::from(1) {
+                            acc.count_1 += 1;
+                        }
+                    }
+                }
+            }
+            let subj_name = subject_short_map
+                .get(&g.subject_id)
+                .map(String::as_str)
+                .unwrap_or("Предмет");
+            acc.push_detail(format!("{} ({})", g.mark_label, subj_name));
         }
         for a in &attendance {
-            heat.entry(a.date).or_insert((0, 0, 0)).1 += 1;
+            let acc = heat.entry(a.date).or_default();
+            acc.attendance_count += 1;
+            let subj_name = subject_short_map
+                .get(&a.subject_id)
+                .map(String::as_str)
+                .unwrap_or("Предмет");
+            match &a.status {
+                AttendanceStatus::Absent => {
+                    acc.absent_count += 1;
+                    acc.push_detail(format!("Н/Б ({subj_name})"));
+                }
+                AttendanceStatus::Excused => {
+                    acc.excused_count += 1;
+                    acc.push_detail(format!("Уваж. ({subj_name})"));
+                }
+                AttendanceStatus::Present => {
+                    acc.push_detail(format!("Прис. ({subj_name})"));
+                }
+                AttendanceStatus::Custom(c) => {
+                    acc.push_detail(format!("{c} ({subj_name})"));
+                }
+            }
         }
         let now = Utc::now();
         let mut completed_tasks = 0usize;
@@ -377,7 +493,10 @@ impl AppServices {
                 if filter.from_date.is_none_or(|f| d >= f)
                     && filter.to_date.is_none_or(|to| d <= to)
                 {
-                    heat.entry(d).or_insert((0, 0, 0)).2 += 1;
+                    let acc = heat.entry(d).or_default();
+                    acc.tasks_count += 1;
+                    acc.completed_tasks_count += 1;
+                    acc.push_detail(format!("✓ {}", t.title));
                 }
                 let iso = d.iso_week();
                 *by_week
@@ -396,19 +515,30 @@ impl AppServices {
                 if filter.from_date.is_none_or(|f| d >= f)
                     && filter.to_date.is_none_or(|to| d <= to)
                 {
-                    heat.entry(d).or_insert((0, 0, 0)).2 += 1;
+                    heat.entry(d).or_default().tasks_count += 1;
                 }
             }
         }
 
         let activity_heatmap = heat
             .into_iter()
-            .map(|(date, (gc, ac, tc))| ActivityHeatmapDay {
+            .map(|(date, acc)| ActivityHeatmapDay {
                 date,
-                grades_count: gc,
-                attendance_count: ac,
-                tasks_count: tc,
-                total_activity: gc + ac + tc,
+                grades_count: acc.grades_count,
+                attendance_count: acc.attendance_count,
+                tasks_count: acc.tasks_count,
+                total_activity: acc.grades_count + acc.attendance_count + acc.tasks_count,
+                count_5: acc.count_5,
+                count_4: acc.count_4,
+                count_3: acc.count_3,
+                count_2: acc.count_2,
+                count_1: acc.count_1,
+                count_pass: acc.count_pass,
+                count_fail: acc.count_fail,
+                absent_count: acc.absent_count,
+                excused_count: acc.excused_count,
+                completed_tasks_count: acc.completed_tasks_count,
+                details: acc.details,
             })
             .collect();
 

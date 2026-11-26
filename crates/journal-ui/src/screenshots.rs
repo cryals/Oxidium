@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{Duration, NaiveDate, Utc};
+use chrono::{Duration, Utc};
 use journal_app::{
     AddAttendanceInput, AddGradeInput, AppServices, AuditMeta, CreateSubjectInput, CreateTaskInput,
 };
@@ -65,6 +65,7 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
     let controller = UiController::new(Arc::clone(&app), Arc::clone(&mcp), None);
     let win = MainWindow::new()?;
     controller.bind_to_window(&win);
+    win.global::<crate::OxidiumTheme>().set_reduced_motion(true);
     win.show()?;
 
     let mut buffer = vec![Rgb8Pixel::default(); (width * height) as usize];
@@ -115,25 +116,50 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
     win.invoke_apply_color_scheme(0);
     capture("kanban.png")?;
 
-    // 5. Settings & MCP Server Panel (Dark)
+    // 5. Settings All Key Tabs (Dark — verifying switches, buttons, cards & overflow fixes)
     if let Ok(mut s) = app.get_settings() {
         s.theme_mode = ThemeMode::Dark;
         let _ = app.update_settings(&s, RecordSource::Gui);
     }
     controller.apply_settings_and_theme(&win);
+    win.global::<crate::OxidiumTheme>().set_reduced_motion(true);
     win.set_active_section(0);
-    win.set_settings_active_tab(3);
     win.set_settings_modal_open(true);
     controller.refresh_mcp_panel(&win);
-    win.invoke_apply_color_scheme(1);
-    capture("settings-mcp.png")?;
+    for (tab, shot) in [
+        (0, "settings-appearance.png"),
+        (1, "settings-journal.png"),
+        (2, "settings-kanban.png"),
+        (3, "settings-mcp.png"),
+        (4, "settings-data.png"),
+        (5, "settings-about.png"),
+    ] {
+        win.set_settings_active_tab(tab);
+        win.invoke_apply_color_scheme(1);
+        capture(shot)?;
+    }
 
-    // 6. Statistics Dark Mode
+    // 6. Statistics Dark Mode + Lower Activity Heatmap / Attendance / Forecast View
     win.set_settings_modal_open(false);
     win.set_active_section(1);
     controller.refresh_statistics(&win);
     win.invoke_apply_color_scheme(1);
     capture("statistics-dark.png")?;
+
+    let mixed_day = Utc::now().date_naive() - Duration::days(10);
+    win.invoke_qa_scroll_stats_activity(
+        -520.0,
+        mixed_day.format("%Y-%m-%d").to_string().into(),
+        format!(
+            "{} нояб. · смешанный день",
+            chrono::Datelike::day(&mixed_day)
+        )
+        .into(),
+        "Оценок: 2 · Н/Б: 1".into(),
+        "5 (Прог) · 2 (Матан) · Н/Б (Матан)".into(),
+    );
+    capture("statistics-activity.png")?;
+    win.invoke_qa_scroll_stats_activity(0.0, "".into(), "".into(), "".into(), "".into());
 
     // 7. Kanban Dark Mode
     win.set_active_section(2);
@@ -234,6 +260,20 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
             "#0F766E",
             Some(Decimal::new(45, 1)),
         ),
+        (
+            "Компьютерные сети",
+            "Сети",
+            "Таненбаум Э.С.",
+            "#0284C7",
+            Some(Decimal::new(43, 1)),
+        ),
+        (
+            "Английский язык",
+            "Англ",
+            "Смит М.Д.",
+            "#9333EA",
+            Some(Decimal::new(44, 1)),
+        ),
         ("Физкультура", "Физра", "Спортов Е.К.", "#E11D48", None),
     ];
 
@@ -258,34 +298,41 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
     }
 
     let today = Utc::now().date_naive();
-    let y = chrono::Datelike::year(&today);
-    let m = chrono::Datelike::month(&today);
-    let d = |day: u32| NaiveDate::from_ymd_opt(y, m, day.min(28)).unwrap();
 
-    // Realistic grades across subjects
+    // Realistic grades across subjects (including 5, 4, 3, 2 and mixed days for heatmap splitting)
+    let d_ago = |days_back: i64| today - Duration::days(days_back);
     let grade_entries = [
-        (0, 2, 5, WorkType::ClassAnswer, "Античная философия"),
-        (0, 6, 4, WorkType::Homework, "Эссе по Канту"),
-        (0, 12, 5, WorkType::Test, "Немецкая классика"),
-        (1, 3, 5, WorkType::LabWork, "Нормализация БД"),
-        (1, 9, 5, WorkType::LabWork, "Индексы B-Tree"),
-        (1, 9, 4, WorkType::ClassAnswer, "Ответ по SQL"),
-        (1, 18, 4, WorkType::ControlWork, "Транзакции ACID"),
-        (2, 4, 4, WorkType::PracticalWork, "Итераторы Rust"),
-        (2, 11, 5, WorkType::LabWork, "Асинхронный Tokio"),
-        (2, 19, 5, WorkType::Project, "Сетевой протокол"),
-        (3, 5, 3, WorkType::ControlWork, "Ряды Фурье"),
-        (3, 14, 4, WorkType::Homework, "Интегралы"),
-        (3, 21, 5, WorkType::Test, "Дифференциалы"),
-        (4, 7, 5, WorkType::LabWork, "Планировщик процессов"),
-        (4, 16, 4, WorkType::Test, "Виртуальная память"),
+        (0, d_ago(24), 5, WorkType::ClassAnswer, "Античная философия"),
+        (0, d_ago(16), 4, WorkType::Homework, "Эссе по Канту"),
+        (0, d_ago(7), 5, WorkType::Test, "Немецкая классика"),
+        (1, d_ago(22), 5, WorkType::LabWork, "Нормализация БД"),
+        (1, d_ago(14), 5, WorkType::LabWork, "Индексы B-Tree"),
+        (1, d_ago(14), 4, WorkType::ClassAnswer, "Ответ по SQL"),
+        (1, d_ago(4), 4, WorkType::ControlWork, "Транзакции ACID"),
+        (2, d_ago(20), 4, WorkType::PracticalWork, "Итераторы Rust"),
+        (2, d_ago(10), 5, WorkType::LabWork, "Асинхронный Tokio"),
+        (2, d_ago(2), 5, WorkType::Project, "Сетевой протокол"),
+        (3, d_ago(18), 3, WorkType::ControlWork, "Ряды Фурье"),
+        (
+            3,
+            d_ago(10),
+            2,
+            WorkType::ControlWork,
+            "Интегралы по контуру",
+        ),
+        (3, d_ago(1), 5, WorkType::Test, "Дифференциалы"),
+        (4, d_ago(13), 5, WorkType::LabWork, "Планировщик процессов"),
+        (4, d_ago(5), 4, WorkType::Test, "Виртуальная память"),
+        (5, d_ago(12), 2, WorkType::Test, "Маршрутизация OSPF"),
+        (5, d_ago(3), 4, WorkType::LabWork, "TCP Congestion"),
+        (6, d_ago(8), 5, WorkType::ClassAnswer, "Speaking Test"),
     ];
-    for (si, day, val, wt, topic) in grade_entries {
+    for (si, g_date, val, wt, topic) in grade_entries {
         app.add_grade(
             AddGradeInput {
                 profile_id: p.id,
                 subject_id: ids[si],
-                date: d(day),
+                date: g_date,
                 time: None,
                 mark_type_id: None,
                 mark_code: None,
@@ -304,8 +351,8 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
     app.add_grade(
         AddGradeInput {
             profile_id: p.id,
-            subject_id: ids[5],
-            date: d(15),
+            subject_id: ids[7],
+            date: d_ago(6),
             time: None,
             mark_type_id: None,
             mark_code: Some("pass".into()),
@@ -320,24 +367,26 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
         None,
     )?;
 
+    for (si, a_date) in [(7, d_ago(19)), (3, d_ago(10)), (5, d_ago(9)), (0, d_ago(4))] {
+        app.add_attendance(
+            AddAttendanceInput {
+                profile_id: p.id,
+                subject_id: ids[si],
+                date: a_date,
+                time: None,
+                status: AttendanceStatus::Absent,
+                reason: None,
+                comment: None,
+            },
+            RecordSource::Gui,
+            None,
+        )?;
+    }
     app.add_attendance(
         AddAttendanceInput {
             profile_id: p.id,
-            subject_id: ids[5],
-            date: d(4),
-            time: None,
-            status: AttendanceStatus::Absent,
-            reason: None,
-            comment: None,
-        },
-        RecordSource::Gui,
-        None,
-    )?;
-    app.add_attendance(
-        AddAttendanceInput {
-            profile_id: p.id,
-            subject_id: ids[5],
-            date: d(10),
+            subject_id: ids[7],
+            date: d_ago(11),
             time: None,
             status: AttendanceStatus::Excused,
             reason: Some("Справка".into()),

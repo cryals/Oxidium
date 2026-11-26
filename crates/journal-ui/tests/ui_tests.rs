@@ -75,6 +75,18 @@ fn headless_ui_end_to_end_flows() {
     assert_eq!(win.get_stats_overall_avg().as_str(), "4.50");
     assert_eq!(win.get_stats_total_grades().as_str(), "2");
     assert_eq!(win.get_stats_absences().as_str(), "1");
+    assert_eq!(win.get_stats_heatmap_weeks().row_count(), 5);
+    let total_heat_days: usize = (0..5)
+        .map(|w| {
+            win.get_stats_heatmap_weeks()
+                .row_data(w)
+                .unwrap()
+                .days
+                .row_count()
+        })
+        .sum();
+    assert_eq!(total_heat_days, 35);
+    assert!(win.get_stats_trend_points().row_count() >= 1);
 
     win.invoke_stats_run_forecast(0, "5, 5".into(), "4.8".into(), "5".into(), "1".into());
     assert!(!win.get_forecast_result_text().is_empty());
