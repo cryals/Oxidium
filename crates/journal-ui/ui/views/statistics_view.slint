@@ -1,5 +1,5 @@
 import { MaterialPalette, FilledButton, TonalButton, OutlineButton, Icon, ScrollView } from "@material";
-import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
+import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
 import { StatBarItem, TrendPointItem, HeatmapWeekRow, SubjectItem, UiStrings } from "../types.slint";
 
 component KpiCard inherits Rectangle {
@@ -15,7 +15,7 @@ component KpiCard inherits Rectangle {
     background: kpi_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface_container;
     border_width: 1px;
     border_color: kpi_ta.has_hover ? MaterialPalette.primary.with_alpha(40%) : OxidiumTheme.cell_border;
-    animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_standard; }
+    animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_standard; }
 
     kpi_ta := TouchArea {}
 
@@ -99,7 +99,7 @@ export component StatisticsView inherits Rectangle {
     in property <[StatBarItem]> subject_avg_bars;
     in property <[StatBarItem]> attendance_bars;
     in property <[HeatmapWeekRow]> heatmap_weeks;
-    in property <[StatBarItem]> task_dynamics_bars;
+    in property <[string]> heatmap_weekdays: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
     in_out property <int> hovered_trend_idx: -1;
     in_out property <string> hovered_trend_text: "";
@@ -127,6 +127,13 @@ export component StatisticsView inherits Rectangle {
 
     public function scroll_to_activity_qa(offset: length) {
         stats_scroll.viewport_y = offset;
+    }
+
+    public function reset_transient_state() {
+        root.hovered_trend_idx = -1;
+        root.hovered_trend_text = "";
+        root.hovered_day_key = "";
+        root.forecast_subject_idx = 0;
     }
 
     background: transparent;
@@ -159,7 +166,7 @@ export component StatisticsView inherits Rectangle {
                             : pre_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface_container_low;
                         border_width: 1px;
                         border_color: root.period_preset == idx ? transparent : OxidiumTheme.cell_border;
-                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 14px;
                             padding_right: 14px;
@@ -173,7 +180,11 @@ export component StatisticsView inherits Rectangle {
                         }
                         pre_ta := TouchArea {
                             mouse_cursor: pointer;
-                            clicked => { root.select_period_preset(idx); }
+                            clicked => {
+                                root.hovered_trend_idx = -1;
+                                root.hovered_day_key = "";
+                                root.select_period_preset(idx);
+                            }
                         }
                     }
                 }
@@ -258,8 +269,10 @@ export component StatisticsView inherits Rectangle {
                 }
             }
 
-            if root.attendance_note != "" : Text {
-                text: "ℹ " + root.attendance_note + "  ·  Требуют внимания: " + root.lowest_subject_text;
+            if root.attendance_note != "" || root.lowest_subject_text != "" : Text {
+                text: (root.attendance_note != "" ? root.attendance_note : "")
+                    + (root.attendance_note != "" && root.lowest_subject_text != "" ? "  ·  " : "")
+                    + (root.lowest_subject_text != "" ? "Требуют внимания: " + root.lowest_subject_text : "");
                 font_size: 12px;
                 color: MaterialPalette.on_surface_variant;
                 wrap: word_wrap;
@@ -470,7 +483,7 @@ export component StatisticsView inherits Rectangle {
                                             height: 100%;
                                             border_radius: 7px;
                                             background: bar.color;
-                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumMotion.ease_emphasized; }
                                         }
                                     }
                                 }
@@ -560,7 +573,7 @@ export component StatisticsView inherits Rectangle {
                                         height: 100%;
                                         border_radius: 6px;
                                         background: sb.color;
-                                        animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                        animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumMotion.ease_emphasized; }
                                     }
                                     if sb.target_ratio > 0.0 : Rectangle {
                                         x: clamp(parent.width * sb.target_ratio - 1px, 0px, parent.width - 2px);
@@ -652,6 +665,7 @@ export component StatisticsView inherits Rectangle {
                                     spacing: 6px;
                                     alignment: space-between;
                                     HorizontalLayout {
+                                        horizontal_stretch: 1;
                                         spacing: 6px;
                                         VerticalLayout {
                                             alignment: center;
@@ -659,13 +673,28 @@ export component StatisticsView inherits Rectangle {
                                         }
                                         Text { text: leg.label; font_size: 12px; font_weight: 500; color: MaterialPalette.on_surface; vertical_alignment: center; }
                                     }
-                                    Text {
-                                        text: leg.value_text + " (" + leg.percent_text + ")";
-                                        font_family: OxidiumTheme.font_mono;
-                                        font_size: 11px;
-                                        font_weight: 600;
-                                        color: leg.value_text == "0" ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
-                                        vertical_alignment: center;
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Text {
+                                            width: 24px;
+                                            text: leg.value_text;
+                                            font_family: OxidiumTheme.font_mono;
+                                            font_size: 11px;
+                                            font_weight: 700;
+                                            color: leg.value_text == "0" ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
+                                            horizontal_alignment: right;
+                                            vertical_alignment: center;
+                                        }
+                                        Text {
+                                            width: 36px;
+                                            text: leg.percent_text;
+                                            font_family: OxidiumTheme.font_mono;
+                                            font_size: 11px;
+                                            font_weight: 500;
+                                            color: MaterialPalette.on_surface_variant;
+                                            horizontal_alignment: right;
+                                            vertical_alignment: center;
+                                        }
                                     }
                                 }
                             }
@@ -753,14 +782,14 @@ export component StatisticsView inherits Rectangle {
                                             height: 100%;
                                             border_radius: 5.5px;
                                             background: OxidiumTheme.absent_red;
-                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumMotion.ease_emphasized; }
                                         }
                                         if ab.secondary_ratio > 0.0 : Rectangle {
                                             width: max(8px, (parent.width - 2px) * clamp(ab.secondary_ratio, 0.0, 1.0));
                                             height: 100%;
                                             border_radius: 5.5px;
                                             background: OxidiumTheme.mark_excused;
-                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumTheme.ease_emphasized; }
+                                            animate width { duration: OxidiumTheme.anim_chart; easing: OxidiumMotion.ease_emphasized; }
                                         }
                                     }
                                 }
@@ -810,6 +839,7 @@ export component StatisticsView inherits Rectangle {
                                     { l: "2", c: OxidiumTheme.grade_2_brown },
                                     { l: "Н/Б", c: OxidiumTheme.absent_red },
                                     { l: "Ув.", c: OxidiumTheme.mark_excused },
+                                    { l: "Зад.", c: OxidiumTheme.task_accent },
                                 ] : HorizontalLayout {
                                     spacing: 3px;
                                     VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border_radius: 2.5px; background: hleg.c; } }
@@ -818,10 +848,10 @@ export component StatisticsView inherits Rectangle {
                             }
                         }
 
-                        // Mon..Sun weekday labels
+                        // Weekday labels matching user week_start preference
                         HorizontalLayout {
                             spacing: 5px;
-                            for wd in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] : Text {
+                            for wd in root.heatmap_weekdays : Text {
                                 horizontal_stretch: 1;
                                 text: wd;
                                 font_size: 10px;
@@ -845,7 +875,7 @@ export component StatisticsView inherits Rectangle {
                                     border_width: h_ta.has_hover ? 2px : (d.is_today ? 1.5px : 1px);
                                     border_color: h_ta.has_hover || d.is_today ? MaterialPalette.primary : OxidiumTheme.cell_border;
                                     clip: true;
-                                    animate border_width, border_color { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+                                    animate border_width, border_color { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
 
                                     // 2 distinct event types -> crisp left/right split
                                     if d.slot_count == 2 : HorizontalLayout {

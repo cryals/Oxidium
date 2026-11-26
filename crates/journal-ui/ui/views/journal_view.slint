@@ -1,5 +1,5 @@
 import { MaterialPalette, MaterialTypography, MaterialStyleMetrics, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView } from "@material";
-import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
+import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
 import { DayHeaderItem, JournalRowItem, JournalCellItem, CellDetailEntry, MarkTypeItem, PeriodItem, UiStrings } from "../types.slint";
 
 export component JournalView inherits Rectangle {
@@ -143,10 +143,10 @@ export component JournalView inherits Rectangle {
                             root.tr.journal_week,
                             root.tr.journal_month,
                             root.tr.journal_semester,
-                            "Год"
+                            root.tr.journal_year
                         ] : Rectangle {
                             background: root.view_mode == idx ? MaterialPalette.secondary_container : transparent;
-                            animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                            animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                             TouchArea {
                                 mouse_cursor: pointer;
                                 clicked => { root.change_view_mode(idx); }
@@ -183,7 +183,7 @@ export component JournalView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
-                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.cursor;
                                     width: 16px; height: 16px;
@@ -194,7 +194,7 @@ export component JournalView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
-                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.hand;
                                     width: 16px; height: 16px;
@@ -270,7 +270,7 @@ export component JournalView inherits Rectangle {
                     }
 
                     FilledButton {
-                        text: "Предметы";
+                        text: root.tr.journal_add_subject;
                         height: 36px;
                         icon: OxidiumIcons.add;
                         clicked => { root.open_subjects_manager(); }
@@ -614,7 +614,7 @@ export component JournalView inherits Rectangle {
                                             : transparent;
                                         border_width: (root.active_row == row.row_index && root.active_col == cell.day_index) ? 2px : 0px;
                                         border_color: MaterialPalette.primary;
-                                        animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+                                        animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
 
                                         if cell.has_entries : HorizontalLayout {
                                             alignment: center;
@@ -675,11 +675,11 @@ export component JournalView inherits Rectangle {
 
                                         // Subtle MCP AI source micro-indicator
                                         if cell.has_mcp : Rectangle {
-                                            x: parent.width - 11px;
-                                            y: 3px;
-                                            width: 8px;
-                                            height: 8px;
-                                            border_radius: 4px;
+                                            x: parent.width - 8px;
+                                            y: 2px;
+                                            width: 6px;
+                                            height: 6px;
+                                            border_radius: 3px;
                                             background: MaterialPalette.primary;
                                         }
 
@@ -945,7 +945,7 @@ export component JournalView inherits Rectangle {
                         background: g.bg;
                         border_width: g_ta.has_hover ? 2px : 0px;
                         border_color: g.fg;
-                        animate border_width { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+                        animate border_width { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
                         Text {
                             text: g.label;
                             font_family: OxidiumTheme.font_mono;
@@ -1033,8 +1033,8 @@ export component JournalView inherits Rectangle {
         }
 
         Rectangle {
-            width: 540px;
-            height: 540px;
+            width: 560px;
+            height: 590px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border_radius: 24px;
@@ -1048,7 +1048,7 @@ export component JournalView inherits Rectangle {
 
             VerticalLayout {
                 padding: 20px;
-                spacing: 12px;
+                spacing: 10px;
 
                 HorizontalLayout {
                     alignment: space-between;
@@ -1074,9 +1074,15 @@ export component JournalView inherits Rectangle {
 
                 // Existing entries list
                 ScrollView {
-                    height: 190px;
-                    VerticalLayout {
+                    height: 176px;
+                    viewport_width: self.visible_width;
+                    viewport_height: max(self.visible_height, cell_entries_col.preferred_height);
+                    cell_entries_col := VerticalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: parent.visible_width;
                         spacing: 8px;
+                        alignment: start;
                         if root.cell_entries.length == 0 : Text {
                             text: "Записей за этот день пока нет.";
                             font_size: 13px;
@@ -1097,14 +1103,14 @@ export component JournalView inherits Rectangle {
                                     spacing: 10px;
                                     horizontal_stretch: 1;
                                     Rectangle {
-                                        width: 44px;
+                                        width: 48px;
                                         height: 36px;
                                         border_radius: 10px;
-                                        background: entry.color.with_alpha(20%);
+                                        background: entry.color.with_alpha(24%);
                                         Text {
                                             text: entry.label;
                                             font_family: OxidiumTheme.font_mono;
-                                            font_size: 14px;
+                                            font_size: 13px;
                                             font_weight: 700;
                                             color: entry.color;
                                             horizontal_alignment: center;
@@ -1133,11 +1139,16 @@ export component JournalView inherits Rectangle {
                                 }
 
                                 HorizontalLayout {
-                                    spacing: 4px;
+                                    spacing: 2px;
                                     if !entry.is_attendance : IconButton {
                                         icon: OxidiumIcons.copy;
-                                        tooltip: "Копировать на указанную дату";
+                                        tooltip: "Копировать на дату (ISO)";
                                         clicked => { root.copy_cell_entry(entry.id, root.detail_move_date); }
+                                    }
+                                    if !entry.is_attendance : IconButton {
+                                        icon: OxidiumIcons.arrow_forward;
+                                        tooltip: "Перенести на дату (ISO)";
+                                        clicked => { root.move_cell_entry(entry.id, root.detail_move_date); }
                                     }
                                     IconButton {
                                         icon: OxidiumIcons.delete;
@@ -1161,7 +1172,7 @@ export component JournalView inherits Rectangle {
                 }
 
                 HorizontalLayout {
-                    spacing: 8px;
+                    spacing: 6px;
                     for m in ["5", "4", "3", "2", "1", "Н/Б", "Уваж.", "Зач.", "Н/З"] : Rectangle {
                         horizontal_stretch: 1;
                         height: 32px;
@@ -1179,6 +1190,39 @@ export component JournalView inherits Rectangle {
                         TouchArea {
                             mouse_cursor: pointer;
                             clicked => { root.detail_new_mark = m; }
+                        }
+                    }
+                }
+
+                // Work type selector matching WorkType::all() indices
+                HorizontalLayout {
+                    spacing: 5px;
+                    for wt in [
+                        { idx: 0, l: "Ответ" },
+                        { idx: 1, l: "Д/З" },
+                        { idx: 2, l: "Контр." },
+                        { idx: 4, l: "Лаб." },
+                        { idx: 6, l: "Тест" },
+                        { idx: 8, l: "Экзамен" },
+                        { idx: 10, l: "Другое" },
+                    ] : Rectangle {
+                        horizontal_stretch: 1;
+                        height: 28px;
+                        border_radius: 8px;
+                        background: root.detail_work_type_idx == wt.idx ? MaterialPalette.secondary_container : MaterialPalette.surface_container;
+                        border_width: 1px;
+                        border_color: root.detail_work_type_idx == wt.idx ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                        Text {
+                            text: wt.l;
+                            font_size: 10px;
+                            font_weight: root.detail_work_type_idx == wt.idx ? 600 : 500;
+                            color: root.detail_work_type_idx == wt.idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                            horizontal_alignment: center;
+                            vertical_alignment: center;
+                        }
+                        TouchArea {
+                            mouse_cursor: pointer;
+                            clicked => { root.detail_work_type_idx = wt.idx; }
                         }
                     }
                 }
@@ -1224,6 +1268,7 @@ export component JournalView inherits Rectangle {
                                 text <=> root.detail_topic;
                                 color: MaterialPalette.on_surface;
                             }
+                            if root.detail_topic == "" : Text { x: 8px; height: 100%; text: "Например: Тема или причина"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                         }
                     }
                 }
@@ -1248,12 +1293,13 @@ export component JournalView inherits Rectangle {
                                 text <=> root.detail_comment;
                                 color: MaterialPalette.on_surface;
                             }
+                            if root.detail_comment == "" : Text { x: 8px; height: 100%; text: "Необязательная заметка"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                         }
                     }
                     VerticalLayout {
-                        width: 140px;
+                        width: 150px;
                         spacing: 4px;
-                        Text { text: "Дата копии (ISO)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Text { text: "Дата копии/переноса"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                         Rectangle {
                             height: 36px;
                             border_radius: 8px;
@@ -1278,10 +1324,12 @@ export component JournalView inherits Rectangle {
                     spacing: 8px;
                     OutlineButton {
                         text: "Закрыть";
+                        height: 36px;
                         clicked => { root.cell_detail_open = false; }
                     }
                     FilledButton {
                         text: "Добавить запись";
+                        height: 36px;
                         icon: OxidiumIcons.add;
                         clicked => {
                             root.add_detailed_entry(
@@ -1293,6 +1341,8 @@ export component JournalView inherits Rectangle {
                                 root.detail_topic,
                                 root.detail_comment,
                             );
+                            root.detail_topic = "";
+                            root.detail_comment = "";
                         }
                     }
                 }

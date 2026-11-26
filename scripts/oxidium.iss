@@ -2,7 +2,9 @@
 ; Per-user HKCU installation — requires NO administrator elevation.
 
 #define MyAppName "Oxidium"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+#define MyAppVersion "0.1.1"
+#endif
 #define MyAppPublisher "Oxidium Contributors"
 #define MyAppURL "https://github.com/cryals/Oxidium"
 #define MyAppExeName "student-journal.exe"

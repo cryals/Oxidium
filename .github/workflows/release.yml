@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.1.0)"
+        description: "Release tag to build & publish (e.g. v0.1.1)"
         required: true
         type: string
 
@@ -26,13 +26,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Determine release version
+      - name: Determine & verify release version matches Cargo.toml
         id: ver
         shell: pwsh
         run: |
           $tag = "${{ github.event.inputs.tag }}"
           if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
           $version = $tag.TrimStart('v')
+          $cargoToml = Get-Content -Path "Cargo.toml" -Raw
+          if ($cargoToml -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
+            throw "Could not parse workspace version from Cargo.toml"
+          }
+          $wsVer = $Matches[1]
+          if ($wsVer -ne $version) {
+            throw "Release tag version ($version) does not match Cargo.toml workspace version ($wsVer)!"
+          }
           echo "tag=$tag" >> $env:GITHUB_OUTPUT
           echo "version=$version" >> $env:GITHUB_OUTPUT
       - name: Run full workspace tests
@@ -62,13 +70,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Determine release version
+      - name: Determine & verify release version matches Cargo.toml
         id: ver
         run: |
           TAG="${{ github.event.inputs.tag }}"
           if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          VER="${TAG#v}"
+          WS_VER="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
+          if [ "$VER" != "$WS_VER" ]; then
+            echo "ERROR: tag version ($VER) != Cargo.toml workspace version ($WS_VER)" >&2
+            exit 1
+          fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
       - name: Install Linux GUI & TLS dependencies
         run: |
           sudo apt-get update
@@ -96,13 +110,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Determine release version
+      - name: Determine & verify release version matches Cargo.toml
         id: ver
         run: |
           TAG="${{ github.event.inputs.tag }}"
           if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          VER="${TAG#v}"
+          WS_VER="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
+          if [ "$VER" != "$WS_VER" ]; then
+            echo "ERROR: tag version ($VER) != Cargo.toml workspace version ($WS_VER)" >&2
+            exit 1
+          fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
       - name: Install Linux GUI & TLS dependencies
         run: |
           sudo apt-get update
@@ -136,18 +156,34 @@ jobs:
           rm -f SHA256SUMS.txt
           LC_ALL=C sha256sum * | sort -k2 > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - name: Resolve tag name
+      - name: Resolve tag & extract single-version release notes from CHANGELOG.md
         id: rel
         run: |
           TAG="${{ github.event.inputs.tag }}"
           if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          VER="${TAG#v}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          REL_VER="${VER}" REL_TAG="${TAG}" python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          ver = os.environ["REL_VER"]
+          tag = os.environ["REL_TAG"]
+          text = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          m = re.search(rf"^## \[{re.escape(ver)}\].*$", text, re.M)
+          if m:
+              rest = text[m.start():]
+              nxt = re.search(r"\n## \[", rest[1:])
+              section = rest[:nxt.start() + 1] if nxt else rest
+              Path("release-notes.md").write_text(section.strip() + "\n", encoding="utf-8")
+          else:
+              Path("release-notes.md").write_text(f"# Oxidium {tag}\n", encoding="utf-8")
+          PY
       - name: Publish or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.rel.outputs.tag }}
           name: "Oxidium ${{ steps.rel.outputs.tag }}"
-          body_path: CHANGELOG.md
-          generate_release_notes: true
+          body_path: release-notes.md
+          generate_release_notes: false
           fail_on_unmatched_files: false
           files: release-assets/*

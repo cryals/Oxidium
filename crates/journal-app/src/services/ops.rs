@@ -16,9 +16,11 @@ use uuid::Uuid;
 use crate::error::{AppError, AppResult};
 use crate::secret::redact_secrets;
 use crate::services::{
-    AddGradeInput, AppServices, CreateSubjectInput, CreateTaskInput, StatisticsFilter,
+    AddAttendanceInput, AddGradeInput, AppServices, CreateSubjectInput, CreateTaskInput,
+    StatisticsFilter,
 };
 use crate::undo::UndoCommand;
+use subtle::ConstantTimeEq;
 
 #[derive(Debug, Clone)]
 pub struct AuditMeta {
@@ -658,7 +660,7 @@ impl AppServices {
                 warnings.push(format!("Skipped grade {} with unmapped subject", g.id));
                 continue;
             };
-            let _ = self.add_grade(
+            match self.add_grade(
                 AddGradeInput {
                     profile_id,
                     subject_id: new_sid,
@@ -675,14 +677,40 @@ impl AppServices {
                 },
                 RecordSource::Import,
                 None,
-            );
-            grades_imported += 1;
+            ) {
+                Ok(_) => grades_imported += 1,
+                Err(e) => warnings.push(format!("Failed importing grade {}: {e}", g.id)),
+            }
+        }
+
+        let mut attendance_imported = 0usize;
+        for a in &bundle.attendance {
+            let Some(&new_sid) = subject_map.get(&a.subject_id) else {
+                warnings.push(format!("Skipped attendance {} with unmapped subject", a.id));
+                continue;
+            };
+            match self.add_attendance(
+                AddAttendanceInput {
+                    profile_id,
+                    subject_id: new_sid,
+                    date: a.date,
+                    time: a.time,
+                    status: a.status.clone(),
+                    reason: Some(a.reason.clone()),
+                    comment: Some(a.comment.clone()),
+                },
+                RecordSource::Import,
+                None,
+            ) {
+                Ok(_) => attendance_imported += 1,
+                Err(e) => warnings.push(format!("Failed importing attendance {}: {e}", a.id)),
+            }
         }
 
         let mut tasks_imported = 0usize;
         for t in &bundle.tasks {
             let mapped_sid = t.subject_id.and_then(|old| subject_map.get(&old).copied());
-            let _ = self.create_task(
+            match self.create_task(
                 CreateTaskInput {
                     profile_id,
                     board_id: None,
@@ -702,15 +730,17 @@ impl AppServices {
                 },
                 RecordSource::Import,
                 None,
-            );
-            tasks_imported += 1;
+            ) {
+                Ok(_) => tasks_imported += 1,
+                Err(e) => warnings.push(format!("Failed importing task '{}': {e}", t.title)),
+            }
         }
 
         Ok(ImportPreview {
             format: "oxidium_json".into(),
             subjects_count: subject_map.len(),
             grades_count: grades_imported,
-            attendance_count: 0,
+            attendance_count: attendance_imported,
             tasks_count: tasks_imported,
             warnings,
         })
@@ -929,17 +959,57 @@ impl AppServices {
     }
 
     pub fn restore_from_backup_archive(&self, zip_path: impl AsRef<Path>) -> AppResult<()> {
+        const MAX_BACKUP_DB_BYTES: u64 = 512 * 1024 * 1024;
+        const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
+
         let backups_dir = self.backups_dir();
         std::fs::create_dir_all(&backups_dir)?;
 
         let file = std::fs::File::open(zip_path)?;
         let mut archive = zip::ZipArchive::new(file)
             .map_err(|e| AppError::Backup(format!("invalid zip: {e}")))?;
-        let mut db_entry = archive
+
+        let expected_sha = match archive.by_name("manifest.json") {
+            Ok(mf) => {
+                let mut mf_bytes = Vec::new();
+                mf.take(MAX_MANIFEST_BYTES + 1).read_to_end(&mut mf_bytes)?;
+                if mf_bytes.len() as u64 > MAX_MANIFEST_BYTES {
+                    return Err(AppError::Backup(
+                        "backup manifest exceeds size limit".into(),
+                    ));
+                }
+                let val: serde_json::Value = serde_json::from_slice(&mf_bytes)
+                    .map_err(|e| AppError::Backup(format!("invalid backup manifest: {e}")))?;
+                val.get("database_sha256")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_ascii_lowercase())
+            }
+            Err(_) => None,
+        };
+
+        let db_entry = archive
             .by_name("oxidium.db")
             .map_err(|_| AppError::Backup("backup archive missing oxidium.db".into()))?;
         let mut buf = Vec::new();
-        db_entry.read_to_end(&mut buf)?;
+        db_entry
+            .take(MAX_BACKUP_DB_BYTES + 1)
+            .read_to_end(&mut buf)?;
+        if buf.len() as u64 > MAX_BACKUP_DB_BYTES {
+            return Err(AppError::Backup(
+                "backup database exceeds 512 MiB extraction limit".into(),
+            ));
+        }
+
+        if let Some(ref exp_sha) = expected_sha {
+            let actual_sha = hex::encode(Sha256::digest(&buf));
+            let matches: bool = actual_sha.as_bytes().ct_eq(exp_sha.as_bytes()).into();
+            if !matches {
+                return Err(AppError::Backup(
+                    "backup database failed SHA-256 checksum verification against manifest.json"
+                        .into(),
+                ));
+            }
+        }
 
         let temp_restore = backups_dir.join(format!(".restore-{}.db", Uuid::new_v4()));
         std::fs::write(&temp_restore, &buf)?;

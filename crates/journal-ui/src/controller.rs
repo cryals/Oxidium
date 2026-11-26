@@ -12,7 +12,7 @@ use journal_domain::{
 };
 use journal_mcp::{EmbeddedHttpManager, McpServerStatus};
 use journal_storage::SearchFilter;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, RoundingStrategy};
 use slint::{Color, ComponentHandle, ModelRc, SharedString, VecModel};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -28,6 +28,7 @@ use crate::*;
 pub struct UiViewState {
     pub year: i32,
     pub month: u32,
+    pub anchor_date: NaiveDate,
     pub view_mode: CalendarViewMode,
     pub selected_period_id: Option<Uuid>,
     pub active_board_id: Option<Uuid>,
@@ -48,6 +49,7 @@ impl Default for UiViewState {
         Self {
             year: today.year(),
             month: today.month(),
+            anchor_date: today,
             view_mode: CalendarViewMode::Month,
             selected_period_id: None,
             active_board_id: None,
@@ -231,12 +233,33 @@ impl UiController {
                 }
             });
         }
+        win.on_add_onboarding_subject(|csv, item| {
+            let trimmed_item = item.trim();
+            if trimmed_item.is_empty() {
+                return csv;
+            }
+            let target_lower = trimmed_item.to_lowercase();
+            let mut list: Vec<String> = csv
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !list
+                .iter()
+                .any(|existing| existing.to_lowercase() == target_lower)
+            {
+                list.push(trimmed_item.to_string());
+            }
+            list.join(", ").into()
+        });
 
         // Dynamic GitHub Releases semi-automatic updater callbacks
         {
             let ctrl = Arc::clone(self);
             win.on_toggle_auto_updates(move |enabled| {
-                if let Ok(mut s) = ctrl.app.get_settings() {
+                if let Ok(mut s) = ctrl.app.get_settings()
+                    && s.auto_check_updates != enabled
+                {
                     s.auto_check_updates = enabled;
                     let _ = ctrl.app.update_settings(&s, RecordSource::Gui);
                 }
@@ -346,18 +369,36 @@ impl UiController {
             });
         }
 
-        // 1-Click Export Report from Statistics header
+        // 1-Click Export Report from Statistics header (non-blocking I/O)
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_stats_export_report(move || {
-                if let Some(win) = w.upgrade()
-                    && let Ok(p) = ctrl.app.get_active_profile()
-                {
-                    let out_path = ctrl.app.data_dir.join(format!(
-                        "oxidium-report-{}.md",
-                        Utc::now().format("%Y%m%d-%H%M%S")
-                    ));
+                let Ok(p) = ctrl.app.get_active_profile() else {
+                    return;
+                };
+                let out_path = ctrl.app.data_dir.join(format!(
+                    "oxidium-report-{}.md",
+                    Utc::now().format("%Y%m%d-%H%M%S")
+                ));
+                if let Some(ref rt) = ctrl.rt_handle {
+                    let app = Arc::clone(&ctrl.app);
+                    let w2 = w.clone();
+                    rt.spawn_blocking(move || {
+                        let res = app.export_profile_markdown(p.id, &out_path);
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(win) = w2.upgrade() {
+                                match res {
+                                    Ok(()) => show_toast(
+                                        &win,
+                                        &format!("Отчёт сохранён: {}", out_path.display()),
+                                    ),
+                                    Err(e) => show_toast(&win, &format!("Ошибка экспорта: {e}")),
+                                }
+                            }
+                        });
+                    });
+                } else if let Some(win) = w.upgrade() {
                     match ctrl.app.export_profile_markdown(p.id, &out_path) {
                         Ok(()) => {
                             show_toast(&win, &format!("Отчёт сохранён: {}", out_path.display()))
@@ -408,12 +449,33 @@ impl UiController {
             let w = win.as_weak();
             win.on_journal_prev_period(move || {
                 if let Ok(mut st) = ctrl.state.lock() {
-                    let (y, m) = prev_month(st.year, st.month);
-                    st.year = y;
-                    st.month = m;
+                    match st.view_mode {
+                        CalendarViewMode::Week => {
+                            st.anchor_date -= Duration::days(7);
+                            st.year = st.anchor_date.year();
+                            st.month = st.anchor_date.month();
+                        }
+                        CalendarViewMode::AcademicYear => {
+                            st.year -= 1;
+                            st.anchor_date = shift_months(st.anchor_date, -12);
+                        }
+                        CalendarViewMode::Semester => {
+                            st.anchor_date = shift_months(st.anchor_date, -6);
+                            st.year = st.anchor_date.year();
+                            st.month = st.anchor_date.month();
+                        }
+                        CalendarViewMode::Month | CalendarViewMode::Custom => {
+                            let (y, m) = prev_month(st.year, st.month);
+                            st.year = y;
+                            st.month = m;
+                            st.anchor_date =
+                                NaiveDate::from_ymd_opt(y, m, 1).unwrap_or(st.anchor_date);
+                        }
+                    }
                     st.selected_period_id = None;
                 }
                 if let Some(win) = w.upgrade() {
+                    win.set_active_period_label("Периоды".into());
                     ctrl.refresh_journal(&win);
                 }
             });
@@ -423,12 +485,33 @@ impl UiController {
             let w = win.as_weak();
             win.on_journal_next_period(move || {
                 if let Ok(mut st) = ctrl.state.lock() {
-                    let (y, m) = next_month(st.year, st.month);
-                    st.year = y;
-                    st.month = m;
+                    match st.view_mode {
+                        CalendarViewMode::Week => {
+                            st.anchor_date += Duration::days(7);
+                            st.year = st.anchor_date.year();
+                            st.month = st.anchor_date.month();
+                        }
+                        CalendarViewMode::AcademicYear => {
+                            st.year += 1;
+                            st.anchor_date = shift_months(st.anchor_date, 12);
+                        }
+                        CalendarViewMode::Semester => {
+                            st.anchor_date = shift_months(st.anchor_date, 6);
+                            st.year = st.anchor_date.year();
+                            st.month = st.anchor_date.month();
+                        }
+                        CalendarViewMode::Month | CalendarViewMode::Custom => {
+                            let (y, m) = next_month(st.year, st.month);
+                            st.year = y;
+                            st.month = m;
+                            st.anchor_date =
+                                NaiveDate::from_ymd_opt(y, m, 1).unwrap_or(st.anchor_date);
+                        }
+                    }
                     st.selected_period_id = None;
                 }
                 if let Some(win) = w.upgrade() {
+                    win.set_active_period_label("Периоды".into());
                     ctrl.refresh_journal(&win);
                 }
             });
@@ -441,9 +524,11 @@ impl UiController {
                 if let Ok(mut st) = ctrl.state.lock() {
                     st.year = today.year();
                     st.month = today.month();
+                    st.anchor_date = today;
                     st.selected_period_id = None;
                 }
                 if let Some(win) = w.upgrade() {
+                    win.set_active_period_label("Периоды".into());
                     ctrl.refresh_journal(&win);
                 }
             });
@@ -459,8 +544,14 @@ impl UiController {
                         3 => CalendarViewMode::AcademicYear,
                         _ => CalendarViewMode::Month,
                     };
+                    if st.view_mode != CalendarViewMode::Semester {
+                        st.selected_period_id = None;
+                    }
                 }
                 if let Some(win) = w.upgrade() {
+                    if mode != 2 {
+                        win.set_active_period_label("Периоды".into());
+                    }
                     win.set_journal_view_mode(mode);
                     ctrl.refresh_journal(&win);
                 }
@@ -519,7 +610,7 @@ impl UiController {
             });
         }
 
-        // Keyboard 1-5 quick digit grade
+        // Keyboard 1-5 quick digit grade + Enter/Delete active cell actions
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
@@ -543,6 +634,97 @@ impl UiController {
                             &date.format("%Y-%m-%d").to_string(),
                             &format!("grade_{digit}"),
                         );
+                    }
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_journal_open_cell_at(move |row, col| {
+                if let Some(win) = w.upgrade()
+                    && let Ok(p) = ctrl.app.get_active_profile()
+                {
+                    let (sid_opt, date_opt) = ctrl
+                        .state
+                        .lock()
+                        .ok()
+                        .map(|st| {
+                            (
+                                st.visible_subject_ids.get(row as usize).copied(),
+                                st.visible_days.get(col as usize).copied(),
+                            )
+                        })
+                        .unwrap_or((None, None));
+                    if let (Some(sid), Some(date)) = (sid_opt, date_opt) {
+                        let sid_str = sid.to_string();
+                        let date_iso = date.format("%Y-%m-%d").to_string();
+                        let sname = ctrl
+                            .app
+                            .list_subjects(p.id, true)
+                            .unwrap_or_default()
+                            .into_iter()
+                            .find(|s| s.id == sid)
+                            .map(|s| s.name)
+                            .unwrap_or_default();
+                        win.set_journal_picker_subject_id(sid_str.clone().into());
+                        win.set_journal_picker_subject_name(sname.into());
+                        win.set_journal_picker_date_iso(date_iso.clone().into());
+                        ctrl.populate_cell_detail(&win, &sid_str, &date_iso);
+                        win.set_journal_cell_detail_open(true);
+                    }
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_journal_delete_active_cell(move |row, col| {
+                if let Some(win) = w.upgrade()
+                    && let Ok(p) = ctrl.app.get_active_profile()
+                {
+                    let (sid_opt, date_opt) = ctrl
+                        .state
+                        .lock()
+                        .ok()
+                        .map(|st| {
+                            (
+                                st.visible_subject_ids.get(row as usize).copied(),
+                                st.visible_days.get(col as usize).copied(),
+                            )
+                        })
+                        .unwrap_or((None, None));
+                    if let (Some(sid), Some(date)) = (sid_opt, date_opt) {
+                        let mut deleted = false;
+                        if let Ok(mut grades) = ctrl.app.list_grades(
+                            p.id,
+                            Some(sid),
+                            Some(date),
+                            Some(date),
+                            None,
+                            None,
+                            None,
+                            None,
+                        ) && let Some(last_g) = grades.pop()
+                        {
+                            deleted = ctrl
+                                .app
+                                .delete_grade(last_g.id, RecordSource::Gui, None)
+                                .is_ok();
+                        } else if let Ok(mut atts) =
+                            ctrl.app
+                                .list_attendance(p.id, Some(sid), Some(date), Some(date))
+                            && let Some(last_a) = atts.pop()
+                        {
+                            deleted = ctrl
+                                .app
+                                .delete_attendance(last_a.id, RecordSource::Gui, None)
+                                .is_ok();
+                        }
+                        if deleted {
+                            ctrl.refresh_all(&win);
+                            show_toast(&win, "Последняя запись в ячейке удалена");
+                        }
                     }
                 }
             });
@@ -685,14 +867,17 @@ impl UiController {
             let w = win.as_weak();
             win.on_journal_copy_entry(move |id_str, target_date_str| {
                 if let Some(win) = w.upgrade()
-                    && let (Ok(id), Ok(td)) = (
-                        Uuid::parse_str(&id_str),
-                        NaiveDate::parse_from_str(target_date_str.trim(), "%Y-%m-%d"),
-                    )
+                    && let Ok(id) = Uuid::parse_str(&id_str)
                 {
+                    let Ok(td) = NaiveDate::parse_from_str(target_date_str.trim(), "%Y-%m-%d")
+                    else {
+                        show_toast(&win, "Некорректная дата (ожидается ГГГГ-ММ-ДД)");
+                        return;
+                    };
                     match ctrl.app.copy_grade_to_date(id, td, None, RecordSource::Gui) {
                         Ok(_) => {
                             ctrl.refresh_journal(&win);
+                            ctrl.refresh_undo_flags(&win);
                             show_toast(&win, &format!("Оценка скопирована на {td}"));
                         }
                         Err(e) => show_toast(&win, &format!("Ошибка: {e}")),
@@ -705,14 +890,20 @@ impl UiController {
             let w = win.as_weak();
             win.on_journal_move_entry(move |id_str, target_date_str| {
                 if let Some(win) = w.upgrade()
-                    && let (Ok(id), Ok(td)) = (
-                        Uuid::parse_str(&id_str),
-                        NaiveDate::parse_from_str(target_date_str.trim(), "%Y-%m-%d"),
-                    )
+                    && let Ok(id) = Uuid::parse_str(&id_str)
                 {
+                    let Ok(td) = NaiveDate::parse_from_str(target_date_str.trim(), "%Y-%m-%d")
+                    else {
+                        show_toast(&win, "Некорректная дата (ожидается ГГГГ-ММ-ДД)");
+                        return;
+                    };
                     match ctrl.app.move_grade_to_date(id, td, None, RecordSource::Gui) {
                         Ok(_) => {
+                            let sid = win.get_journal_picker_subject_id().to_string();
+                            let d = win.get_journal_picker_date_iso().to_string();
+                            ctrl.populate_cell_detail(&win, &sid, &d);
                             ctrl.refresh_journal(&win);
+                            ctrl.refresh_undo_flags(&win);
                             show_toast(&win, &format!("Оценка перенесена на {td}"));
                         }
                         Err(e) => show_toast(&win, &format!("Ошибка: {e}")),
@@ -728,6 +919,7 @@ impl UiController {
                     st.kanban_subject_filter = Uuid::parse_str(&sid_str).ok();
                 }
                 if let Some(win) = w.upgrade() {
+                    win.invoke_reset_kanban_hover_state();
                     win.set_active_section(2);
                     ctrl.refresh_kanban(&win);
                 }
@@ -884,12 +1076,18 @@ impl UiController {
                     {
                         let cid = Uuid::parse_str(&col_str).ok();
                         let bid = ctrl.active_board_id_or_first();
-                        let due_at = NaiveDate::parse_from_str(deadline_str.trim(), "%Y-%m-%d")
-                            .ok()
-                            .and_then(|d| d.and_hms_opt(23, 59, 0))
-                            .map(|ndt| {
+                        let dl_trimmed = deadline_str.trim();
+                        let due_at = if dl_trimmed.is_empty() {
+                            None
+                        } else {
+                            let Ok(d) = NaiveDate::parse_from_str(dl_trimmed, "%Y-%m-%d") else {
+                                show_toast(&win, "Некорректная дата дедлайна (ГГГГ-ММ-ДД)");
+                                return;
+                            };
+                            d.and_hms_opt(23, 59, 0).map(|ndt| {
                                 chrono::DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc)
-                            });
+                            })
+                        };
                         let subject_id = if subj_idx > 0 {
                             ctrl.app
                                 .list_subjects(p.id, false)
@@ -1038,17 +1236,17 @@ impl UiController {
                     if let Some(win) = w.upgrade()
                         && let Ok(tid) = Uuid::parse_str(&tid_str)
                     {
-                        let due_at = if deadline_str.trim().is_empty() {
+                        let dl_trimmed = deadline_str.trim();
+                        let due_at = if dl_trimmed.is_empty() {
                             Some(None)
                         } else {
-                            NaiveDate::parse_from_str(deadline_str.trim(), "%Y-%m-%d")
-                                .ok()
-                                .and_then(|d| d.and_hms_opt(23, 59, 0))
-                                .map(|ndt| {
-                                    Some(chrono::DateTime::<Utc>::from_naive_utc_and_offset(
-                                        ndt, Utc,
-                                    ))
-                                })
+                            let Ok(d) = NaiveDate::parse_from_str(dl_trimmed, "%Y-%m-%d") else {
+                                show_toast(&win, "Некорректная дата дедлайна (ГГГГ-ММ-ДД)");
+                                return;
+                            };
+                            d.and_hms_opt(23, 59, 0).map(|ndt| {
+                                Some(chrono::DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc))
+                            })
                         };
                         let _ = ctrl.app.update_task(
                             tid,
@@ -1064,6 +1262,7 @@ impl UiController {
                             None,
                         );
                         ctrl.refresh_kanban(&win);
+                        ctrl.refresh_undo_flags(&win);
                         show_toast(&win, "Задача сохранена");
                     }
                 },
@@ -1078,6 +1277,7 @@ impl UiController {
                 {
                     let _ = ctrl.app.duplicate_task(tid, RecordSource::Gui);
                     ctrl.refresh_kanban(&win);
+                    ctrl.refresh_undo_flags(&win);
                     show_toast(&win, "Задача продублирована");
                 }
             });
@@ -1173,6 +1373,20 @@ impl UiController {
                     st.kanban_subject_filter = None;
                 }
                 if let Some(win) = w.upgrade() {
+                    win.invoke_reset_kanban_hover_state();
+                    ctrl.refresh_kanban(&win);
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_kanban_clear_subject_filter(move || {
+                if let Ok(mut st) = ctrl.state.lock() {
+                    st.kanban_subject_filter = None;
+                }
+                if let Some(win) = w.upgrade() {
+                    win.invoke_reset_kanban_hover_state();
                     ctrl.refresh_kanban(&win);
                 }
             });
@@ -1192,7 +1406,12 @@ impl UiController {
                     if let Ok(mut st) = ctrl.state.lock() {
                         st.active_board_id = None;
                         st.selected_period_id = None;
+                        st.kanban_subject_filter = None;
+                        st.stats_preset = 0;
                     }
+                    win.set_stats_period_preset(0);
+                    win.invoke_reset_stats_view_state();
+                    win.invoke_reset_kanban_hover_state();
                     ctrl.refresh_all(&win);
                     show_toast(&win, "Профиль переключён");
                 }
@@ -1407,12 +1626,15 @@ impl UiController {
             let w = win.as_weak();
             win.on_period_create(move |name, pt_idx, start_str, end_str| {
                 if let Some(win) = w.upgrade()
-                    && let (Ok(p), Ok(s), Ok(e)) = (
-                        ctrl.app.get_active_profile(),
+                    && let Ok(p) = ctrl.app.get_active_profile()
+                {
+                    let (Ok(s), Ok(e)) = (
                         NaiveDate::parse_from_str(start_str.trim(), "%Y-%m-%d"),
                         NaiveDate::parse_from_str(end_str.trim(), "%Y-%m-%d"),
-                    )
-                {
+                    ) else {
+                        show_toast(&win, "Некорректная дата периода (ожидается ГГГГ-ММ-ДД)");
+                        return;
+                    };
                     let pt = match pt_idx {
                         0 => PeriodType::AcademicYear,
                         1 => PeriodType::Semester,
@@ -1487,6 +1709,7 @@ impl UiController {
             });
         }
         {
+            let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_search_hit_selected(move |et, eid| {
                 if let Some(win) = w.upgrade() {
@@ -1494,6 +1717,33 @@ impl UiController {
                         win.set_active_section(2);
                         win.invoke_kanban_open_task_detail(eid);
                     } else {
+                        if let Ok(id) = Uuid::parse_str(&eid) {
+                            let target_date = if et == "grade" {
+                                ctrl.app.get_grade(id).ok().map(|g| g.date)
+                            } else if et == "attendance" {
+                                ctrl.app
+                                    .get_active_profile()
+                                    .ok()
+                                    .and_then(|p| {
+                                        ctrl.app.list_attendance(p.id, None, None, None).ok()
+                                    })
+                                    .and_then(|list| {
+                                        list.into_iter().find(|a| a.id == id).map(|a| a.date)
+                                    })
+                            } else {
+                                None
+                            };
+                            if let Some(d) = target_date {
+                                if let Ok(mut st) = ctrl.state.lock() {
+                                    st.anchor_date = d;
+                                    st.year = d.year();
+                                    st.month = d.month();
+                                    st.selected_period_id = None;
+                                }
+                                win.set_active_period_label("Периоды".into());
+                                ctrl.refresh_journal(&win);
+                            }
+                        }
                         win.set_active_section(0);
                     }
                 }
@@ -1635,17 +1885,31 @@ impl UiController {
             let w = win.as_weak();
             win.on_mcp_start_http(move || {
                 if let Some(win) = w.upgrade()
-                    && let (Some(rt), Ok(s)) = (ctrl.rt_handle.as_ref(), ctrl.app.get_settings())
+                    && let (Some(rt), Ok(mut s)) =
+                        (ctrl.rt_handle.as_ref(), ctrl.app.get_settings())
                 {
-                    match ctrl.mcp.start(rt, s.mcp_http_port) {
+                    let port_raw = win.get_mcp_port_text();
+                    let Ok(port) = port_raw.trim().parse::<u16>() else {
+                        show_toast(&win, "Некорректный порт MCP (допустимо 1024–65535)");
+                        return;
+                    };
+                    if port < 1024 {
+                        show_toast(&win, "Порт MCP должен быть не ниже 1024");
+                        return;
+                    }
+                    if s.mcp_http_port != port {
+                        s.mcp_http_port = port;
+                        let _ = ctrl.app.update_settings(&s, RecordSource::Gui);
+                    }
+                    match ctrl.mcp.start(rt, port) {
                         Ok(()) => {
                             ctrl.refresh_mcp_panel(&win);
-                            show_toast(
-                                &win,
-                                &format!("MCP HTTP запущен на 127.0.0.1:{}", s.mcp_http_port),
-                            );
+                            show_toast(&win, &format!("MCP HTTP запущен на 127.0.0.1:{port}"));
                         }
-                        Err(e) => show_toast(&win, &format!("Ошибка запуска MCP: {e}")),
+                        Err(e) => {
+                            ctrl.refresh_mcp_panel(&win);
+                            show_toast(&win, &format!("Ошибка запуска MCP: {e}"));
+                        }
                     }
                 }
             });
@@ -1666,11 +1930,32 @@ impl UiController {
             let w = win.as_weak();
             win.on_mcp_restart_http(move || {
                 if let Some(win) = w.upgrade()
-                    && let (Some(rt), Ok(s)) = (ctrl.rt_handle.as_ref(), ctrl.app.get_settings())
+                    && let (Some(rt), Ok(mut s)) =
+                        (ctrl.rt_handle.as_ref(), ctrl.app.get_settings())
                 {
-                    let _ = ctrl.mcp.restart(rt, s.mcp_http_port);
-                    ctrl.refresh_mcp_panel(&win);
-                    show_toast(&win, "MCP HTTP перезапущен");
+                    let port_raw = win.get_mcp_port_text();
+                    let Ok(port) = port_raw.trim().parse::<u16>() else {
+                        show_toast(&win, "Некорректный порт MCP (допустимо 1024–65535)");
+                        return;
+                    };
+                    if port < 1024 {
+                        show_toast(&win, "Порт MCP должен быть не ниже 1024");
+                        return;
+                    }
+                    if s.mcp_http_port != port {
+                        s.mcp_http_port = port;
+                        let _ = ctrl.app.update_settings(&s, RecordSource::Gui);
+                    }
+                    match ctrl.mcp.restart(rt, port) {
+                        Ok(()) => {
+                            ctrl.refresh_mcp_panel(&win);
+                            show_toast(&win, &format!("MCP HTTP перезапущен на 127.0.0.1:{port}"));
+                        }
+                        Err(e) => {
+                            ctrl.refresh_mcp_panel(&win);
+                            show_toast(&win, &format!("Ошибка перезапуска MCP: {e}"));
+                        }
+                    }
                 }
             });
         }
@@ -1705,12 +1990,36 @@ impl UiController {
             });
         }
 
-        // Backup / Restore / Export / Import
+        // Backup / Restore / Export / Import (offloaded from UI thread via tokio::spawn_blocking)
         {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_trigger_backup(move || {
-                if let Some(win) = w.upgrade() {
+                if let Some(ref rt) = ctrl.rt_handle {
+                    let app = Arc::clone(&ctrl.app);
+                    let w2 = w.clone();
+                    rt.spawn_blocking(move || {
+                        let res = app.create_backup_archive(None);
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(win) = w2.upgrade() {
+                                match res {
+                                    Ok(info) => {
+                                        win.set_backup_status_text(
+                                            format!(
+                                                "Резервная копия создана: {} ({} байт)",
+                                                info.path.display(),
+                                                info.size_bytes
+                                            )
+                                            .into(),
+                                        );
+                                        show_toast(&win, "Резервная копия создана");
+                                    }
+                                    Err(e) => show_toast(&win, &format!("Ошибка бэкапа: {e}")),
+                                }
+                            }
+                        });
+                    });
+                } else if let Some(win) = w.upgrade() {
                     match ctrl.app.create_backup_archive(None) {
                         Ok(info) => {
                             win.set_backup_status_text(
@@ -1732,26 +2041,39 @@ impl UiController {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_trigger_restore(move || {
-                if let Some(win) = w.upgrade()
-                    && let Some(file) = rfd::FileDialog::new()
-                        .add_filter("Oxidium Backup ZIP", &["zip"])
-                        .pick_file()
-                {
-                    match ctrl.app.restore_from_backup_archive(&file) {
-                        Ok(()) => {
-                            ctrl.refresh_all(&win);
-                            win.set_backup_status_text(
-                                "База успешно восстановлена из архива.".into(),
-                            );
-                            show_toast(&win, "База восстановлена");
-                        }
-                        Err(e) => {
-                            win.set_backup_status_text(
-                                format!("Восстановление отменено (исходные данные сохранены): {e}")
-                                    .into(),
-                            );
-                        }
-                    }
+                if let Some(ref rt) = ctrl.rt_handle {
+                    let c = Arc::clone(&ctrl);
+                    let w2 = w.clone();
+                    rt.spawn_blocking(move || {
+                        let Some(file) = rfd::FileDialog::new()
+                            .add_filter("Oxidium Backup ZIP", &["zip"])
+                            .pick_file()
+                        else {
+                            return;
+                        };
+                        let res = c.app.restore_from_backup_archive(&file);
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(win) = w2.upgrade() {
+                                match res {
+                                    Ok(()) => {
+                                        c.refresh_all(&win);
+                                        win.set_backup_status_text(
+                                            "База успешно восстановлена из архива.".into(),
+                                        );
+                                        show_toast(&win, "База восстановлена");
+                                    }
+                                    Err(e) => {
+                                        win.set_backup_status_text(
+                                            format!(
+                                                "Восстановление отменено (исходные данные сохранены): {e}"
+                                            )
+                                            .into(),
+                                        );
+                                    }
+                                }
+                            }
+                        });
+                    });
                 }
             });
         }
@@ -1759,31 +2081,41 @@ impl UiController {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_export_data(move |fmt| {
-                if let Some(win) = w.upgrade()
-                    && let Ok(p) = ctrl.app.get_active_profile()
-                {
-                    let ext = fmt.as_str();
-                    if let Some(path) = rfd::FileDialog::new()
-                        .set_file_name(format!("oxidium-export.{ext}"))
-                        .save_file()
-                    {
-                        let res = match ext {
-                            "json" => ctrl.app.export_profile_json(p.id, &path),
-                            "csv" => ctrl.app.export_grades_csv(p.id, &path),
-                            "xlsx" => ctrl.app.export_profile_xlsx(p.id, &path),
-                            "md" => ctrl.app.export_profile_markdown(p.id, &path),
+                let Ok(p) = ctrl.app.get_active_profile() else {
+                    return;
+                };
+                let ext = fmt.to_string();
+                if let Some(ref rt) = ctrl.rt_handle {
+                    let app = Arc::clone(&ctrl.app);
+                    let w2 = w.clone();
+                    rt.spawn_blocking(move || {
+                        let Some(path) = rfd::FileDialog::new()
+                            .set_file_name(format!("oxidium-export.{ext}"))
+                            .save_file()
+                        else {
+                            return;
+                        };
+                        let res = match ext.as_str() {
+                            "json" => app.export_profile_json(p.id, &path),
+                            "csv" => app.export_grades_csv(p.id, &path),
+                            "xlsx" => app.export_profile_xlsx(p.id, &path),
+                            "md" => app.export_profile_markdown(p.id, &path),
                             _ => Ok(()),
                         };
-                        match res {
-                            Ok(()) => {
-                                win.set_backup_status_text(
-                                    format!("Экспорт сохранён: {}", path.display()).into(),
-                                );
-                                show_toast(&win, "Экспорт завершён");
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(win) = w2.upgrade() {
+                                match res {
+                                    Ok(()) => {
+                                        win.set_backup_status_text(
+                                            format!("Экспорт сохранён: {}", path.display()).into(),
+                                        );
+                                        show_toast(&win, "Экспорт завершён");
+                                    }
+                                    Err(e) => show_toast(&win, &format!("Ошибка экспорта: {e}")),
+                                }
                             }
-                            Err(e) => show_toast(&win, &format!("Ошибка экспорта: {e}")),
-                        }
-                    }
+                        });
+                    });
                 }
             });
         }
@@ -1791,39 +2123,83 @@ impl UiController {
             let ctrl = Arc::clone(self);
             let w = win.as_weak();
             win.on_import_data(move |fmt| {
-                if let Some(win) = w.upgrade()
-                    && let Ok(p) = ctrl.app.get_active_profile()
-                    && let Some(path) = rfd::FileDialog::new().pick_file()
-                {
-                    match fmt.as_str() {
-                        "json" => match ctrl.app.import_json_into_profile(p.id, &path) {
-                            Ok(prev) => {
-                                ctrl.refresh_all(&win);
-                                win.set_backup_status_text(
-                                    format!("Импортировано JSON: {} предм., {} оценок, {} задач", prev.subjects_count, prev.grades_count, prev.tasks_count).into(),
-                                );
+                let Ok(p) = ctrl.app.get_active_profile() else {
+                    return;
+                };
+                let fmt_s = fmt.to_string();
+                if let Some(ref rt) = ctrl.rt_handle {
+                    let c = Arc::clone(&ctrl);
+                    let w2 = w.clone();
+                    rt.spawn_blocking(move || {
+                        let Some(path) = rfd::FileDialog::new().pick_file() else {
+                            return;
+                        };
+                        let outcome: Result<(bool, String), String> = match fmt_s.as_str() {
+                            "json" => c
+                                .app
+                                .import_json_into_profile(p.id, &path)
+                                .map(|prev| {
+                                    (
+                                        true,
+                                        format!(
+                                            "Импортировано JSON: {} предм., {} оценок, {} посещ., {} задач (предупреждений: {})",
+                                            prev.subjects_count,
+                                            prev.grades_count,
+                                            prev.attendance_count,
+                                            prev.tasks_count,
+                                            prev.warnings.len()
+                                        ),
+                                    )
+                                })
+                                .map_err(|e| format!("Ошибка импорта: {e}")),
+                            "csv" => c
+                                .app
+                                .import_grades_csv(p.id, &path, false)
+                                .map(|prev| {
+                                    (
+                                        true,
+                                        format!(
+                                            "Импортировано CSV: {} оценок (предупреждений: {})",
+                                            prev.grades_count,
+                                            prev.warnings.len()
+                                        ),
+                                    )
+                                })
+                                .map_err(|e| format!("Ошибка импорта: {e}")),
+                            "telegram" => c
+                                .app
+                                .preview_telegram_export(&path)
+                                .map(|prev| {
+                                    (
+                                        false,
+                                        format!(
+                                            "Telegram «{}»: найдено {} текстовых заметок из {} сообщений. {}",
+                                            prev.chat_name,
+                                            prev.non_empty_notes.len(),
+                                            prev.total_messages,
+                                            prev.notice
+                                        ),
+                                    )
+                                })
+                                .map_err(|e| format!("Ошибка Telegram JSON: {e}")),
+                            _ => Ok((false, String::new())),
+                        };
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(win) = w2.upgrade() {
+                                match outcome {
+                                    Ok((needs_refresh, msg)) => {
+                                        if needs_refresh {
+                                            c.refresh_all(&win);
+                                        }
+                                        if !msg.is_empty() {
+                                            win.set_backup_status_text(msg.into());
+                                        }
+                                    }
+                                    Err(err) => show_toast(&win, &err),
+                                }
                             }
-                            Err(e) => show_toast(&win, &format!("Ошибка импорта: {e}")),
-                        },
-                        "csv" => match ctrl.app.import_grades_csv(p.id, &path, false) {
-                            Ok(prev) => {
-                                ctrl.refresh_all(&win);
-                                win.set_backup_status_text(
-                                    format!("Импортировано CSV: {} оценок (предупреждений: {})", prev.grades_count, prev.warnings.len()).into(),
-                                );
-                            }
-                            Err(e) => show_toast(&win, &format!("Ошибка импорта: {e}")),
-                        },
-                        "telegram" => match ctrl.app.preview_telegram_export(&path) {
-                            Ok(prev) => {
-                                win.set_backup_status_text(
-                                    format!("Telegram «{}»: найдено {} текстовых заметок из {} сообщений. {}", prev.chat_name, prev.non_empty_notes.len(), prev.total_messages, prev.notice).into(),
-                                );
-                            }
-                            Err(e) => show_toast(&win, &format!("Ошибка Telegram JSON: {e}")),
-                        },
-                        _ => {}
-                    }
+                        });
+                    });
                 }
             });
         }
@@ -1988,42 +2364,16 @@ impl UiController {
         th.set_compact_mode(s.compact_mode);
         th.set_reduced_motion(s.reduced_motion);
         th.set_ui_scale(s.ui_scale);
-        th.set_grade_5(parse_hex_color(
-            &s.mark_colors.grade_5,
-            Color::from_rgb_u8(46, 125, 50),
-        ));
-        th.set_grade_4(parse_hex_color(
-            &s.mark_colors.grade_4,
-            Color::from_rgb_u8(0, 137, 123),
-        ));
-        th.set_grade_3(parse_hex_color(
-            &s.mark_colors.grade_3,
-            Color::from_rgb_u8(217, 119, 6),
-        ));
-        th.set_grade_2(parse_hex_color(
-            &s.mark_colors.grade_2,
-            Color::from_rgb_u8(234, 88, 12),
-        ));
-        th.set_grade_1(parse_hex_color(
-            &s.mark_colors.grade_1,
-            Color::from_rgb_u8(220, 38, 38),
-        ));
-        th.set_mark_absent(parse_hex_color(
-            &s.mark_colors.absent,
-            Color::from_rgb_u8(225, 29, 72),
-        ));
-        th.set_mark_excused(parse_hex_color(
-            &s.mark_colors.excused,
-            Color::from_rgb_u8(37, 99, 235),
-        ));
-        th.set_mark_pass(parse_hex_color(
-            &s.mark_colors.pass,
-            Color::from_rgb_u8(13, 148, 136),
-        ));
-        th.set_mark_fail(parse_hex_color(
-            &s.mark_colors.fail,
-            Color::from_rgb_u8(185, 28, 28),
-        ));
+        let dark = th.get_dark_mode();
+        th.set_grade_5(color_for_mark_code("grade_5", &s.mark_colors, dark));
+        th.set_grade_4(color_for_mark_code("grade_4", &s.mark_colors, dark));
+        th.set_grade_3(color_for_mark_code("grade_3", &s.mark_colors, dark));
+        th.set_grade_2(color_for_mark_code("grade_2", &s.mark_colors, dark));
+        th.set_grade_1(color_for_mark_code("grade_1", &s.mark_colors, dark));
+        th.set_mark_absent(color_for_mark_code("absent", &s.mark_colors, dark));
+        th.set_mark_excused(color_for_mark_code("excused", &s.mark_colors, dark));
+        th.set_mark_pass(color_for_mark_code("pass", &s.mark_colors, dark));
+        th.set_mark_fail(color_for_mark_code("fail", &s.mark_colors, dark));
 
         // Sync settings form fields
         win.set_setting_theme_idx(mode_idx);
@@ -2165,6 +2515,24 @@ impl UiController {
         win.set_profiles_list(ModelRc::new(VecModel::from(items)));
 
         let subjects = self.app.list_subjects(active.id, true).unwrap_or_default();
+        let active_items: Vec<SubjectItem> = subjects
+            .iter()
+            .filter(|s| !s.is_archived)
+            .map(|s| SubjectItem {
+                id: s.id.to_string().into(),
+                name: s.name.clone().into(),
+                short_name: s.short_name.clone().into(),
+                teacher: s.teacher.clone().into(),
+                color: parse_hex_color(&s.color, Color::from_rgb_u8(68, 94, 145)),
+                target_average: s
+                    .target_average
+                    .map(|d| d.to_string())
+                    .unwrap_or_default()
+                    .into(),
+                is_archived: s.is_archived,
+                sort_order: s.sort_order,
+            })
+            .collect();
         let s_items: Vec<SubjectItem> = subjects
             .into_iter()
             .map(|s| SubjectItem {
@@ -2183,6 +2551,7 @@ impl UiController {
             })
             .collect();
         win.set_subjects_list(ModelRc::new(VecModel::from(s_items)));
+        win.set_active_subjects_list(ModelRc::new(VecModel::from(active_items)));
     }
 
     pub fn refresh_periods(&self, win: &MainWindow) {
@@ -2215,17 +2584,30 @@ impl UiController {
             return;
         };
         let today = Utc::now().date_naive();
-        let (year, month, view_mode, sel_period) = self
+        let (year, month, anchor_date, view_mode, sel_period) = self
             .state
             .lock()
-            .map(|st| (st.year, st.month, st.view_mode, st.selected_period_id))
-            .unwrap_or((today.year(), today.month(), CalendarViewMode::Month, None));
+            .map(|st| {
+                (
+                    st.year,
+                    st.month,
+                    st.anchor_date,
+                    st.view_mode,
+                    st.selected_period_id,
+                )
+            })
+            .unwrap_or((
+                today.year(),
+                today.month(),
+                today,
+                CalendarViewMode::Month,
+                None,
+            ));
 
+        let mut custom_period_label: Option<String> = None;
         let matrix = match view_mode {
             CalendarViewMode::Week => {
-                let anchor =
-                    NaiveDate::from_ymd_opt(year, month, today.day().min(28)).unwrap_or(today);
-                let (s, e) = week_bounds(anchor, settings.week_start);
+                let (s, e) = week_bounds(anchor_date, settings.week_start);
                 self.app.get_journal_for_range(active.id, s, e, today)
             }
             CalendarViewMode::Semester => {
@@ -2233,7 +2615,7 @@ impl UiController {
                     && let Ok(periods) = self.app.list_academic_periods(active.id, false)
                     && let Some(per) = periods.into_iter().find(|p| p.id == pid)
                 {
-                    win.set_active_period_label(per.name.into());
+                    custom_period_label = Some(per.name);
                     self.app
                         .get_journal_for_range(active.id, per.start_date, per.end_date, today)
                 } else {
@@ -2241,13 +2623,14 @@ impl UiController {
                 }
             }
             CalendarViewMode::AcademicYear => {
-                let (s, e) = academic_year_bounds(today);
+                let (s, e) = academic_year_bounds(anchor_date);
                 self.app.get_journal_for_range(active.id, s, e, today)
             }
             CalendarViewMode::Month | CalendarViewMode::Custom => {
                 self.app.get_monthly_journal(active.id, year, month, today)
             }
         };
+        win.set_active_period_label(custom_period_label.as_deref().unwrap_or("Периоды").into());
 
         let Ok(matrix) = matrix else {
             return;
@@ -2331,7 +2714,7 @@ impl UiController {
                         let (bg, fg) = mark_container_pair(&g.mark_code, dark);
                         badges.push((
                             g.mark_label.clone(),
-                            color_for_mark_code(&g.mark_code, &settings.mark_colors),
+                            color_for_mark_code(&g.mark_code, &settings.mark_colors, dark),
                             bg,
                             fg,
                         ));
@@ -2349,7 +2732,7 @@ impl UiController {
                         let (bg, fg) = mark_container_pair(code, dark);
                         badges.push((
                             lbl.to_string(),
-                            color_for_mark_code(code, &settings.mark_colors),
+                            color_for_mark_code(code, &settings.mark_colors, dark),
                             bg,
                             fg,
                         ));
@@ -2439,6 +2822,7 @@ impl UiController {
         };
         win.set_journal_detail_move_date(date_iso.into());
 
+        let dark = win.global::<OxidiumTheme>().get_dark_mode();
         let mut items = Vec::new();
         if let Ok(grades) = self.app.list_grades(
             profile.id,
@@ -2455,7 +2839,7 @@ impl UiController {
                     id: g.id.to_string().into(),
                     is_attendance: false,
                     label: g.mark_label.into(),
-                    color: color_for_mark_code(&g.mark_code, &settings.mark_colors),
+                    color: color_for_mark_code(&g.mark_code, &settings.mark_colors, dark),
                     weight_text: g.weight.to_string().into(),
                     work_type_label: i18n::work_type_label(settings.language, g.work_type).into(),
                     topic: g.topic.into(),
@@ -2479,7 +2863,7 @@ impl UiController {
                     id: a.id.to_string().into(),
                     is_attendance: true,
                     label: lbl.into(),
-                    color: color_for_mark_code(code, &settings.mark_colors),
+                    color: color_for_mark_code(code, &settings.mark_colors, dark),
                     weight_text: SharedString::new(),
                     work_type_label: "Посещаемость".into(),
                     topic: a.reason.into(),
@@ -2549,18 +2933,16 @@ impl UiController {
                 .unwrap_or_else(|| "—".into())
                 .into(),
         );
-        win.set_stats_lowest_subject(
-            if rep.lowest_subjects.is_empty() {
-                "—".into()
-            } else {
-                rep.lowest_subjects
-                    .iter()
-                    .map(|s| format!("{} ({})", s.subject_name, s.average_formatted))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            }
-            .into(),
-        );
+        win.set_stats_lowest_subject(if rep.lowest_subjects.is_empty() {
+            SharedString::new()
+        } else {
+            rep.lowest_subjects
+                .iter()
+                .map(|s| format!("{} ({})", s.subject_name, s.average_formatted))
+                .collect::<Vec<_>>()
+                .join(", ")
+                .into()
+        });
         win.set_stats_completed_tasks(rep.task_stats.completed.to_string().into());
         win.set_stats_overdue_tasks(rep.task_stats.overdue.to_string().into());
         win.set_stats_active_tasks(rep.task_stats.active.to_string().into());
@@ -2589,7 +2971,11 @@ impl UiController {
                 let delta_str = cmp
                     .metrics
                     .absolute_delta
-                    .map(|d| format!("{:+.2}", d))
+                    .map(|d| {
+                        let rounded =
+                            d.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
+                        format!("{rounded:+.2}")
+                    })
                     .unwrap_or_else(|| "—".into());
                 win.set_stats_comparison_summary(
                     format!(
@@ -2652,10 +3038,11 @@ impl UiController {
         win.set_stats_chart_y_mid(format!("{y_mid:.1}").into());
         win.set_stats_chart_y_bot(format!("{y_min:.1}").into());
         win.set_stats_chart_target_label(format!("Цель {mean_target:.2}").into());
+        // Render bitmap at ~4.5:1 matching the ~800x180 desktop plot viewport so nodes stay circular
         win.set_stats_line_chart(render_line_chart(
             &line_pts,
-            1040,
-            340,
+            1440,
+            320,
             dark,
             [primary_c.red(), primary_c.green(), primary_c.blue()],
             Some(mean_target),
@@ -2674,10 +3061,10 @@ impl UiController {
                 } else {
                     i as f32 / (dyn_len - 1) as f32
                 };
-                let x_ratio = (18.0 + 1000.0 * t) / 1040.0;
+                let x_ratio = (22.0 + 1396.0 * t) / 1440.0;
                 TrendPointItem {
                     date_short: pt.date.format("%d.%m").to_string().into(),
-                    full_date: format_date_long_ru(pt.date).into(),
+                    full_date: format_date_long_localized(pt.date, settings.language).into(),
                     avg_text: format_average(
                         Some(pt.cumulative_average),
                         settings.average_precision,
@@ -2710,7 +3097,8 @@ impl UiController {
             });
             if dyn_len >= 2 {
                 let d = last.cumulative_average - first.cumulative_average;
-                win.set_stats_chart_trend_delta(format!("{:+.2}", d).into());
+                let rounded = d.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
+                win.set_stats_chart_trend_delta(format!("{rounded:+.2}").into());
                 win.set_stats_chart_trend_positive(d >= Decimal::ZERO);
             } else {
                 win.set_stats_chart_trend_delta(SharedString::new());
@@ -2722,31 +3110,31 @@ impl UiController {
             win.set_stats_chart_trend_delta(SharedString::new());
         }
 
-        // Harmonized grade colors respecting theme mode & readable contrast
+        // Harmonized grade colors respecting theme mode & clear separation between 3 and 2
         let g5_c = if dark {
             Color::from_rgb_u8(0x6D, 0xD5, 0x8C)
         } else {
-            color_for_mark_code("grade_5", &settings.mark_colors)
+            color_for_mark_code("grade_5", &settings.mark_colors, false)
         };
         let g4_c = if dark {
             Color::from_rgb_u8(0x4F, 0xD8, 0xC6)
         } else {
-            color_for_mark_code("grade_4", &settings.mark_colors)
+            color_for_mark_code("grade_4", &settings.mark_colors, false)
         };
         let g3_c = if dark {
-            Color::from_rgb_u8(0xFF, 0xB9, 0x69)
+            Color::from_rgb_u8(0xFF, 0xCA, 0x62)
         } else {
-            color_for_mark_code("grade_3", &settings.mark_colors)
+            color_for_mark_code("grade_3", &settings.mark_colors, false)
         };
         let g2_c = if dark {
-            Color::from_rgb_u8(0xE0, 0x8E, 0x58)
+            Color::from_rgb_u8(0xD9, 0x6B, 0x43)
         } else {
             Color::from_rgb_u8(0xA1, 0x52, 0x1D)
         };
         let g1_c = if dark {
             Color::from_rgb_u8(0xF2, 0x8B, 0x82)
         } else {
-            color_for_mark_code("grade_1", &settings.mark_colors)
+            color_for_mark_code("grade_1", &settings.mark_colors, false)
         };
 
         win.set_stats_donut_chart(render_donut_chart(
@@ -2834,7 +3222,15 @@ impl UiController {
                     .parse::<f32>()
                     .map(|v| (v / 5.0).clamp(0.0, 1.0))
                     .unwrap_or(0.0);
-                let perf_col = grade_semantic_color(avg_val, dark);
+                let perf_col = if s.below_target {
+                    if dark {
+                        Color::from_rgb_u8(0xFF, 0xCA, 0x62)
+                    } else {
+                        Color::from_rgb_u8(0x8D, 0x4E, 0x00)
+                    }
+                } else {
+                    grade_semantic_color(avg_val, dark)
+                };
                 let target_ratio = s
                     .target_average
                     .and_then(|t| t.to_string().parse::<f32>().ok())
@@ -2889,15 +3285,45 @@ impl UiController {
             .collect();
         win.set_stats_attendance_bars(ModelRc::new(VecModel::from(att_bars)));
 
-        // Multi-type 5x7 Mon-Sun Activity Calendar Heatmap with Sub-Cell Splitting & Hover Details
+        // Multi-type 5x7 Activity Calendar Heatmap respecting user week_start & language
         let heat_map: HashMap<NaiveDate, journal_app::ActivityHeatmapDay> = rep
             .activity_heatmap
             .into_iter()
             .map(|h| (h.date, h))
             .collect();
-        let days_from_mon = today.weekday().num_days_from_monday() as i64;
-        let this_monday = today - Duration::days(days_from_mon);
-        let grid_start = this_monday - Duration::weeks(4);
+        let days_from_start = match settings.week_start {
+            WeekStart::Sunday => today.weekday().num_days_from_sunday() as i64,
+            WeekStart::Monday => today.weekday().num_days_from_monday() as i64,
+        };
+        let this_week_start = today - Duration::days(days_from_start);
+        let grid_start = this_week_start - Duration::weeks(4);
+        let task_accent = win.global::<OxidiumTheme>().get_task_accent();
+
+        let wd_seq: [chrono::Weekday; 7] = match settings.week_start {
+            WeekStart::Sunday => [
+                chrono::Weekday::Sun,
+                chrono::Weekday::Mon,
+                chrono::Weekday::Tue,
+                chrono::Weekday::Wed,
+                chrono::Weekday::Thu,
+                chrono::Weekday::Fri,
+                chrono::Weekday::Sat,
+            ],
+            WeekStart::Monday => [
+                chrono::Weekday::Mon,
+                chrono::Weekday::Tue,
+                chrono::Weekday::Wed,
+                chrono::Weekday::Thu,
+                chrono::Weekday::Fri,
+                chrono::Weekday::Sat,
+                chrono::Weekday::Sun,
+            ],
+        };
+        let wd_labels: Vec<SharedString> = wd_seq
+            .iter()
+            .map(|&w| i18n::weekday_short(settings.language, w).into())
+            .collect();
+        win.set_stats_heatmap_weekdays(ModelRc::new(VecModel::from(wd_labels)));
 
         let mut week_rows = Vec::with_capacity(5);
         for w in 0..5 {
@@ -2909,7 +3335,8 @@ impl UiController {
                     today,
                     heat_map.get(&d),
                     dark,
-                    primary_c,
+                    task_accent,
+                    settings.language,
                 ));
             }
             week_rows.push(HeatmapWeekRow {
@@ -2921,26 +3348,6 @@ impl UiController {
             });
         }
         win.set_stats_heatmap_weeks(ModelRc::new(VecModel::from(week_rows)));
-
-        // Task dynamics
-        let dyn_bars: Vec<StatBarItem> = rep
-            .task_stats
-            .completed_by_month
-            .into_iter()
-            .map(|pt| StatBarItem {
-                label: pt.period_label.into(),
-                value_text: pt.completed_count.to_string().into(),
-                ratio: 1.0,
-                color: primary_c,
-                extra_text: SharedString::new(),
-                below_target: false,
-                dot_color: primary_c,
-                secondary_ratio: 0.0,
-                target_ratio: 0.0,
-                percent_text: SharedString::new(),
-            })
-            .collect();
-        win.set_stats_task_dynamics(ModelRc::new(VecModel::from(dyn_bars)));
     }
 
     fn active_board_id_or_first(&self) -> Option<Uuid> {
@@ -3014,6 +3421,12 @@ impl UiController {
                 )
             })
             .unwrap_or_default();
+        win.set_kanban_subject_filter_label(
+            f_subj
+                .and_then(|sid| subjects_map.get(&sid).map(|(n, _)| n.clone()))
+                .unwrap_or_default()
+                .into(),
+        );
 
         let cols = self.app.list_columns(bid, false).unwrap_or_default();
         let all_tasks = self
@@ -3339,12 +3752,18 @@ impl UiController {
         win.set_update_status_text("Загрузка пакета обновления и проверка SHA-256...".into());
 
         let updates_dir = self.app.data_dir.join("updates");
+        let rt_clone = rt.clone();
         let weak = win.as_weak();
         rt.spawn(async move {
             let dl_res = journal_app::download_and_verify_update(&info, &updates_dir).await;
-            let final_res = match dl_res {
-                Ok(path) => journal_app::launch_update_artifact(&path),
-                Err(e) => Err(e),
+            let (final_res, should_exit_for_installer) = match dl_res {
+                Ok(path) => {
+                    let is_self_upd = journal_app::is_windows_self_updating_installer(&path);
+                    let launch = journal_app::launch_update_artifact(&path);
+                    let exit_now = launch.is_ok() && is_self_upd;
+                    (launch, exit_now)
+                }
+                Err(e) => (Err(e), false),
             };
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(win) = weak.upgrade() {
@@ -3353,6 +3772,15 @@ impl UiController {
                         Ok(msg) => {
                             win.set_update_status_text(msg.clone().into());
                             show_toast(&win, &msg);
+                            if should_exit_for_installer {
+                                // Yield briefly so toast/status paints, then exit cleanly while installer waits on PID
+                                rt_clone.spawn(async move {
+                                    tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+                                    let _ = slint::invoke_from_event_loop(|| {
+                                        let _ = slint::quit_event_loop();
+                                    });
+                                });
+                            }
                         }
                         Err(e) => {
                             win.set_update_status_text(format!("Ошибка обновления: {e}").into());
@@ -3363,6 +3791,14 @@ impl UiController {
             });
         });
     }
+}
+
+fn shift_months(d: NaiveDate, delta: i32) -> NaiveDate {
+    let total = d.year() * 12 + (d.month() as i32 - 1) + delta;
+    let ny = total.div_euclid(12);
+    let nm = (total.rem_euclid(12) + 1) as u32;
+    let max_d = journal_domain::days_in_month(ny, nm);
+    NaiveDate::from_ymd_opt(ny, nm, d.day().min(max_d)).unwrap_or(d)
 }
 
 fn grade_semantic_color(avg: Decimal, dark: bool) -> Color {
@@ -3380,13 +3816,13 @@ fn grade_semantic_color(avg: Decimal, dark: bool) -> Color {
         }
     } else if avg >= Decimal::new(30, 1) {
         if dark {
-            Color::from_rgb_u8(0xFF, 0xB9, 0x69)
+            Color::from_rgb_u8(0xFF, 0xCA, 0x62)
         } else {
             Color::from_rgb_u8(0xB2, 0x62, 0x00)
         }
     } else if avg >= Decimal::new(225, 2) {
         if dark {
-            Color::from_rgb_u8(0xD8, 0x8A, 0x56)
+            Color::from_rgb_u8(0xD9, 0x6B, 0x43)
         } else {
             Color::from_rgb_u8(0xA1, 0x52, 0x1D)
         }
@@ -3397,7 +3833,12 @@ fn grade_semantic_color(avg: Decimal, dark: bool) -> Color {
     }
 }
 
-fn format_date_long_ru(d: NaiveDate) -> String {
+fn format_date_long_localized(d: NaiveDate, lang: Language) -> String {
+    if lang == Language::En {
+        let wd = i18n::weekday_short(lang, d.weekday());
+        let mon = i18n::month_name(lang, d.month());
+        return format!("{} {}, {}", mon, d.day(), wd);
+    }
     let month = match d.month() {
         1 => "января",
         2 => "февраля",
@@ -3412,15 +3853,7 @@ fn format_date_long_ru(d: NaiveDate) -> String {
         11 => "ноября",
         _ => "декабря",
     };
-    let wd = match d.weekday() {
-        chrono::Weekday::Mon => "Пн",
-        chrono::Weekday::Tue => "Вт",
-        chrono::Weekday::Wed => "Ср",
-        chrono::Weekday::Thu => "Чт",
-        chrono::Weekday::Fri => "Пт",
-        chrono::Weekday::Sat => "Сб",
-        chrono::Weekday::Sun => "Вс",
-    };
+    let wd = i18n::weekday_short(lang, d.weekday());
     format!("{} {}, {}", d.day(), month, wd)
 }
 
@@ -3430,6 +3863,7 @@ fn build_heatmap_day_item(
     rec: Option<&journal_app::ActivityHeatmapDay>,
     dark: bool,
     task_accent: Color,
+    lang: Language,
 ) -> HeatmapDayItem {
     let is_today = date == today;
     let is_future = date > today;
@@ -3443,7 +3877,7 @@ fn build_heatmap_day_item(
     } else {
         Color::from_rgb_u8(0x5E, 0x59, 0x69)
     };
-    let full_date_label = format_date_long_ru(date);
+    let full_date_label = format_date_long_localized(date, lang);
 
     let Some(r) = rec else {
         return HeatmapDayItem {
@@ -3611,18 +4045,86 @@ fn build_heatmap_day_item(
     }
 }
 
-fn color_for_mark_code(code: &str, palette: &journal_domain::MarkColorPalette) -> Color {
-    match code {
-        "grade_5" => parse_hex_color(&palette.grade_5, Color::from_rgb_u8(46, 125, 50)),
-        "grade_4" => parse_hex_color(&palette.grade_4, Color::from_rgb_u8(0, 137, 123)),
-        "grade_3" => parse_hex_color(&palette.grade_3, Color::from_rgb_u8(217, 119, 6)),
-        "grade_2" => parse_hex_color(&palette.grade_2, Color::from_rgb_u8(234, 88, 12)),
-        "grade_1" => parse_hex_color(&palette.grade_1, Color::from_rgb_u8(220, 38, 38)),
-        "absent" => parse_hex_color(&palette.absent, Color::from_rgb_u8(225, 29, 72)),
-        "excused" => parse_hex_color(&palette.excused, Color::from_rgb_u8(37, 99, 235)),
-        "pass" => parse_hex_color(&palette.pass, Color::from_rgb_u8(13, 148, 136)),
-        "fail" => parse_hex_color(&palette.fail, Color::from_rgb_u8(185, 28, 28)),
-        _ => Color::from_rgb_u8(100, 116, 139),
+fn color_for_mark_code(
+    code: &str,
+    palette: &journal_domain::MarkColorPalette,
+    dark: bool,
+) -> Color {
+    let (raw_hex, default_light_hex, light_fallback, dark_pastel) = match code {
+        "grade_5" => (
+            palette.grade_5.as_str(),
+            "#2E7D32",
+            Color::from_rgb_u8(0x14, 0x6C, 0x2E),
+            Color::from_rgb_u8(0x8C, 0xD9, 0x9E),
+        ),
+        "grade_4" => (
+            palette.grade_4.as_str(),
+            "#00897B",
+            Color::from_rgb_u8(0x00, 0x6A, 0x60),
+            Color::from_rgb_u8(0x7A, 0xD7, 0xCA),
+        ),
+        "grade_3" => (
+            palette.grade_3.as_str(),
+            "#D97706",
+            Color::from_rgb_u8(0x8D, 0x4E, 0x00),
+            Color::from_rgb_u8(0xFF, 0xCA, 0x62),
+        ),
+        "grade_2" => (
+            palette.grade_2.as_str(),
+            "#EA580C",
+            Color::from_rgb_u8(0xB3, 0x3B, 0x00),
+            Color::from_rgb_u8(0xD9, 0x6B, 0x43),
+        ),
+        "grade_1" => (
+            palette.grade_1.as_str(),
+            "#DC2626",
+            Color::from_rgb_u8(0xB3, 0x26, 0x1E),
+            Color::from_rgb_u8(0xF2, 0xB8, 0xB5),
+        ),
+        "absent" => (
+            palette.absent.as_str(),
+            "#E11D48",
+            Color::from_rgb_u8(0xD3, 0x2F, 0x2F),
+            Color::from_rgb_u8(0xF2, 0x8B, 0x82),
+        ),
+        "excused" => (
+            palette.excused.as_str(),
+            "#2563EB",
+            Color::from_rgb_u8(0x1A, 0x5F, 0x9E),
+            Color::from_rgb_u8(0x9E, 0xC8, 0xF5),
+        ),
+        "pass" => (
+            palette.pass.as_str(),
+            "#0D9488",
+            Color::from_rgb_u8(0x14, 0x6C, 0x2E),
+            Color::from_rgb_u8(0x8C, 0xD9, 0x9E),
+        ),
+        "fail" => (
+            palette.fail.as_str(),
+            "#B91C1C",
+            Color::from_rgb_u8(0xB3, 0x26, 0x1E),
+            Color::from_rgb_u8(0xF2, 0xB8, 0xB5),
+        ),
+        _ => {
+            return if dark {
+                Color::from_rgb_u8(0xCA, 0xC3, 0xDC)
+            } else {
+                Color::from_rgb_u8(100, 116, 139)
+            };
+        }
+    };
+
+    if dark {
+        if raw_hex.trim().eq_ignore_ascii_case(default_light_hex) {
+            return dark_pastel;
+        }
+        let parsed = parse_hex_color(raw_hex, dark_pastel);
+        let luma = 0.299 * parsed.red() as f32
+            + 0.587 * parsed.green() as f32
+            + 0.114 * parsed.blue() as f32;
+        if luma < 115.0 { dark_pastel } else { parsed }
+    } else {
+        parse_hex_color(raw_hex, light_fallback)
     }
 }
 
@@ -3705,6 +4207,7 @@ fn compute_initials(name: &str) -> String {
 
 fn show_toast(win: &MainWindow, msg: &str) {
     win.set_snackbar_message(msg.into());
+    win.set_snackbar_ticks(8);
     win.set_snackbar_visible(true);
 }
 

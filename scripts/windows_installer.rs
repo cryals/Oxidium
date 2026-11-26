@@ -1,20 +1,25 @@
 //! Oxidium Windows Per-User (HKCU) Self-Extracting Installer & Uninstaller.
 //!
 //! Built by `scripts/package-windows.ps1` with `OXIDIUM_PAYLOAD_ZIP` pointing to
-//! the verified release portable archive `Oxidium-0.1.0-windows-x86_64-portable.zip`.
+//! the verified release portable archive and `OXIDIUM_VERSION` set to the workspace version.
 //!
 //! Usage:
-//!   Oxidium-0.1.0-windows-x86_64-setup.exe [--silent] [--dir <PATH>] [--no-shortcuts]
-//!   Oxidium-0.1.0-windows-x86_64-setup.exe --uninstall [--silent] [--dir <PATH>]
+//!   Oxidium-<VER>-windows-x86_64-setup.exe [--silent] [--dir <PATH>] [--no-shortcuts] [--no-registry] [--wait-pid <PID>] [--relaunch]
+//!   Oxidium-<VER>-windows-x86_64-setup.exe --uninstall [--silent] [--dir <PATH>] [--no-shortcuts] [--no-registry]
 
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::thread;
+use std::time::{Duration, Instant};
 
 const APP_NAME: &str = "Oxidium";
-const APP_VERSION: &str = "0.1.0";
+const APP_VERSION: &str = match option_env!("OXIDIUM_VERSION") {
+    Some(v) => v,
+    None => "0.1.1",
+};
 const APP_PUBLISHER: &str = "Oxidium Contributors";
 const UNINSTALL_REG_KEY: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Oxidium";
@@ -45,18 +50,68 @@ fn ps_escape(s: &str) -> String {
 }
 
 fn run_powershell(script: &str) -> io::Result<()> {
-    let status = Command::new("powershell")
+    let output = Command::new("powershell")
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
-        .status()?;
-    if !status.success() {
+        .output()?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(io::Error::other(format!(
-            "PowerShell step exited with status {status}"
+            "PowerShell step exited with status {}: {}",
+            output.status,
+            stderr.trim()
         )));
     }
     Ok(())
 }
 
-fn create_shortcut(lnk_path: &Path, target: &Path, args: &str, work_dir: &Path, desc: &str) -> io::Result<()> {
+fn is_pid_running(pid: u32) -> bool {
+    let filter = format!("PID eq {pid}");
+    let Ok(output) = Command::new("tasklist")
+        .args(["/FI", &filter, "/NH", "/FO", "CSV"])
+        .output()
+    else {
+        return false;
+    };
+    let text = String::from_utf8_lossy(&output.stdout);
+    let needle = format!(",\"{pid}\",");
+    text.lines().any(|line| line.contains(&needle))
+}
+
+fn wait_for_pid_exit(pid: u32) {
+    println!("Waiting for running Oxidium process (PID {pid}) to exit...");
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < deadline {
+        if !is_pid_running(pid) {
+            // Brief settle pause for Windows PE handle release
+            thread::sleep(Duration::from_millis(300));
+            return;
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+}
+
+fn park_existing_executables(install_dir: &Path) -> Vec<PathBuf> {
+    let mut parked = Vec::new();
+    for exe in ["student-journal.exe", "student-journal-mcp.exe", "uninstall.exe"] {
+        let live = install_dir.join(exe);
+        let old = install_dir.join(format!("{exe}.old"));
+        if old.exists() {
+            let _ = fs::remove_file(&old);
+        }
+        if live.exists() && fs::rename(&live, &old).is_ok() {
+            parked.push(old);
+        }
+    }
+    parked
+}
+
+fn create_shortcut(
+    lnk_path: &Path,
+    target: &Path,
+    args: &str,
+    work_dir: &Path,
+    desc: &str,
+) -> io::Result<()> {
     if let Some(parent) = lnk_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -90,7 +145,11 @@ fn register_uninstall(install_dir: &Path, uninstaller: &Path) -> io::Result<()> 
         (
             "UninstallString",
             "REG_SZ",
-            &format!("\"{}\" --uninstall --dir \"{}\"", uninstaller.display(), install_dir.display()),
+            &format!(
+                "\"{}\" --uninstall --dir \"{}\"",
+                uninstaller.display(),
+                install_dir.display()
+            ),
         ),
         ("NoModify", "REG_DWORD", "1"),
         ("NoRepair", "REG_DWORD", "1"),
@@ -112,9 +171,22 @@ fn unregister_uninstall() {
         .status();
 }
 
-fn do_install(install_dir: &Path, create_shortcuts: bool, register_hkcu: bool) -> io::Result<()> {
+fn do_install(
+    install_dir: &Path,
+    create_shortcuts: bool,
+    register_hkcu: bool,
+    wait_pid: Option<u32>,
+    relaunch: bool,
+) -> io::Result<()> {
+    if let Some(pid) = wait_pid {
+        wait_for_pid_exit(pid);
+    }
+
     println!("Installing {APP_NAME} v{APP_VERSION} to {}...", install_dir.display());
     fs::create_dir_all(install_dir)?;
+
+    // Rename running payload binaries aside so upgrades succeed cleanly even if Windows keeps handles brief
+    let parked_old = park_existing_executables(install_dir);
 
     // Write embedded portable ZIP to a temporary file and extract cleanly
     let tmp_zip = env::temp_dir().join(format!("oxidium-setup-{}.zip", std::process::id()));
@@ -127,7 +199,22 @@ fn do_install(install_dir: &Path, create_shortcuts: bool, register_hkcu: bool) -
     );
     let extract_res = run_powershell(&extract_script);
     let _ = fs::remove_file(&tmp_zip);
-    extract_res?;
+    if let Err(e) = extract_res {
+        // Attempt rollback of parked binaries if extraction failed
+        for old in &parked_old {
+            if let Some(orig_name) = old
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| n.strip_suffix(".old"))
+            {
+                let live = install_dir.join(orig_name);
+                if !live.exists() {
+                    let _ = fs::rename(old, &live);
+                }
+            }
+        }
+        return Err(e);
+    }
 
     // Copy self as uninstall.exe for standard Windows Apps & Features removal
     let uninstaller_path = install_dir.join("uninstall.exe");
@@ -135,6 +222,11 @@ fn do_install(install_dir: &Path, create_shortcuts: bool, register_hkcu: bool) -
         && current_exe != uninstaller_path
     {
         let _ = fs::copy(&current_exe, &uninstaller_path);
+    }
+
+    // Best-effort cleanup of .old binaries
+    for old in parked_old {
+        let _ = fs::remove_file(old);
     }
 
     if create_shortcuts
@@ -161,9 +253,16 @@ fn do_install(install_dir: &Path, create_shortcuts: bool, register_hkcu: bool) -
         register_uninstall(install_dir, &uninstaller_path)?;
     }
 
+    let gui_path = install_dir.join("student-journal.exe");
     println!("Oxidium v{APP_VERSION} successfully installed to {}", install_dir.display());
-    println!("  GUI: {}", install_dir.join("student-journal.exe").display());
+    println!("  GUI: {}", gui_path.display());
     println!("  MCP: {}", install_dir.join("student-journal-mcp.exe").display());
+
+    if relaunch && gui_path.exists() {
+        println!("Launching updated Oxidium...");
+        let _ = Command::new(&gui_path).current_dir(install_dir).spawn();
+    }
+
     Ok(())
 }
 
@@ -182,7 +281,10 @@ fn do_uninstall(install_dir: &Path, remove_shortcuts: bool, unregister_hkcu: boo
     // Remove installed payload files (leave user database in %LOCALAPPDATA%\oxidium untouched!)
     let files = [
         "student-journal.exe",
+        "student-journal.exe.old",
         "student-journal-mcp.exe",
+        "student-journal-mcp.exe.old",
+        "uninstall.exe.old",
         "LICENSE.txt",
         "THIRD_PARTY_NOTICES.md",
         "MCP-QUICKSTART.md",
@@ -203,12 +305,21 @@ fn do_uninstall(install_dir: &Path, remove_shortcuts: bool, unregister_hkcu: boo
     Ok(())
 }
 
+fn pause_before_exit() {
+    print!("Press Enter to close...");
+    let _ = io::stdout().flush();
+    let mut dummy = String::new();
+    let _ = io::stdin().read_line(&mut dummy);
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let mut silent = false;
     let mut uninstall = false;
     let mut no_shortcuts = false;
     let mut no_registry = false;
+    let mut relaunch = false;
+    let mut wait_pid: Option<u32> = None;
     let mut custom_dir: Option<PathBuf> = None;
 
     let mut i = 1;
@@ -218,6 +329,11 @@ fn main() -> ExitCode {
             "--uninstall" => uninstall = true,
             "--no-shortcuts" => no_shortcuts = true,
             "--no-registry" => no_registry = true,
+            "--relaunch" => relaunch = true,
+            "--wait-pid" if i + 1 < args.len() => {
+                i += 1;
+                wait_pid = args[i].trim().parse::<u32>().ok();
+            }
             "--dir" if i + 1 < args.len() => {
                 i += 1;
                 custom_dir = Some(PathBuf::from(&args[i]));
@@ -225,7 +341,7 @@ fn main() -> ExitCode {
             "--help" | "-h" | "/?" => {
                 println!("Oxidium v{APP_VERSION} Windows Setup (Per-User HKCU, No UAC Required)");
                 println!("Usage:");
-                println!("  setup.exe [--silent] [--dir <PATH>] [--no-shortcuts] [--no-registry]");
+                println!("  setup.exe [--silent] [--dir <PATH>] [--no-shortcuts] [--no-registry] [--wait-pid <PID>] [--relaunch]");
                 println!("  setup.exe --uninstall [--silent] [--dir <PATH>] [--no-shortcuts] [--no-registry]");
                 return ExitCode::SUCCESS;
             }
@@ -266,13 +382,16 @@ fn main() -> ExitCode {
     let res = if uninstall {
         do_uninstall(&install_dir, !no_shortcuts, !no_registry)
     } else {
-        do_install(&install_dir, !no_shortcuts, !no_registry)
+        do_install(&install_dir, !no_shortcuts, !no_registry, wait_pid, relaunch)
     };
 
     match res {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("Setup error: {e}");
+            if !silent {
+                pause_before_exit();
+            }
             ExitCode::FAILURE
         }
     }

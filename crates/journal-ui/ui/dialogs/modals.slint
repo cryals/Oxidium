@@ -1,5 +1,5 @@
 import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView, Switch } from "@material";
-import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
+import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
 import {
     ProfileItem, SubjectItem, PeriodItem, SearchHitItem,
     ActivityRowItem, NotificationRowItem, UiStrings
@@ -61,12 +61,16 @@ export component ProfilesModal inherits Rectangle {
                     }
                     HorizontalLayout {
                         spacing: 6px;
-                        OutlineButton { text: "Отмена"; clicked => { root.pending_delete_id = ""; } }
-                        FilledButton {
-                            text: "Удалить навсегда";
-                            clicked => {
-                                root.confirm_delete_profile(root.pending_delete_id);
-                                root.pending_delete_id = "";
+                        VerticalLayout { alignment: center; OutlineButton { text: "Отмена"; height: 36px; clicked => { root.pending_delete_id = ""; } } }
+                        VerticalLayout {
+                            alignment: center;
+                            FilledButton {
+                                text: "Удалить навсегда";
+                                height: 36px;
+                                clicked => {
+                                    root.confirm_delete_profile(root.pending_delete_id);
+                                    root.pending_delete_id = "";
+                                }
                             }
                         }
                     }
@@ -75,8 +79,13 @@ export component ProfilesModal inherits Rectangle {
 
             ScrollView {
                 vertical_stretch: 1;
-                VerticalLayout {
+                viewport_width: self.visible_width;
+                viewport_height: max(self.visible_height, profiles_scroll_col.preferred_height);
+                profiles_scroll_col := VerticalLayout {
+                    x: 0px; y: 0px;
+                    width: parent.visible_width;
                     spacing: 8px;
+                    alignment: start;
                     for p in root.profiles : Rectangle {
                         border_radius: 14px;
                         background: p.is_active ? MaterialPalette.primary_container : MaterialPalette.surface_container;
@@ -108,9 +117,13 @@ export component ProfilesModal inherits Rectangle {
                             }
                             HorizontalLayout {
                                 spacing: 4px;
-                                if !p.is_active && !p.is_archived : TonalButton {
-                                    text: "Выбрать";
-                                    clicked => { root.switch_profile(p.id); }
+                                if !p.is_active && !p.is_archived : VerticalLayout {
+                                    alignment: center;
+                                    TonalButton {
+                                        text: "Выбрать";
+                                        height: 36px;
+                                        clicked => { root.switch_profile(p.id); }
+                                    }
                                 }
                                 IconButton { icon: OxidiumIcons.copy; tooltip: "Дублировать"; clicked => { root.duplicate_profile(p.id); } }
                                 IconButton {
@@ -127,28 +140,35 @@ export component ProfilesModal inherits Rectangle {
 
             Rectangle { height: 1px; background: OxidiumTheme.cell_border; }
 
-            Text { text: "Создать новый независимый профиль"; font_size: 14px; font_weight: 600; color: MaterialPalette.on_surface; }
+            Text { text: "Создать новый независимый профиль (Название • Учебное заведение • Группа)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
             HorizontalLayout {
                 spacing: 8px;
                 Rectangle {
                     horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_name; color: MaterialPalette.on_surface; }
+                    if root.new_name == "" : Text { x: 8px; height: 100%; text: "Название профиля"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 Rectangle {
                     horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_institution; color: MaterialPalette.on_surface; }
+                    if root.new_institution == "" : Text { x: 8px; height: 100%; text: "ВУЗ / Колледж / Школа"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 Rectangle {
                     horizontal_stretch: 1; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_group; color: MaterialPalette.on_surface; }
+                    if root.new_group == "" : Text { x: 8px; height: 100%; text: "Группа"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
-                FilledButton {
-                    text: "Создать";
-                    clicked => {
-                        root.create_profile(root.new_name, root.new_institution, root.new_group, root.new_year, root.new_color);
-                        root.new_name = "";
-                        root.new_institution = "";
-                        root.new_group = "";
+                VerticalLayout {
+                    alignment: center;
+                    FilledButton {
+                        text: "Создать";
+                        height: 36px;
+                        clicked => {
+                            root.create_profile(root.new_name, root.new_institution, root.new_group, root.new_year, root.new_color);
+                            root.new_name = "";
+                            root.new_institution = "";
+                            root.new_group = "";
+                        }
                     }
                 }
             }
@@ -202,12 +222,16 @@ export component SubjectsModal inherits Rectangle {
                 HorizontalLayout {
                     padding: 12px; spacing: 8px; alignment: space-between;
                     Text { horizontal_stretch: 1; text: root.delete_warning_text; font_size: 12px; color: MaterialPalette.on_error_container; wrap: word_wrap; }
-                    OutlineButton { text: "Отмена"; clicked => { root.pending_delete_id = ""; } }
-                    FilledButton {
-                        text: "Удалить";
-                        clicked => {
-                            root.confirm_delete_subject(root.pending_delete_id);
-                            root.pending_delete_id = "";
+                    VerticalLayout { alignment: center; OutlineButton { text: "Отмена"; height: 36px; clicked => { root.pending_delete_id = ""; } } }
+                    VerticalLayout {
+                        alignment: center;
+                        FilledButton {
+                            text: "Удалить";
+                            height: 36px;
+                            clicked => {
+                                root.confirm_delete_subject(root.pending_delete_id);
+                                root.pending_delete_id = "";
+                            }
                         }
                     }
                 }
@@ -215,8 +239,13 @@ export component SubjectsModal inherits Rectangle {
 
             ScrollView {
                 vertical_stretch: 1;
-                VerticalLayout {
+                viewport_width: self.visible_width;
+                viewport_height: max(self.visible_height, subjects_scroll_col.preferred_height);
+                subjects_scroll_col := VerticalLayout {
+                    x: 0px; y: 0px;
+                    width: parent.visible_width;
                     spacing: 6px;
+                    alignment: start;
                     for s in root.subjects : Rectangle {
                         border_radius: 12px;
                         background: MaterialPalette.surface_container;
@@ -261,26 +290,33 @@ export component SubjectsModal inherits Rectangle {
                 Rectangle {
                     horizontal_stretch: 3; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_name; color: MaterialPalette.on_surface; }
+                    if root.new_name == "" : Text { x: 8px; height: 100%; text: "Название предмета"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 Rectangle {
                     horizontal_stretch: 1; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_short; color: MaterialPalette.on_surface; }
+                    if root.new_short == "" : Text { x: 8px; height: 100%; text: "Сокр."; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 Rectangle {
                     horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_teacher; color: MaterialPalette.on_surface; }
+                    if root.new_teacher == "" : Text { x: 8px; height: 100%; text: "Преподаватель"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 Rectangle {
                     width: 68px; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_target; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                 }
-                FilledButton {
-                    text: "Добавить";
-                    clicked => {
-                        root.create_subject(root.new_name, root.new_short, root.new_teacher, root.new_target, root.new_color);
-                        root.new_name = "";
-                        root.new_short = "";
-                        root.new_teacher = "";
+                VerticalLayout {
+                    alignment: center;
+                    FilledButton {
+                        text: "Добавить";
+                        height: 36px;
+                        clicked => {
+                            root.create_subject(root.new_name, root.new_short, root.new_teacher, root.new_target, root.new_color);
+                            root.new_name = "";
+                            root.new_short = "";
+                            root.new_teacher = "";
+                        }
                     }
                 }
             }
@@ -323,8 +359,13 @@ export component PeriodsModal inherits Rectangle {
 
             ScrollView {
                 vertical_stretch: 1;
-                VerticalLayout {
+                viewport_width: self.visible_width;
+                viewport_height: max(self.visible_height, periods_scroll_col.preferred_height);
+                periods_scroll_col := VerticalLayout {
+                    x: 0px; y: 0px;
+                    width: parent.visible_width;
                     spacing: 6px;
+                    alignment: start;
                     for per in root.periods : Rectangle {
                         border_radius: 12px; background: MaterialPalette.surface_container;
                         HorizontalLayout {
@@ -333,11 +374,15 @@ export component PeriodsModal inherits Rectangle {
                                 Text { text: per.name; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
                                 Text { text: per.start_date + " — " + per.end_date + " (" + per.period_type + ")"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                             }
-                            TonalButton {
-                                text: "Открыть в журнале";
-                                clicked => {
-                                    root.select_period(per.id);
-                                    root.close();
+                            VerticalLayout {
+                                alignment: center;
+                                TonalButton {
+                                    text: "Открыть в журнале";
+                                    height: 36px;
+                                    clicked => {
+                                        root.select_period(per.id);
+                                        root.close();
+                                    }
                                 }
                             }
                         }
@@ -346,12 +391,27 @@ export component PeriodsModal inherits Rectangle {
             }
 
             Rectangle { height: 1px; background: OxidiumTheme.cell_border; }
+            HorizontalLayout {
+                spacing: 6px;
+                for pt[idx] in ["Уч. год", "Семестр", "Четверть", "Триместр", "Свой"] : Rectangle {
+                    horizontal_stretch: 1; height: 28px; border_radius: 8px;
+                    background: root.new_type_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface_container;
+                    border_width: 1px; border_color: root.new_type_idx == idx ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                    Text {
+                        text: pt; font_size: 11px; font_weight: 600;
+                        color: root.new_type_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant;
+                        horizontal_alignment: center; vertical_alignment: center;
+                    }
+                    TouchArea { mouse_cursor: pointer; clicked => { root.new_type_idx = idx; } }
+                }
+            }
             Text { text: "Новый период (Название • Начало YYYY-MM-DD • Окончание YYYY-MM-DD)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
             HorizontalLayout {
                 spacing: 8px;
                 Rectangle {
                     horizontal_stretch: 2; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_name; color: MaterialPalette.on_surface; }
+                    if root.new_name == "" : Text { x: 8px; height: 100%; text: "Например: Осенний семестр"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 Rectangle {
                     width: 110px; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
@@ -361,11 +421,15 @@ export component PeriodsModal inherits Rectangle {
                     width: 110px; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_end; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                 }
-                FilledButton {
-                    text: "Создать";
-                    clicked => {
-                        root.create_period(root.new_name, root.new_type_idx, root.new_start, root.new_end);
-                        root.new_name = "";
+                VerticalLayout {
+                    alignment: center;
+                    FilledButton {
+                        text: "Создать";
+                        height: 36px;
+                        clicked => {
+                            root.create_period(root.new_name, root.new_type_idx, root.new_start, root.new_end);
+                            root.new_name = "";
+                        }
                     }
                 }
             }
@@ -386,6 +450,7 @@ export component GlobalSearchModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000050;
+    init => { search_input.focus(); }
     TouchArea { clicked => { root.close(); } }
 
     Rectangle {
@@ -406,7 +471,7 @@ export component GlobalSearchModal inherits Rectangle {
                     HorizontalLayout {
                         padding_left: 14px; padding_right: 12px; spacing: 8px;
                         VerticalLayout { alignment: center; Icon { source: OxidiumIcons.search; width: 18px; height: 18px; colorize: MaterialPalette.primary; } }
-                        TextInput {
+                        search_input := TextInput {
                             horizontal_stretch: 1;
                             vertical_alignment: center;
                             text <=> root.query;
@@ -414,14 +479,20 @@ export component GlobalSearchModal inherits Rectangle {
                             edited => { root.search_edited(self.text); }
                         }
                     }
+                    if root.query == "" : Text { x: 40px; height: 100%; text: "Поиск по предметам, оценкам, задачам и тегам..."; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
                 IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
             }
 
             ScrollView {
                 vertical_stretch: 1;
-                VerticalLayout {
+                viewport_width: self.visible_width;
+                viewport_height: max(self.visible_height, search_hits_col.preferred_height);
+                search_hits_col := VerticalLayout {
+                    x: 0px; y: 0px;
+                    width: parent.visible_width;
                     spacing: 6px;
+                    alignment: start;
                     if root.hits.length == 0 : Text {
                         text: root.query == "" ? "Введите запрос для поиска по предметам, оценкам, заметкам, задачам и тегам." : "Ничего не найдено.";
                         font_size: 13px; color: MaterialPalette.on_surface_variant;
@@ -485,7 +556,7 @@ export component NotificationsModal inherits Rectangle {
                 Text { text: "Центр уведомлений"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
                 HorizontalLayout {
                     spacing: 4px;
-                    TonalButton { text: "Прочитать все"; clicked => { root.mark_all_read(); } }
+                    VerticalLayout { alignment: center; TonalButton { text: "Прочитать все"; height: 32px; clicked => { root.mark_all_read(); } } }
                     IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
                 }
             }
@@ -494,14 +565,21 @@ export component NotificationsModal inherits Rectangle {
                 border_radius: 10px; background: MaterialPalette.surface_container;
                 HorizontalLayout {
                     padding: 8px;
-                    Text { text: "ℹ " + root.background_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                    spacing: 8px;
+                    VerticalLayout { alignment: center; Icon { source: OxidiumIcons.notifications; width: 14px; height: 14px; colorize: MaterialPalette.primary; } }
+                    Text { horizontal_stretch: 1; text: root.background_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; vertical_alignment: center; }
                 }
             }
 
             ScrollView {
                 vertical_stretch: 1;
-                VerticalLayout {
+                viewport_width: self.visible_width;
+                viewport_height: max(self.visible_height, notif_scroll_col.preferred_height);
+                notif_scroll_col := VerticalLayout {
+                    x: 0px; y: 0px;
+                    width: parent.visible_width;
                     spacing: 8px;
+                    alignment: start;
                     if root.items.length == 0 : Text { text: "Новых уведомлений нет."; font_size: 13px; color: MaterialPalette.on_surface_variant; }
                     for n in root.items : Rectangle {
                         border_radius: 12px;
@@ -542,13 +620,12 @@ component SettingsToggleRow inherits Rectangle {
     min_height: root.subtitle != "" ? 54px : 44px;
     border_radius: 12px;
     background: row_ta.has_hover ? MaterialPalette.surface_container_high.with_alpha(65%) : transparent;
-    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
 
     row_ta := TouchArea {
         mouse_cursor: pointer;
         clicked => {
             root.checked = !root.checked;
-            root.toggled(root.checked);
         }
     }
 
@@ -691,7 +768,7 @@ export component SettingsModal inherits Rectangle {
                         height: 38px; border_radius: 12px;
                         background: root.active_tab == idx ? MaterialPalette.secondary_container
                             : tab_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                        animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                        animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 12px; padding_right: 12px;
                             Text {
@@ -737,7 +814,7 @@ export component SettingsModal inherits Rectangle {
                                         background: root.theme_mode_idx == idx ? MaterialPalette.primary_container
                                             : th_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.theme_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                         Text { text: th; font_size: 13px; font_weight: 600; color: root.theme_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         th_ta := TouchArea { mouse_cursor: pointer; clicked => { root.theme_mode_idx = idx; } }
                                     }
@@ -751,7 +828,7 @@ export component SettingsModal inherits Rectangle {
                                         background: root.lang_idx == idx ? MaterialPalette.primary_container
                                             : lg_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.lang_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                         Text { text: lg; font_size: 13px; font_weight: 600; color: root.lang_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         lg_ta := TouchArea { mouse_cursor: pointer; clicked => { root.lang_idx = idx; } }
                                     }
@@ -852,7 +929,7 @@ export component SettingsModal inherits Rectangle {
                                         horizontal_stretch: 1; height: 38px; border_radius: 12px;
                                         background: root.avg_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.avg_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                         Text { text: am; font_size: 12px; font_weight: 600; color: root.avg_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         TouchArea { mouse_cursor: pointer; clicked => { root.avg_mode_idx = idx; } }
                                     }
@@ -865,9 +942,22 @@ export component SettingsModal inherits Rectangle {
                                         horizontal_stretch: 1; height: 36px; border_radius: 12px;
                                         background: root.avg_precision_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.avg_precision_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                         Text { text: pr; font_family: OxidiumTheme.font_mono; font_size: 12px; font_weight: 600; color: root.avg_precision_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         TouchArea { mouse_cursor: pointer; clicked => { root.avg_precision_idx = idx; } }
+                                    }
+                                }
+
+                                Text { text: "Начало учебной недели"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for ws[idx] in ["Понедельник (Пн–Вс)", "Воскресенье (Вс–Сб)"] : Rectangle {
+                                        horizontal_stretch: 1; height: 36px; border_radius: 12px;
+                                        background: root.week_start_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
+                                        border_width: 1px; border_color: root.week_start_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                        Text { text: ws; font_size: 12px; font_weight: 600; color: root.week_start_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
+                                        TouchArea { mouse_cursor: pointer; clicked => { root.week_start_idx = idx; } }
                                     }
                                 }
                             }
@@ -978,8 +1068,9 @@ export component SettingsModal inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     alignment: start;
+                                    Text { text: "Порт:"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
                                     Rectangle {
-                                        width: 88px; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                        width: 82px; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                                         TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; text <=> root.mcp_port_text; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
                                     }
                                     if !root.mcp_http_running : FilledButton { text: "Запустить HTTP"; height: 38px; icon: OxidiumIcons.play; clicked => { root.mcp_start_http(); } }
@@ -1015,7 +1106,7 @@ export component SettingsModal inherits Rectangle {
                                     title: "Автозапуск встроенного HTTP MCP при старте Oxidium";
                                     checked <=> root.mcp_autostart;
                                 }
-                                Text { text: "⚠ " + root.tr.mcp_privacy_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                Text { text: root.tr.mcp_privacy_notice; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
                                 HorizontalLayout {
                                     alignment: start;
                                     FilledButton {
@@ -1027,12 +1118,22 @@ export component SettingsModal inherits Rectangle {
                             }
                         }
 
-                        // External STDIO snippet (honestly separated from embedded HTTP)
+                        // External STDIO snippet (selectable via Ctrl+A/Ctrl+C, honestly separated from embedded HTTP)
                         SettingsSectionCard {
                             VerticalLayout {
-                                padding: 12px; spacing: 4px; alignment: start;
+                                padding: 12px; spacing: 6px; alignment: start;
                                 Text { text: "Внешний STDIO-процесс (запускается AI-клиентом, например Claude Desktop / Gemini CLI)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface; wrap: word_wrap; }
-                                Text { text: root.mcp_stdio_config_preview; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                Rectangle {
+                                    height: 32px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: OxidiumTheme.cell_border;
+                                    TextInput {
+                                        x: 8px; width: parent.width - 16px; height: 100%;
+                                        text: root.mcp_stdio_config_preview;
+                                        read_only: true;
+                                        font_family: OxidiumTheme.font_mono; font_size: 10px;
+                                        color: MaterialPalette.on_surface_variant;
+                                        vertical_alignment: center;
+                                    }
+                                }
                             }
                         }
 
@@ -1403,6 +1504,7 @@ export component OnboardingModal inherits Rectangle {
 
     callback close();
     callback toggle_theme();
+    callback add_subject_chip(string, string) -> string;
     callback complete(string, string, string, string, bool, bool, int);
 
     width: 100%; height: 100%;
@@ -1425,7 +1527,6 @@ export component OnboardingModal inherits Rectangle {
         VerticalLayout {
             padding: 28px;
             spacing: 20px;
-            alignment: space-between;
 
             // Top Brand + Expressive 4-Step Progress Dots + Theme Toggle
             HorizontalLayout {
@@ -1449,7 +1550,7 @@ export component OnboardingModal inherits Rectangle {
                             height: 10px;
                             border_radius: 5px;
                             background: root.step == s ? MaterialPalette.primary : MaterialPalette.surface_container_highest;
-                            animate width, background { duration: OxidiumTheme.anim_emphasized; easing: OxidiumTheme.ease_emphasized; }
+                            animate width, background { duration: OxidiumTheme.anim_emphasized; easing: OxidiumMotion.ease_emphasized; }
                         }
                     }
                 }
@@ -1503,7 +1604,7 @@ export component OnboardingModal inherits Rectangle {
                 }
                 HorizontalLayout {
                     alignment: center;
-                    OutlineButton { text: "Пропустить"; clicked => { root.close(); } }
+                    OutlineButton { text: "Пропустить"; height: 40px; clicked => { root.close(); } }
                 }
             }
 
@@ -1522,6 +1623,7 @@ export component OnboardingModal inherits Rectangle {
                     Rectangle {
                         height: 42px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
                         TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.profile_name; color: MaterialPalette.on_surface; }
+                        if root.profile_name == "" : Text { x: 12px; height: 100%; text: "Например: Основной профиль"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                     }
                 }
 
@@ -1533,6 +1635,7 @@ export component OnboardingModal inherits Rectangle {
                         Rectangle {
                             height: 42px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
                             TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.institution; color: MaterialPalette.on_surface; }
+                            if root.institution == "" : Text { x: 12px; height: 100%; text: "Например: МГТУ / Лицей №1"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                         }
                     }
                     VerticalLayout {
@@ -1541,6 +1644,7 @@ export component OnboardingModal inherits Rectangle {
                         Rectangle {
                             height: 42px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
                             TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.group_name; color: MaterialPalette.on_surface; }
+                            if root.group_name == "" : Text { x: 12px; height: 100%; text: "Например: ИУ7-31Б / 11А"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                         }
                     }
                 }
@@ -1549,8 +1653,8 @@ export component OnboardingModal inherits Rectangle {
 
                 HorizontalLayout {
                     alignment: space-between;
-                    OutlineButton { text: "Назад"; clicked => { root.step = 1; } }
-                    FilledButton { text: "Далее"; icon: OxidiumIcons.arrow_forward; clicked => { root.step = 3; } }
+                    OutlineButton { text: "Назад"; height: 40px; clicked => { root.step = 1; } }
+                    FilledButton { text: "Далее"; height: 40px; icon: OxidiumIcons.arrow_forward; clicked => { root.step = 3; } }
                 }
             }
 
@@ -1575,7 +1679,7 @@ export component OnboardingModal inherits Rectangle {
                         TouchArea {
                             mouse_cursor: pointer;
                             clicked => {
-                                root.subjects_csv = root.subjects_csv == "" ? tpl : root.subjects_csv + ", " + tpl;
+                                root.subjects_csv = root.add_subject_chip(root.subjects_csv, tpl);
                             }
                         }
                     }
@@ -1587,6 +1691,7 @@ export component OnboardingModal inherits Rectangle {
                     Rectangle {
                         height: 44px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
                         TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.subjects_csv; color: MaterialPalette.on_surface; }
+                        if root.subjects_csv == "" : Text { x: 12px; height: 100%; text: "Например: Математика, Физика, Программирование"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                     }
                 }
 
@@ -1595,13 +1700,18 @@ export component OnboardingModal inherits Rectangle {
                     Rectangle {
                         horizontal_stretch: 1; height: 40px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
                         TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.new_subject_draft; color: MaterialPalette.on_surface; }
+                        if root.new_subject_draft == "" : Text { x: 12px; height: 100%; text: "Свой предмет..."; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                     }
-                    TonalButton {
-                        text: "Добавить";
-                        clicked => {
-                            if (root.new_subject_draft != "") {
-                                root.subjects_csv = root.subjects_csv == "" ? root.new_subject_draft : root.subjects_csv + ", " + root.new_subject_draft;
-                                root.new_subject_draft = "";
+                    VerticalLayout {
+                        alignment: center;
+                        TonalButton {
+                            text: "Добавить";
+                            height: 40px;
+                            clicked => {
+                                if (root.new_subject_draft != "") {
+                                    root.subjects_csv = root.add_subject_chip(root.subjects_csv, root.new_subject_draft);
+                                    root.new_subject_draft = "";
+                                }
                             }
                         }
                     }
@@ -1611,8 +1721,8 @@ export component OnboardingModal inherits Rectangle {
 
                 HorizontalLayout {
                     alignment: space-between;
-                    OutlineButton { text: "Назад"; clicked => { root.step = 2; } }
-                    FilledButton { text: "Далее"; icon: OxidiumIcons.arrow_forward; clicked => { root.step = 4; } }
+                    OutlineButton { text: "Назад"; height: 40px; clicked => { root.step = 2; } }
+                    FilledButton { text: "Далее"; height: 40px; icon: OxidiumIcons.arrow_forward; clicked => { root.step = 4; } }
                 }
             }
 
@@ -1649,7 +1759,7 @@ export component OnboardingModal inherits Rectangle {
                         horizontal_stretch: 1; height: 42px; border_radius: 12px;
                         background: root.mcp_access_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface_container;
                         border_width: 1px; border_color: root.mcp_access_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                         Text {
                             text: perm; font_size: 11px; font_weight: 600;
                             color: root.mcp_access_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface;
@@ -1770,11 +1880,13 @@ export component UpdateModal inherits Rectangle {
                     x: 0px; y: 0px;
                     width: parent.width; height: parent.height;
                     viewport_width: self.visible_width;
-                    VerticalLayout {
+                    viewport_height: max(self.visible_height, update_notes_col.preferred_height);
+                    update_notes_col := VerticalLayout {
                         x: 0px; y: 0px;
                         width: parent.visible_width;
                         padding: 14px;
                         spacing: 6px;
+                        alignment: start;
                         Text { text: "Что нового в релизе"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
                         Text {
                             text: root.release_notes != "" ? root.release_notes : "Описание релиза доступно на странице GitHub Releases.";
@@ -1829,17 +1941,20 @@ export component UpdateModal inherits Rectangle {
                 spacing: 8px;
                 OutlineButton {
                     text: "Открыть GitHub Releases";
+                    height: 38px;
                     clicked => { root.open_releases_page(); }
                 }
                 HorizontalLayout {
                     spacing: 8px;
                     OutlineButton {
                         text: "Позже";
+                        height: 38px;
                         enabled: !root.downloading;
                         clicked => { root.close(); }
                     }
                     if root.has_asset : FilledButton {
                         text: root.downloading ? "Загрузка и проверка SHA-256..." : "Скачать и установить";
+                        height: 38px;
                         icon: OxidiumIcons.download;
                         enabled: !root.downloading;
                         clicked => { root.download_and_install(); }

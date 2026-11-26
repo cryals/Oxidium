@@ -1,6 +1,6 @@
-# Oxidium v0.1.0 — Production Readiness Report
+# Oxidium v0.1.1 — Production Readiness Report
 
-**Date**: 2026-11-26  
+**Date**: 2026-11-27  
 **Platform Verified Locally**: Windows 10/11 x86_64 (`rustc 1.100.0`, `cargo 1.100.0`, Slint `1.19.1`, `rusqlite 0.43.0` bundled SQLite, `rmcp 3.11.0`)  
 **Repository**: `https://github.com/cryals/Oxidium`
 
@@ -39,7 +39,7 @@ Where host-platform constraints apply (Linux binaries/packages and external thir
 | 19 | **Security Audit, License Compliance & Parameterized SQL** | **PASS** | `cargo audit`: **0 vulnerabilities** across 700 dependencies (7 non-security upstream `unmaintained` notices documented). `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`. Full grep audit of `journal-storage` confirms 100% parameterized SQL (zero user-value interpolation). |
 | 20 | **Real Scale Performance Benchmarks (100 Subjects, 100k Grades, 10k Tasks)** | **PASS** | Verified in `--release` via `perf_benchmarks.rs` and `ui_tests.rs` (exact measured timings tabulated below). |
 | 21 | **Visual Screenshot QA across All Core Screens** | **PASS** | Rendered 9 real 1440×900 PNGs via `--render-screenshots docs/screenshots` (Journal Light/Dark, Statistics Light/Dark, Kanban Light/Dark, Settings/MCP, 4-Step Setup Wizard, Dynamic Update Modal), visually inspected every image, and verified crisp MD3 Expressive layout without clipping. |
-| 22 | **Windows Release Packaging, Dynamic Updater & Real Installer Verification** | **PASS** | `scripts/package-windows.ps1` builds `Oxidium-0.1.0-windows-x86_64-portable.zip`, per-user HKCU `Oxidium-0.1.0-windows-x86_64-setup.exe`, CycloneDX 1.5 SBOM, and `SHA256SUMS.txt`. Dynamic semi-automatic updater (`crates/journal-app/src/updater.rs`) queries GitHub Releases, verifies `SHA256SUMS.txt`, and launches installers non-blockingly (`updater_tests.rs` + `ui_tests.rs` PASSED). |
+| 22 | **Windows Release Packaging, Dynamic Updater & Real Installer Verification** | **PASS** | `scripts/package-windows.ps1` builds `Oxidium-0.1.1-windows-x86_64-portable.zip`, per-user HKCU `Oxidium-0.1.1-windows-x86_64-setup.exe` (`--wait-pid`/`--relaunch`/`.old` executable swap), CycloneDX 1.5 SBOM, and `SHA256SUMS.txt`. Dynamic semi-automatic updater (`crates/journal-app/src/updater.rs`) queries GitHub Releases, fails closed unless `SHA256SUMS.txt` verifies the payload, and upgrades running installations cleanly. |
 | 23 | **Linux Packaging (`x86_64` & `arm64`)** | **CI-AUTOMATED** | This host runs Windows 10/11 x86_64; Linux native `.tar.gz` / `.deb` packages are built & published automatically by GitHub Actions (`.github/workflows/ci.yml` & `.github/workflows/release.yml` on `ubuntu-24.04` and `ubuntu-24.04-arm`). |
 | 24 | **External Commercial MCP Clients Live Testing (Claude Desktop / Cursor / Windsurf)** | **BLOCKED (Environment)** | Third-party commercial AI desktop apps are not installed in this build sandbox. Protocol conformance was verified end-to-end against real `rmcp` STDIO child-process and Streamable HTTP clients (`mcp_tests.rs`, `stdio_tests.rs`), and copy-paste client configs are documented honestly in `docs/mcp/CLIENT-COMPATIBILITY.md`. |
 | 25 | **Localization (`ru`/`en`), Settings Persistence, First-Run Onboarding & Honest Reminders** | **PASS** | Verified in `ui_tests.rs`: Russian (primary) and English switch live, theme/accent/compact/reduced-motion/scale/auto-updates persist in SQLite, 4-step Setup Wizard auto-opens once on brand-new DB (`onboarding_completed`), and both Settings UI and docs state honestly that deadline reminders fire while Oxidium is running. |
@@ -97,9 +97,9 @@ Hardware/OS: Windows x86_64 local workstation, SQLite WAL mode, `--release` prof
 
 Reproducible via `powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1`:
 
-- `Oxidium-0.1.0-windows-x86_64-portable.zip` (`20.16 MB`) — `student-journal.exe`, `student-journal-mcp.exe`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.md`, `MCP-QUICKSTART.md`, `RELEASE-NOTES.md`
-- `Oxidium-0.1.0-windows-x86_64-setup.exe` (`20.44 MB`) — per-user HKCU self-extracting installer & uninstaller (no Administrator/UAC required; supports interactive and `--silent --dir <PATH>` / `--uninstall`)
-- `oxidium-0.1.0-sbom.cdx.json` — CycloneDX 1.5 JSON SBOM (`686` resolved Cargo components)
+- `Oxidium-0.1.1-windows-x86_64-portable.zip` — `student-journal.exe`, `student-journal-mcp.exe`, `LICENSE.txt`, `THIRD_PARTY_NOTICES.md`, `MCP-QUICKSTART.md`, `RELEASE-NOTES.md`
+- `Oxidium-0.1.1-windows-x86_64-setup.exe` — per-user HKCU self-extracting installer & uninstaller (no Administrator/UAC required; supports interactive, `--silent --dir <PATH> --wait-pid <PID> --relaunch`, and `--uninstall`)
+- `oxidium-0.1.1-sbom.cdx.json` — CycloneDX 1.5 JSON SBOM
 - `SHA256SUMS.txt` — SHA-256 digests for all artifacts
 
 Inno Setup script (`scripts/oxidium.iss`) and Linux `.tar.gz`/`.deb` builder (`scripts/package-linux.sh`) are also included for automated CI releases.

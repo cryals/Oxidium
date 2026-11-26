@@ -349,6 +349,22 @@ fn kanban_tags_reminders_export_import_backup_and_secrets() {
     assert!(done.is_completed());
     assert_eq!(done.linked_grade_ids, vec![grade.id]);
 
+    // Add an attendance record before export so JSON export->import preserves attendance too
+    app.add_attendance(
+        AddAttendanceInput {
+            profile_id: p.id,
+            subject_id: subj.id,
+            date: NaiveDate::from_ymd_opt(2026, 11, 24).unwrap(),
+            time: None,
+            status: AttendanceStatus::Absent,
+            reason: Some("Пропуск пары".into()),
+            comment: None,
+        },
+        RecordSource::Gui,
+        None,
+    )
+    .unwrap();
+
     // Export JSON, CSV, XLSX, Markdown, and ZIP backup
     let json_path = dir.path().join("export.json");
     let csv_path = dir.path().join("export.csv");
@@ -365,10 +381,35 @@ fn kanban_tags_reminders_export_import_backup_and_secrets() {
             .contains("Базы данных")
     );
 
-    // Preview & Import JSON into a second profile
+    // Preview & Import JSON into a second profile (verifies grades + attendance + tasks!)
     let preview = app.preview_json_import(&json_path).unwrap();
     assert_eq!(preview.grades_count, 1);
+    assert_eq!(preview.attendance_count, 1);
     assert_eq!(preview.tasks_count, 1);
+
+    let p2 = app
+        .create_profile(
+            CreateProfileInput {
+                name: "Импорт проверка".into(),
+                icon: None,
+                color: None,
+                institution: None,
+                group_name: None,
+                academic_year: None,
+                description: None,
+            },
+            RecordSource::Gui,
+            None,
+        )
+        .unwrap();
+    let imported = app.import_json_into_profile(p2.id, &json_path).unwrap();
+    assert_eq!(imported.grades_count, 1);
+    assert_eq!(imported.attendance_count, 1);
+    assert_eq!(imported.tasks_count, 1);
+    assert_eq!(
+        app.list_attendance(p2.id, None, None, None).unwrap().len(),
+        1
+    );
 
     // Telegram Desktop export preview
     let tg_path = dir.path().join("tg_result.json");

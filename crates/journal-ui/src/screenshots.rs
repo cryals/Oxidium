@@ -135,6 +135,10 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         (5, "settings-about.png"),
     ] {
         win.set_settings_active_tab(tab);
+        if tab == 4 {
+            // Avoid leaking host developer username paths in committed documentation screenshots
+            win.set_db_path_text(r"%LOCALAPPDATA%\oxidium\oxidium.db".into());
+        }
         win.invoke_apply_color_scheme(1);
         capture(shot)?;
     }

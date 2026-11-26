@@ -297,10 +297,10 @@ pub fn render_line_chart(
     hovered_index: Option<usize>,
 ) -> Image {
     let mut canvas = Canvas::new(width, height, [0, 0, 0, 0]);
-    let pad_l = 18.0;
+    let pad_l = 22.0;
     let pad_r = 22.0;
-    let pad_t = 18.0;
-    let pad_b = 18.0;
+    let pad_t = 24.0;
+    let pad_b = 24.0;
     let plot_w = (width as f32 - pad_l - pad_r).max(10.0);
     let plot_h = (height as f32 - pad_t - pad_b).max(10.0);
 
@@ -464,30 +464,30 @@ pub fn render_line_chart(
     canvas.into_image()
 }
 
-/// Shortest signed angular distance to arc `[a0, a1]` (angles in `[0, TAU)` with `a1` possibly `> TAU`),
-/// returning the SDF to an annular rounded-cap pill segment.
-fn rounded_arc_sdf(px: f32, py: f32, mid_r: f32, cap_r: f32, start_a: f32, end_a: f32) -> f32 {
+/// Shortest signed angular distance to arc `[start_a, end_a]`, returning the SDF
+/// to an annular rounded-cap pill segment with half-thickness `seg_cap_r`.
+fn rounded_arc_sdf(px: f32, py: f32, mid_r: f32, seg_cap_r: f32, start_a: f32, end_a: f32) -> f32 {
     let tau = std::f32::consts::TAU;
     let half_pi = std::f32::consts::FRAC_PI_2;
     let r = (px * px + py * py).sqrt();
-    let mut ang = py.atan2(px) + half_pi;
-    if ang < 0.0 {
+    let mut ang = (py.atan2(px) + half_pi).rem_euclid(tau);
+    let a0 = start_a.rem_euclid(tau);
+    let span = (end_a - start_a).max(0.0);
+    if span >= tau - 1e-4 {
+        return (r - mid_r).abs() - seg_cap_r;
+    }
+    let a1 = a0 + span;
+    if ang < a0 {
         ang += tau;
     }
 
-    let in_arc = if end_a <= tau {
-        ang >= start_a && ang <= end_a
-    } else {
-        ang >= start_a || ang <= (end_a - tau)
-    };
-
-    if in_arc {
-        return (r - mid_r).abs() - cap_r;
+    if ang <= a1 {
+        return (r - mid_r).abs() - seg_cap_r;
     }
 
-    // Distance to rounded cap circles at start_a and end_a
-    let theta0 = start_a - half_pi;
-    let theta1 = end_a - half_pi;
+    // Distance to rounded cap circles at a0 and a1
+    let theta0 = a0 - half_pi;
+    let theta1 = a1 - half_pi;
     let c0x = mid_r * theta0.cos();
     let c0y = mid_r * theta0.sin();
     let c1x = mid_r * theta1.cos();
@@ -495,11 +495,11 @@ fn rounded_arc_sdf(px: f32, py: f32, mid_r: f32, cap_r: f32, start_a: f32, end_a
 
     let d0 = ((px - c0x).powi(2) + (py - c0y).powi(2)).sqrt();
     let d1 = ((px - c1x).powi(2) + (py - c1y).powi(2)).sqrt();
-    d0.min(d1) - cap_r
+    d0.min(d1) - seg_cap_r
 }
 
 /// Renders an anti-aliased Material Design 3 Expressive rounded-cap donut chart
-/// with a subtle tonal track ring and clean spacing between segments.
+/// with a subtle tonal track ring and non-overlapping spacing between even tiny segments.
 pub fn render_donut_chart(segments: &[(usize, [u8; 3])], size: usize, dark_mode: bool) -> Image {
     let mut canvas = Canvas::new(size, size, [0, 0, 0, 0]);
     let total: usize = segments.iter().map(|(c, _)| *c).sum();
@@ -536,15 +536,8 @@ pub fn render_donut_chart(segments: &[(usize, [u8; 3])], size: usize, dark_mode:
 
     let tau = std::f32::consts::TAU;
     let non_zero = segments.iter().filter(|(c, _)| *c > 0).count();
-    let mut arcs: Vec<(f32, f32, [u8; 3])> = Vec::new();
+    let mut arcs: Vec<(f32, f32, f32, [u8; 3])> = Vec::new();
     let mut acc = 0.0f32;
-
-    // Each rounded cap extends `cap_r / mid_r` rad beyond its endpoint; add clean gap_px.
-    let gap_rad = if non_zero > 1 {
-        (2.0 * cap_r + 12.0) / mid_r
-    } else {
-        0.0
-    };
 
     for &(count, rgb) in segments {
         if count == 0 {
@@ -566,11 +559,13 @@ pub fn render_donut_chart(segments: &[(usize, [u8; 3])], size: usize, dark_mode:
             }
             return canvas.into_image();
         }
+        // Adapt cap radius on tiny slivers so adjacent rounded caps never overlap each other
+        let seg_cap_r = cap_r.min((sweep * mid_r * 0.36).max(2.5));
+        let half_gap_rad = (seg_cap_r + 4.5) / mid_r;
         let mid_a = acc + sweep * 0.5;
-        let trim = (gap_rad * 0.5).min(sweep * 0.49);
-        let a0 = (acc + trim).min(mid_a);
-        let a1 = (acc + sweep - trim).max(mid_a);
-        arcs.push((a0, a1, rgb));
+        let a0 = (acc + half_gap_rad).min(mid_a);
+        let a1 = (acc + sweep - half_gap_rad).max(mid_a);
+        arcs.push((a0, a1, seg_cap_r, rgb));
         acc += sweep;
     }
 
@@ -582,8 +577,8 @@ pub fn render_donut_chart(segments: &[(usize, [u8; 3])], size: usize, dark_mode:
             if d < inner_r - 1.5 || d > outer_r + 1.5 {
                 continue;
             }
-            for &(a0, a1, rgb) in &arcs {
-                let sdf = rounded_arc_sdf(dx, dy, mid_r, cap_r, a0, a1);
+            for &(a0, a1, seg_cap_r, rgb) in &arcs {
+                let sdf = rounded_arc_sdf(dx, dy, mid_r, seg_cap_r, a0, a1);
                 if sdf < 1.2 {
                     let cov = (0.7 - sdf).clamp(0.0, 1.0);
                     canvas.blend_pixel(x as i32, y as i32, [rgb[0], rgb[1], rgb[2], 255], cov);

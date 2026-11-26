@@ -31,7 +31,23 @@ fn headless_ui_end_to_end_flows() {
     assert!(!controller.maybe_open_first_run_onboarding(&win));
     assert!(!win.get_onboarding_open());
 
-    // 2. Create a subject through UI callback (name, short, teacher, target_str, color)
+    // 2. Create an archived filler subject BEFORE active subject to verify picker indexing stays aligned
+    win.invoke_subject_create(
+        "Архивный предмет".into(),
+        "Арх".into(),
+        "".into(),
+        "".into(),
+        "#64748B".into(),
+    );
+    let arch_id = win
+        .get_subjects_list()
+        .row_data(0)
+        .expect("arch subject")
+        .id;
+    win.invoke_subject_archive(arch_id, true);
+    assert_eq!(win.get_active_subjects_list().row_count(), 0);
+
+    // Create active subject through UI callback (name, short, teacher, target_str, color)
     win.invoke_subject_create(
         "Философия".into(),
         "Фил".into(),
@@ -40,9 +56,26 @@ fn headless_ui_end_to_end_flows() {
         "#2E7D32".into(),
     );
     assert_eq!(win.get_journal_rows().row_count(), 1);
+    assert_eq!(win.get_active_subjects_list().row_count(), 1);
     let subj_row = win.get_journal_rows().row_data(0).expect("row 0");
     assert_eq!(subj_row.subject_name.as_str(), "Философия");
     assert_eq!(subj_row.average_text.as_str(), "—");
+
+    // Verify step-3 onboarding subject deduplication helper
+    let csv = win.invoke_add_onboarding_subject("Математика, Физика".into(), "математика".into());
+    assert_eq!(csv.as_str(), "Математика, Физика");
+    let csv2 = win.invoke_add_onboarding_subject(csv, "Химия".into());
+    assert_eq!(csv2.as_str(), "Математика, Физика, Химия");
+
+    // Verify Week view navigation updates days range cleanly
+    win.invoke_journal_change_view_mode(0);
+    assert_eq!(win.get_journal_days().row_count(), 7);
+    let week0_start = win.get_journal_days().row_data(0).unwrap().date_iso;
+    win.invoke_journal_next_period();
+    let week1_start = win.get_journal_days().row_data(0).unwrap().date_iso;
+    assert_ne!(week0_start, week1_start);
+    win.invoke_journal_go_today();
+    win.invoke_journal_change_view_mode(1);
 
     // 3. Add numeric grades (5 and 4) and an absence (must NOT distort average!)
     let today_iso = chrono::Utc::now()
@@ -105,9 +138,9 @@ fn headless_ui_end_to_end_flows() {
         col0_id,
         "Написать эссе по Канту".into(),
         "Глава 1-3".into(),
-        subj_row.subject_id.clone(),
+        "2026-12-20".into(),
         2,
-        3,
+        1,
         "Эссе, Важное".into(),
     );
     let col0_after = win.get_kanban_columns().row_data(0).expect("col 0 after");

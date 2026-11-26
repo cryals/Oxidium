@@ -1,6 +1,6 @@
 import { MaterialWindow, MaterialPalette, MaterialSchemes, MaterialScheme, IconButton, Icon } from "@material";
 import { Palette } from "std-widgets.slint";
-import { OxidiumTheme, OxidiumIcons } from "theme.slint";
+import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "theme.slint";
 import {
     DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
     PeriodItem, MarkTypeItem, StatBarItem, TrendPointItem, HeatmapWeekRow,
@@ -55,6 +55,14 @@ export component MainWindow inherits MaterialWindow {
         stats_view.hovered_day_title = hov_title;
         stats_view.hovered_day_summary = hov_sum;
         stats_view.hovered_day_details = hov_det;
+    }
+
+    public function reset_stats_view_state() {
+        stats_view.reset_transient_state();
+    }
+
+    public function reset_kanban_hover_state() {
+        kanban_view.hover_hint = "";
     }
     changed color_scheme_mode => {
         if (root.color_scheme_mode == 0) {
@@ -114,6 +122,7 @@ export component MainWindow inherits MaterialWindow {
     in property <int> unread_notifications: 0;
     in property <string> snackbar_message: "";
     in_out property <bool> snackbar_visible: false;
+    in_out property <int> snackbar_ticks: 0;
 
     // Auxiliary modals (NOT main tabs!)
     in_out property <bool> quick_profile_open: false;
@@ -189,7 +198,7 @@ export component MainWindow inherits MaterialWindow {
     in property <[StatBarItem]> stats_subject_avgs;
     in property <[StatBarItem]> stats_attendance_bars;
     in property <[HeatmapWeekRow]> stats_heatmap_weeks;
-    in property <[StatBarItem]> stats_task_dynamics;
+    in property <[string]> stats_heatmap_weekdays: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
     in property <string> forecast_result_text: "";
     in property <string> forecast_target_result_text: "";
 
@@ -197,6 +206,7 @@ export component MainWindow inherits MaterialWindow {
     in property <[BoardItem]> kanban_boards;
     in property <string> kanban_active_board_id;
     in property <[KanbanColumnModel]> kanban_columns;
+    in property <string> kanban_subject_filter_label: "";
     in_out property <bool> kanban_detail_open <=> kanban_view.detail_open;
     in_out property <string> kanban_detail_task_id <=> kanban_view.detail_task_id;
     in_out property <string> kanban_detail_title <=> kanban_view.detail_title;
@@ -210,6 +220,7 @@ export component MainWindow inherits MaterialWindow {
     // Modals & Settings properties
     in property <[ProfileItem]> profiles_list;
     in property <[SubjectItem]> subjects_list;
+    in property <[SubjectItem]> active_subjects_list;
     in property <string> profile_delete_warning;
     in_out property <string> profile_pending_delete_id;
     in property <string> subject_delete_warning;
@@ -253,7 +264,7 @@ export component MainWindow inherits MaterialWindow {
     in property <bool> update_available: false;
     in property <bool> update_checking: false;
     in property <bool> update_downloading: false;
-    in property <string> update_current_version: "v0.1.0";
+    in property <string> update_current_version: "v0.1.1";
     in property <string> update_latest_version: "";
     in property <string> update_release_name: "";
     in property <string> update_published_at: "";
@@ -268,6 +279,7 @@ export component MainWindow inherits MaterialWindow {
     callback theme_quick_toggle();
     callback onboarding_complete(string, string, string, string, bool, bool, int);
     callback onboarding_dismissed();
+    pure callback add_onboarding_subject(string, string) -> string;
     callback toggle_auto_updates(bool);
     callback check_updates_clicked();
     callback download_and_install_update();
@@ -290,6 +302,8 @@ export component MainWindow inherits MaterialWindow {
     callback journal_move_entry(string, string);
     callback journal_subject_open_tasks(string);
     callback journal_quick_digit_grade(int, int, int); // row, col, grade 1..5
+    callback journal_open_cell_at(int, int); // row, col (Return shortcut)
+    callback journal_delete_active_cell(int, int); // row, col (Delete shortcut)
 
     callback stats_select_preset(int);
     callback stats_toggle_compare();
@@ -313,6 +327,7 @@ export component MainWindow inherits MaterialWindow {
     callback kanban_delete_checklist(string);
     callback kanban_add_tag(string, string);
     callback kanban_filter_changed(string, int);
+    callback kanban_clear_subject_filter();
 
     callback profile_switch(string);
     callback profile_create(string, string, string, string, string);
@@ -428,6 +443,8 @@ export component MainWindow inherits MaterialWindow {
                     return accept;
                 }
                 if (journal_view.active_row >= 0 && journal_view.active_col >= 0) {
+                    if (ev.text == Key.Return) { root.journal_open_cell_at(journal_view.active_row, journal_view.active_col); return accept; }
+                    if (ev.text == Key.Delete) { root.journal_delete_active_cell(journal_view.active_row, journal_view.active_col); return accept; }
                     if (ev.text == "1") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 1); return accept; }
                     if (ev.text == "2") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 2); return accept; }
                     if (ev.text == "3") { root.journal_quick_digit_grade(journal_view.active_row, journal_view.active_col, 3); return accept; }
@@ -450,7 +467,7 @@ export component MainWindow inherits MaterialWindow {
                 width: root.rail_expanded ? 212px : (root.width < 940px ? 72px : 92px);
                 background: MaterialPalette.surface_container;
                 clip: true;
-                animate width { duration: OxidiumTheme.anim_emphasized; easing: OxidiumTheme.ease_emphasized; }
+                animate width { duration: OxidiumTheme.anim_emphasized; easing: OxidiumMotion.ease_emphasized; }
 
                 VerticalLayout {
                     x: 0px;
@@ -522,7 +539,7 @@ export component MainWindow inherits MaterialWindow {
                             background: root.rail_expanded && root.active_section == idx
                                 ? MaterialPalette.secondary_container
                                 : root.rail_expanded && nav_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                            animate background, height { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                            animate background, height { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
 
                             if !root.rail_expanded : VerticalLayout {
                                 spacing: 3px;
@@ -534,7 +551,7 @@ export component MainWindow inherits MaterialWindow {
                                         background: root.active_section == idx
                                             ? MaterialPalette.secondary_container
                                             : nav_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                                        animate width, background { duration: OxidiumTheme.anim_medium; easing: OxidiumTheme.ease_emphasized; }
+                                        animate width, background { duration: OxidiumTheme.anim_medium; easing: OxidiumMotion.ease_emphasized; }
                                         Icon {
                                             source: nav.icon;
                                             width: 22px; height: 22px;
@@ -936,8 +953,8 @@ export component MainWindow inherits MaterialWindow {
                         subject_avg_bars: root.stats_subject_avgs;
                         attendance_bars: root.stats_attendance_bars;
                         heatmap_weeks: root.stats_heatmap_weeks;
-                        task_dynamics_bars: root.stats_task_dynamics;
-                        subjects: root.subjects_list;
+                        heatmap_weekdays: root.stats_heatmap_weekdays;
+                        subjects: root.active_subjects_list;
                         forecast_result_text: root.forecast_result_text;
                         forecast_target_result_text: root.forecast_target_result_text;
 
@@ -954,7 +971,8 @@ export component MainWindow inherits MaterialWindow {
                         boards: root.kanban_boards;
                         active_board_id: root.kanban_active_board_id;
                         columns: root.kanban_columns;
-                        subjects: root.subjects_list;
+                        subjects: root.active_subjects_list;
+                        subject_filter_label: root.kanban_subject_filter_label;
                         detail_checklist: root.kanban_detail_checklist;
 
                         select_board(id) => { root.kanban_select_board(id); }
@@ -974,6 +992,7 @@ export component MainWindow inherits MaterialWindow {
                         delete_checklist_item(cid) => { root.kanban_delete_checklist(cid); }
                         add_tag_to_task(tid, tg) => { root.kanban_add_tag(tid, tg); }
                         filter_changed(q, m) => { root.kanban_filter_changed(q, m); }
+                        clear_subject_filter => { root.kanban_clear_subject_filter(); }
                     }
                 }
                 }
@@ -1104,6 +1123,7 @@ export component MainWindow inherits MaterialWindow {
             root.onboarding_dismissed();
         }
         toggle_theme => { root.theme_quick_toggle(); }
+        add_subject_chip(csv, tpl) => { return root.add_onboarding_subject(csv, tpl); }
         complete(pn, inst, grp, scsv, en_mcp, auto_mcp, acc) => {
             root.onboarding_open = false;
             root.onboarding_complete(pn, inst, grp, scsv, en_mcp, auto_mcp, acc);
@@ -1131,6 +1151,20 @@ export component MainWindow inherits MaterialWindow {
         close => { root.shortcuts_modal_open = false; }
     }
 
+    // Auto-dismiss timer for floating Snackbar feedback (~4s window reset per toast)
+    Timer {
+        interval: 500ms;
+        running: root.snackbar_visible && root.snackbar_message != "";
+        triggered => {
+            if (root.snackbar_ticks <= 1) {
+                root.snackbar_visible = false;
+                root.snackbar_ticks = 0;
+            } else {
+                root.snackbar_ticks -= 1;
+            }
+        }
+    }
+
     // Floating Snackbar feedback with smooth M3 slide + fade animation
     Rectangle {
         x: (parent.width - self.width) / 2;
@@ -1144,8 +1178,8 @@ export component MainWindow inherits MaterialWindow {
         visible: self.opacity > 0.01;
         drop_shadow_blur: 16px;
         drop_shadow_color: #00000045;
-        animate opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_standard; }
-        animate y { duration: OxidiumTheme.anim_emphasized; easing: OxidiumTheme.ease_emphasized; }
+        animate opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_standard; }
+        animate y { duration: OxidiumTheme.anim_emphasized; easing: OxidiumMotion.ease_emphasized; }
 
         HorizontalLayout {
             padding_left: 16px; padding_right: 12px; spacing: 12px; alignment: space-between;

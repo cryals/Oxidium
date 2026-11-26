@@ -7,6 +7,11 @@ import "../../../assets/fonts/RobotoFlex.ttf";
 
 import { MaterialPalette } from "@material";
 
+export global OxidiumMotion {
+    out property <easing> ease_emphasized: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+    out property <easing> ease_standard: cubic-bezier(0.2, 0.0, 0.0, 1.0);
+}
+
 export global OxidiumTheme {
     in_out property <bool> dark_mode: false;
     in_out property <bool> compact_mode: false;
@@ -24,11 +29,9 @@ export global OxidiumTheme {
     out property <duration> anim_medium: root.reduced_motion ? 0ms : 260ms;
     out property <duration> anim_emphasized: root.reduced_motion ? 0ms : 380ms;
     out property <duration> anim_chart: root.reduced_motion ? 0ms : 460ms;
-    out property <easing> ease_emphasized: cubic-bezier(0.05, 0.7, 0.1, 1.0);
-    out property <easing> ease_standard: cubic-bezier(0.2, 0.0, 0.0, 1.0);
 
     // Semantic heatmap & grade highlight tokens
-    out property <color> grade_2_brown: root.dark_mode ? #D88A56 : #A1521D;
+    out property <color> grade_2_brown: root.dark_mode ? #D96B43 : #A1521D;
     out property <color> grade_2_brown_bg: root.dark_mode ? #5A3117 : #F4DFCF;
     out property <color> absent_red: root.dark_mode ? #F28B82 : #D32F2F;
     out property <color> absent_red_bg: root.dark_mode ? #6E2120 : #FADCD9;
@@ -37,8 +40,8 @@ export global OxidiumTheme {
     // Semantic grade & mark accents (customizable by user, paired with high-contrast Light/Dark containers)
     in_out property <color> grade_5: root.dark_mode ? #8CD99E : #146C2E;
     in_out property <color> grade_4: root.dark_mode ? #7AD7CA : #006A60;
-    in_out property <color> grade_3: root.dark_mode ? #FFB969 : #8D4E00;
-    in_out property <color> grade_2: root.dark_mode ? #FF9F7A : #B33B00;
+    in_out property <color> grade_3: root.dark_mode ? #FFCA62 : #8D4E00;
+    in_out property <color> grade_2: root.dark_mode ? #D96B43 : #B33B00;
     in_out property <color> grade_1: root.dark_mode ? #F2B8B5 : #B3261E;
     in_out property <color> mark_absent: root.dark_mode ? #F2B8B5 : #B3261E;
     in_out property <color> mark_excused: root.dark_mode ? #9EC8F5 : #1A5F9E;

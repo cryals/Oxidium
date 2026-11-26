@@ -374,8 +374,16 @@ impl AppServices {
             .collect();
         ranked.sort_by_key(|a| std::cmp::Reverse(a.average));
         let best_subject = ranked.first().cloned();
-        let mut lowest_subjects = ranked;
-        lowest_subjects.reverse();
+        let threshold_4 = Decimal::from(4);
+        let mut lowest_subjects: Vec<SubjectStatItem> = ranked
+            .into_iter()
+            .filter(|s| s.below_target || s.average.is_some_and(|avg| avg < threshold_4))
+            .collect();
+        lowest_subjects.sort_by(|a, b| {
+            b.below_target
+                .cmp(&a.below_target)
+                .then_with(|| a.average.cmp(&b.average))
+        });
         lowest_subjects.truncate(3);
 
         // Cumulative average dynamics by date

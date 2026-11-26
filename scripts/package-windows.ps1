@@ -1,9 +1,19 @@
 param(
-    [string]$Version = "0.1.0"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $CargoToml = Get-Content -Path (Join-Path $Root "Cargo.toml") -Raw
+    if ($CargoToml -match '(?m)^version\s*=\s*"([^"]+)"') {
+        $Version = $Matches[1]
+    } else {
+        $Version = "0.1.1"
+    }
+}
+
 $Dist = Join-Path $Root "dist"
 $Stage = Join-Path $Dist "stage-windows-x86_64"
 
@@ -15,6 +25,11 @@ if (-not (Test-Path $GuiBin) -or -not (Test-Path $McpBin)) {
 }
 
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
+# Clean stale versioned Windows artifacts so SHA256SUMS.txt only covers this build
+Get-ChildItem $Dist -File | Where-Object {
+    $_.Name -match '^(Oxidium-.*-windows-x86_64.*\.(zip|exe)|oxidium-.*-sbom\.cdx\.json|SHA256SUMS\.txt)$'
+} | Remove-Item -Force
+
 if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 
@@ -34,6 +49,7 @@ Write-Host "Created $PortableZip"
 # 2. Build Native Per-User HKCU Self-Extracting Windows Installer
 $SetupExe = Join-Path $Dist "Oxidium-$Version-windows-x86_64-setup.exe"
 $env:OXIDIUM_PAYLOAD_ZIP = $PortableZip
+$env:OXIDIUM_VERSION = $Version
 $InstallerSrc = Join-Path $Root "scripts\windows_installer.rs"
 & rustc --edition 2024 -C opt-level=3 -C strip=symbols $InstallerSrc -o $SetupExe
 if ($LASTEXITCODE -ne 0) {
@@ -46,7 +62,7 @@ Write-Host "Created $SetupExe"
 # 3. Also compile Inno Setup installer if ISCC is available
 $iscc = Get-Command iscc -ErrorAction SilentlyContinue
 if ($null -ne $iscc) {
-    & $iscc.Source (Join-Path $Root "scripts\oxidium.iss")
+    & $iscc.Source "/DMyAppVersion=$Version" (Join-Path $Root "scripts\oxidium.iss")
     if ($LASTEXITCODE -ne 0) {
         throw "ISCC failed"
     }

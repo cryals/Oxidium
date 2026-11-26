@@ -338,13 +338,30 @@ pub async fn check_for_updates_from_url(
         release_notes: payload.body.unwrap_or_default(),
         html_url: payload
             .html_url
-            .filter(|u| u.starts_with("https://"))
+            .filter(|u| is_safe_release_html_url(u))
             .unwrap_or_else(|| GITHUB_RELEASES_PAGE.to_string()),
         published_at: published_short,
         selected_asset,
         sha256_expected,
         is_update_available: is_available,
     })
+}
+
+fn has_unsafe_url_chars(s: &str) -> bool {
+    s.chars().any(|c| {
+        c.is_control()
+            || c.is_whitespace()
+            || matches!(
+                c,
+                '"' | '\'' | '&' | '|' | '^' | '%' | '<' | '>' | ';' | '`' | '$' | '(' | ')' | '!'
+            )
+    })
+}
+
+/// Restricts release page links strictly to the official Oxidium GitHub repository.
+pub fn is_safe_release_html_url(url: &str) -> bool {
+    let trimmed = url.trim();
+    trimmed.starts_with("https://github.com/cryals/Oxidium/") && !has_unsafe_url_chars(trimmed)
 }
 
 fn sanitize_single_filename(name: &str) -> AppResult<String> {
@@ -360,14 +377,20 @@ fn sanitize_single_filename(name: &str) -> AppResult<String> {
     Ok(trimmed.to_string())
 }
 
-/// Downloads the selected platform release artifact into `updates_dir`, verifies its SHA-256
-/// checksum against `SHA256SUMS.txt` (when available), and commits atomically on disk.
+/// Downloads the selected platform release artifact into `updates_dir`, enforces SHA-256
+/// checksum verification against `SHA256SUMS.txt` (fail-closed), and commits atomically on disk.
 pub async fn download_and_verify_update(
     info: &UpdateInfo,
     updates_dir: &Path,
 ) -> AppResult<PathBuf> {
     let asset = info.selected_asset.as_ref().ok_or_else(|| {
         AppError::Update("Для вашей платформы не найден автоматический пакет в этом релизе".into())
+    })?;
+    let expected_hex = info.sha256_expected.as_deref().ok_or_else(|| {
+        AppError::Update(
+            "В релизе отсутствует проверенная контрольная сумма SHA-256. Скачайте обновление вручную со страницы GitHub Releases."
+                .into(),
+        )
     })?;
     let safe_name = sanitize_single_filename(&asset.name)?;
     if !is_allowed_download_url(&asset.download_url) {
@@ -396,20 +419,18 @@ pub async fn download_and_verify_update(
         .await
         .map_err(|e| AppError::Update(format!("Ошибка чтения потока загрузки: {e}")))?;
 
-    if let Some(ref expected_hex) = info.sha256_expected {
-        let mut hasher = Sha256::new();
-        hasher.update(&bytes);
-        let actual_hex = hex::encode(hasher.finalize());
-        let matches: bool = actual_hex
-            .as_bytes()
-            .ct_eq(expected_hex.to_ascii_lowercase().as_bytes())
-            .into();
-        if !matches {
-            return Err(AppError::Update(format!(
-                "Ошибка целостности SHA-256 для {safe_name}: ожидалось {}, получено {}",
-                expected_hex, actual_hex
-            )));
-        }
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let actual_hex = hex::encode(hasher.finalize());
+    let matches: bool = actual_hex
+        .as_bytes()
+        .ct_eq(expected_hex.to_ascii_lowercase().as_bytes())
+        .into();
+    if !matches {
+        return Err(AppError::Update(format!(
+            "Ошибка целостности SHA-256 для {safe_name}: ожидалось {}, получено {}",
+            expected_hex, actual_hex
+        )));
     }
 
     let part_path = updates_dir.join(format!("{safe_name}.part"));
@@ -420,6 +441,16 @@ pub async fn download_and_verify_update(
     }
     std::fs::rename(&part_path, &final_path)?;
     Ok(final_path)
+}
+
+/// Returns `true` when launching this artifact triggers an unattended in-place Windows upgrade
+/// that expects the running GUI process to exit immediately so files can be replaced.
+pub fn is_windows_self_updating_installer(artifact_path: &Path) -> bool {
+    cfg!(target_os = "windows")
+        && artifact_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("exe"))
 }
 
 /// Launches the verified update installer (Windows `.exe`) or reveals the downloaded package
@@ -433,16 +464,17 @@ pub fn launch_update_artifact(artifact_path: &Path) -> AppResult<String> {
 
     #[cfg(target_os = "windows")]
     {
-        let is_exe = artifact_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .is_some_and(|e| e.eq_ignore_ascii_case("exe"));
-        if is_exe {
+        if is_windows_self_updating_installer(artifact_path) {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+            let pid_str = std::process::id().to_string();
             std::process::Command::new(artifact_path)
+                .args(["--silent", "--wait-pid", &pid_str, "--relaunch"])
+                .creation_flags(CREATE_NEW_CONSOLE)
                 .spawn()
                 .map_err(|e| AppError::Update(format!("Не удалось запустить установщик: {e}")))?;
             return Ok(
-                "Установщик обновления запущен. Завершите установку в открывшемся окне.".into(),
+                "Обновление проверено и запущено. Oxidium закроется, обновится и перезапустится автоматически.".into(),
             );
         }
         let arg = format!("/select,{}", artifact_path.display());
@@ -472,12 +504,13 @@ pub fn launch_update_artifact(artifact_path: &Path) -> AppResult<String> {
     }
 }
 
-/// Opens a verified HTTPS URL (e.g. GitHub Releases page) in the user's default browser.
+/// Opens a verified HTTPS URL (e.g. GitHub Releases page) in the user's default browser
+/// without invoking a shell interpreter.
 pub fn open_url_in_browser(url: &str) -> AppResult<()> {
     let trimmed = url.trim();
-    if !trimmed.starts_with("https://") {
+    if !trimmed.starts_with("https://") || has_unsafe_url_chars(trimmed) {
         return Err(AppError::Update(
-            "Разрешено открытие только HTTPS-ссылок".into(),
+            "Разрешено открытие только безопасных HTTPS-ссылок".into(),
         ));
     }
 
@@ -485,8 +518,8 @@ pub fn open_url_in_browser(url: &str) -> AppResult<()> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", trimmed])
+        std::process::Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", trimmed])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| AppError::Update(format!("Не удалось открыть браузер: {e}")))?;

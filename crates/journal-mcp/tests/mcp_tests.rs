@@ -131,6 +131,31 @@ async fn mcp_tool_count_resources_prompts_http_auth_permissions_idempotency_and_
         post_mcp(&client, &url, Some("oxd_invalid_token"), init_req.clone()).await;
     assert_eq!(status_bad, reqwest::StatusCode::UNAUTHORIZED);
 
+    // 1b. Non-loopback Origin header MUST be rejected with 403 Forbidden
+    let bad_origin_resp = client
+        .post(&url)
+        .header("Accept", "application/json, text/event-stream")
+        .header("Content-Type", "application/json")
+        .header("Origin", "https://evil.example")
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&init_req)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(bad_origin_resp.status(), reqwest::StatusCode::FORBIDDEN);
+
+    let spoofed_origin_resp = client
+        .post(&url)
+        .header("Accept", "application/json, text/event-stream")
+        .header("Content-Type", "application/json")
+        .header("Origin", "http://localhost.evil.com")
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&init_req)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(spoofed_origin_resp.status(), reqwest::StatusCode::FORBIDDEN);
+
     // 2. Authorized initialize + capture session ID
     let resp = client
         .post(&url)

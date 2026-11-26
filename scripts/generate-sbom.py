@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 def main() -> int:
-    out_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("dist/oxidium-0.1.0-sbom.cdx.json")
+    out_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("dist/oxidium-sbom.cdx.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     raw = subprocess.check_output(
@@ -22,9 +22,12 @@ def main() -> int:
 
     components = []
     seen = set()
+    app_version = "0.1.1"
     for pkg in meta.get("packages", []):
         name = pkg["name"]
         version = pkg["version"]
+        if name == "student-journal":
+            app_version = version
         key = (name, version)
         if key in seen:
             continue
@@ -63,7 +66,7 @@ def main() -> int:
             "component": {
                 "type": "application",
                 "name": "Oxidium",
-                "version": "0.1.0",
+                "version": app_version,
                 "description": "Personal local-first Student Journal with native Slint UI, SQLite, and MCP server",
                 "licenses": [{"license": {"id": "MIT"}}],
                 "externalReferences": [

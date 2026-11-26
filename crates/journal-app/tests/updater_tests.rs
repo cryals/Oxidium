@@ -1,7 +1,8 @@
 use axum::{Router, http::StatusCode, routing::get};
 use journal_app::updater::{
-    ReleaseAssetInfo, check_for_updates_from_url, download_and_verify_update, is_newer_version,
-    parse_sha256sums, select_platform_asset_for,
+    GITHUB_RELEASES_PAGE, ReleaseAssetInfo, check_for_updates_from_url, download_and_verify_update,
+    is_newer_version, is_safe_release_html_url, open_url_in_browser, parse_sha256sums,
+    select_platform_asset_for,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -184,6 +185,14 @@ async fn updater_end_to_end_check_download_and_sha256_verification() {
         .expect_err("tampered asset must be rejected");
     assert!(err.to_string().contains("SHA-256"));
 
+    // 3b. Missing SHA-256 digest MUST fail closed (never auto-run unverified binaries)
+    let mut missing_sha = info.clone();
+    missing_sha.sha256_expected = None;
+    let err_no_sha = download_and_verify_update(&missing_sha, tmp.path())
+        .await
+        .expect_err("missing sha256 must fail closed");
+    assert!(err_no_sha.to_string().contains("SHA-256"));
+
     // 4. Same version reports no update available
     let same = check_for_updates_from_url(&format!("{base}/releases/latest"), "0.2.0")
         .await
@@ -197,4 +206,21 @@ async fn updater_end_to_end_check_download_and_sha256_verification() {
     assert!(!empty.is_update_available);
 
     srv.abort();
+}
+
+#[test]
+fn updater_url_validation_blocks_injection_and_foreign_links() {
+    assert!(is_safe_release_html_url(
+        "https://github.com/cryals/Oxidium/releases/tag/v0.1.1"
+    ));
+    assert!(!is_safe_release_html_url("https://evil.example/releases"));
+    assert!(!is_safe_release_html_url(
+        "https://github.com/cryals/Oxidium/releases&calc.exe"
+    ));
+
+    assert!(open_url_in_browser("http://github.com/cryals/Oxidium").is_err());
+    assert!(open_url_in_browser("https://github.com/cryals/Oxidium&calc.exe").is_err());
+    assert!(open_url_in_browser("https://github.com/cryals/Oxidium\"foo").is_err());
+    assert!(open_url_in_browser("https://github.com/cryals/Oxidium\ncalc").is_err());
+    let _ = GITHUB_RELEASES_PAGE;
 }

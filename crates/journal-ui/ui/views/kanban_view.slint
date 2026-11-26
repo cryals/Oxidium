@@ -1,5 +1,5 @@
-import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView } from "@material";
-import { OxidiumTheme, OxidiumIcons } from "../theme.slint";
+import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView, Switch } from "@material";
+import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
 import { BoardItem, KanbanColumnModel, KanbanTaskCard, ChecklistRowItem, SubjectItem, UiStrings } from "../types.slint";
 
 component KanbanMicroButton inherits Rectangle {
@@ -13,7 +13,7 @@ component KanbanMicroButton inherits Rectangle {
     height: 30px;
     border_radius: 15px;
     background: mb_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
-    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
+    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
 
     Icon {
         source: root.icon;
@@ -24,7 +24,10 @@ component KanbanMicroButton inherits Rectangle {
 
     mb_ta := TouchArea {
         mouse_cursor: pointer;
-        clicked => { root.clicked(); }
+        clicked => {
+            root.hover_target = "";
+            root.clicked();
+        }
         changed has_hover => {
             if (self.has_hover && root.hint_text != "") {
                 root.hover_target = root.hint_text;
@@ -41,6 +44,7 @@ export component KanbanView inherits Rectangle {
     in property <string> active_board_id;
     in property <[KanbanColumnModel]> columns;
     in property <[SubjectItem]> subjects;
+    in property <string> subject_filter_label: "";
     in_out property <string> filter_query: "";
     in_out property <int> filter_mode: 0; // 0=All, 1=Overdue, 2=HighPriority
     in_out property <bool> hand_mode: false;
@@ -104,6 +108,7 @@ export component KanbanView inherits Rectangle {
     callback delete_checklist_item(string);
     callback add_tag_to_task(string, string);
     callback filter_changed(string, int);
+    callback clear_subject_filter();
 
     background: transparent;
 
@@ -131,7 +136,7 @@ export component KanbanView inherits Rectangle {
                         background: b.id == root.active_board_id ? MaterialPalette.primary_container : MaterialPalette.surface;
                         border_width: 1px;
                         border_color: b.id == root.active_board_id ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 14px;
                             padding_right: 14px;
@@ -145,12 +150,15 @@ export component KanbanView inherits Rectangle {
                         }
                         TouchArea {
                             mouse_cursor: pointer;
-                            clicked => { root.select_board(b.id); }
+                            clicked => {
+                                root.hover_hint = "";
+                                root.select_board(b.id);
+                            }
                         }
                     }
 
                     OutlineButton {
-                        text: "+ Доска";
+                        text: root.tr.kanban_new_board;
                         height: 36px;
                         clicked => {
                             root.new_board_name = "";
@@ -173,7 +181,7 @@ export component KanbanView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
-                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.cursor;
                                     width: 16px; height: 16px;
@@ -184,7 +192,7 @@ export component KanbanView inherits Rectangle {
                             Rectangle {
                                 width: 30px; height: 30px; border_radius: 15px;
                                 background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
-                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                                 Icon {
                                     source: OxidiumIcons.hand;
                                     width: 16px; height: 16px;
@@ -227,6 +235,35 @@ export component KanbanView inherits Rectangle {
                         }
                     }
 
+                    // Dismissible active subject filter pill when navigated from Journal
+                    if root.subject_filter_label != "" : Rectangle {
+                        height: 36px;
+                        border_radius: 18px;
+                        background: MaterialPalette.tertiary_container;
+                        border_width: 1px;
+                        border_color: MaterialPalette.primary.with_alpha(45%);
+                        HorizontalLayout {
+                            padding_left: 11px;
+                            padding_right: 8px;
+                            spacing: 6px;
+                            Text {
+                                text: "Предмет: " + root.subject_filter_label;
+                                font_size: 11px;
+                                font_weight: 600;
+                                color: MaterialPalette.on_tertiary_container;
+                                vertical_alignment: center;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Icon { source: OxidiumIcons.close; width: 14px; height: 14px; colorize: MaterialPalette.on_tertiary_container; }
+                            }
+                        }
+                        TouchArea {
+                            mouse_cursor: pointer;
+                            clicked => { root.clear_subject_filter(); }
+                        }
+                    }
+
                     // Filter mode chips
                     for fm[idx] in ["Все", "Просрочено", "Срочные"] : Rectangle {
                         height: 36px;
@@ -234,7 +271,7 @@ export component KanbanView inherits Rectangle {
                         background: root.filter_mode == idx ? MaterialPalette.secondary_container : MaterialPalette.surface;
                         border_width: 1px;
                         border_color: root.filter_mode == idx ? transparent : MaterialPalette.outline_variant;
-                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
                         HorizontalLayout {
                             padding_left: 11px;
                             padding_right: 11px;
@@ -299,9 +336,13 @@ export component KanbanView inherits Rectangle {
                     color: MaterialPalette.on_primary_container;
                     vertical_alignment: center;
                 }
-                TonalButton {
-                    text: "Отмена";
-                    clicked => { root.dragging_task = false; }
+                VerticalLayout {
+                    alignment: center;
+                    TonalButton {
+                        text: "Отмена";
+                        height: 30px;
+                        clicked => { root.dragging_task = false; }
+                    }
                 }
             }
         }
@@ -333,7 +374,7 @@ export component KanbanView inherits Rectangle {
                             ? MaterialPalette.primary
                             : col.over_wip ? OxidiumTheme.danger_color
                             : OxidiumTheme.cell_border;
-                        animate width, border_color { duration: OxidiumTheme.anim_medium; easing: OxidiumTheme.ease_emphasized; }
+                        animate width, border_color { duration: OxidiumTheme.anim_medium; easing: OxidiumMotion.ease_emphasized; }
 
                     VerticalLayout {
                         padding: 12px;
@@ -489,7 +530,7 @@ export component KanbanView inherits Rectangle {
                                         : card_ta.has_hover ? MaterialPalette.primary.with_alpha(45%)
                                         : OxidiumTheme.cell_border;
                                     opacity: task.is_completed ? 0.78 : 1.0;
-                                    animate background, border_color, opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_standard; }
+                                    animate background, border_color, opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_standard; }
 
                                     card_ta := TouchArea {}
 
@@ -618,8 +659,14 @@ export component KanbanView inherits Rectangle {
                                                     Text { text: "#" + task.tags_text; font_size: 10px; font_weight: 600; color: MaterialPalette.on_primary_container; vertical_alignment: center; }
                                                 }
                                             }
-                                            if task.badges_text != "" : Text { text: task.badges_text; font_size: 10px; font_weight: 600; color: OxidiumTheme.warning_color; vertical_alignment: center; }
-                                            if task.linked_grades_count > 0 : Text { text: "★ Оценок: " + task.linked_grades_count; font_family: OxidiumTheme.font_mono; font_size: 10px; color: OxidiumTheme.grade_5; vertical_alignment: center; }
+                                             if task.badges_text != "" : Rectangle {
+                                                 height: 20px; border_radius: 6px; background: OxidiumTheme.grade_3_bg;
+                                                 HorizontalLayout {
+                                                     padding_left: 6px; padding_right: 6px;
+                                                     Text { text: task.badges_text; font_size: 10px; font_weight: 600; color: OxidiumTheme.grade_3_fg; vertical_alignment: center; }
+                                                 }
+                                             }
+                                             if task.linked_grades_count > 0 : Text { text: "★ Оценок: " + task.linked_grades_count; font_family: OxidiumTheme.font_mono; font_size: 10px; color: OxidiumTheme.grade_5; vertical_alignment: center; }
                                         }
 
                                         // Checklist Progress Bar
@@ -644,7 +691,7 @@ export component KanbanView inherits Rectangle {
                                                     height: 100%;
                                                     border_radius: 3px;
                                                     background: OxidiumTheme.success_color;
-                                                    animate width { duration: OxidiumTheme.anim_medium; easing: OxidiumTheme.ease_emphasized; }
+                                                    animate width { duration: OxidiumTheme.anim_medium; easing: OxidiumMotion.ease_emphasized; }
                                                 }
                                             }
                                         }
@@ -731,8 +778,8 @@ export component KanbanView inherits Rectangle {
                 visible: self.opacity > 0.01;
                 drop_shadow_blur: 14px;
                 drop_shadow_color: #00000040;
-                animate opacity { duration: OxidiumTheme.anim_instant; easing: OxidiumTheme.ease_standard; }
-                animate y { duration: OxidiumTheme.anim_fast; easing: OxidiumTheme.ease_emphasized; }
+                animate opacity { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
+                animate y { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
 
                 HorizontalLayout {
                     padding_left: 14px;
@@ -757,8 +804,8 @@ export component KanbanView inherits Rectangle {
         TouchArea { clicked => { root.new_task_open = false; } }
 
         Rectangle {
-            width: 480px;
-            height: 430px;
+            width: 500px;
+            height: 500px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border_radius: 24px;
@@ -776,12 +823,43 @@ export component KanbanView inherits Rectangle {
                 Rectangle {
                     height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_title; color: MaterialPalette.on_surface; }
+                    if root.new_task_title == "" : Text { x: 8px; height: 100%; text: "Например: Лабораторная №5"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
+                }
+
+                Text { text: "Предмет"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                ScrollView {
+                    height: 34px;
+                    viewport_width: max(self.visible_width, nt_subj_row.preferred_width);
+                    nt_subj_row := HorizontalLayout {
+                        x: 0px; y: 0px; spacing: 6px; alignment: start;
+                        Rectangle {
+                            height: 28px; border_radius: 14px;
+                            background: root.new_task_subject_idx == 0 ? MaterialPalette.primary_container : MaterialPalette.surface;
+                            border_width: 1px; border_color: root.new_task_subject_idx == 0 ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                            HorizontalLayout {
+                                padding_left: 10px; padding_right: 10px;
+                                Text { text: "Без предмета"; font_size: 11px; font_weight: 600; color: root.new_task_subject_idx == 0 ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                            }
+                            TouchArea { mouse_cursor: pointer; clicked => { root.new_task_subject_idx = 0; } }
+                        }
+                        for subj[s_idx] in root.subjects : Rectangle {
+                            height: 28px; border_radius: 14px;
+                            background: root.new_task_subject_idx == (s_idx + 1) ? MaterialPalette.primary_container : MaterialPalette.surface;
+                            border_width: 1px; border_color: root.new_task_subject_idx == (s_idx + 1) ? MaterialPalette.primary : OxidiumTheme.cell_border;
+                            HorizontalLayout {
+                                padding_left: 10px; padding_right: 10px;
+                                Text { text: subj.short_name != "" ? subj.short_name : subj.name; font_size: 11px; color: root.new_task_subject_idx == (s_idx + 1) ? MaterialPalette.on_primary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                            }
+                            TouchArea { mouse_cursor: pointer; clicked => { root.new_task_subject_idx = s_idx + 1; } }
+                        }
+                    }
                 }
 
                 Text { text: "Описание (Markdown)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                 Rectangle {
-                    height: 54px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                    height: 52px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_desc; color: MaterialPalette.on_surface; }
+                    if root.new_task_desc == "" : Text { x: 8px; height: 100%; text: "Краткое описание или чеклист"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
 
                 HorizontalLayout {
@@ -793,6 +871,7 @@ export component KanbanView inherits Rectangle {
                         Rectangle {
                             height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                             TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_deadline; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                            if root.new_task_deadline == "" : Text { x: 8px; height: 100%; text: "2026-12-15"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                         }
                     }
                     VerticalLayout {
@@ -802,6 +881,7 @@ export component KanbanView inherits Rectangle {
                         Rectangle {
                             height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                             TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_task_tags; color: MaterialPalette.on_surface; }
+                            if root.new_task_tags == "" : Text { x: 8px; height: 100%; text: "Лабораторная, Важное"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                         }
                     }
                 }
@@ -855,7 +935,7 @@ export component KanbanView inherits Rectangle {
         width: 100%; height: 100%; background: #00000050;
         TouchArea { clicked => { root.new_column_open = false; } }
         Rectangle {
-            width: 380px; height: 260px;
+            width: 390px; height: 310px;
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             border_radius: 22px; background: MaterialPalette.surface_container_high;
             TouchArea {}
@@ -866,11 +946,18 @@ export component KanbanView inherits Rectangle {
                 Rectangle {
                     height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_column_name; color: MaterialPalette.on_surface; }
+                    if root.new_column_name == "" : Text { x: 8px; height: 100%; text: "Например: Тестирование"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                 }
                 Text { text: "WIP-лимит (пусто = без ограничения)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                 Rectangle {
                     height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_column_wip; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                    if root.new_column_wip == "" : Text { x: 8px; height: 100%; text: "Например: 5"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
+                }
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Колонка завершённых задач"; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                    Switch { width: 52px; height: 32px; checked <=> root.new_column_done; }
                 }
                 HorizontalLayout {
                     alignment: end; spacing: 8px;
@@ -893,16 +980,18 @@ export component KanbanView inherits Rectangle {
         width: 100%; height: 100%; background: #00000050;
         TouchArea { clicked => { root.new_board_open = false; } }
         Rectangle {
-            width: 360px; height: 190px;
+            width: 360px; height: 210px;
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             border_radius: 22px; background: MaterialPalette.surface_container_high;
             TouchArea {}
             VerticalLayout {
                 padding: 20px; spacing: 10px;
                 Text { text: "Новая Kanban-доска"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Text { text: "Название доски"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                 Rectangle {
                     height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.new_board_name; color: MaterialPalette.on_surface; }
+                    if root.new_board_name == "" : Text { x: 8px; height: 100%; text: "Например: Экзамены"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                 }
                 HorizontalLayout {
                     alignment: end; spacing: 8px;
@@ -925,7 +1014,7 @@ export component KanbanView inherits Rectangle {
         width: 100%; height: 100%; background: #00000050;
         TouchArea { clicked => { root.detail_open = false; } }
         Rectangle {
-            width: 560px; height: 560px;
+            width: 580px; height: 630px;
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             border_radius: 24px; background: MaterialPalette.surface_container_high;
             border_width: 1px; border_color: MaterialPalette.outline_variant;
@@ -942,12 +1031,48 @@ export component KanbanView inherits Rectangle {
                 Rectangle {
                     height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                     TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_title; font_weight: 600; color: MaterialPalette.on_surface; }
+                    if root.detail_title == "" : Text { x: 8px; height: 100%; text: "Название задачи"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                 }
 
-                Text { text: "Описание и заметки (Markdown)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
-                Rectangle {
-                    height: 60px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
-                    TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_desc; color: MaterialPalette.on_surface; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    VerticalLayout {
+                        horizontal_stretch: 1; spacing: 4px;
+                        Text { text: "Описание"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 48px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_desc; color: MaterialPalette.on_surface; }
+                            if root.detail_desc == "" : Text { x: 8px; height: 100%; text: "Описание задачи..."; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
+                        }
+                    }
+                    VerticalLayout {
+                        horizontal_stretch: 1; spacing: 4px;
+                        Text { text: "Заметки (Markdown)"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 48px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_notes; color: MaterialPalette.on_surface; }
+                            if root.detail_notes == "" : Text { x: 8px; height: 100%; text: "Ссылки, формулы, замечания..."; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
+                        }
+                    }
+                }
+
+                Text { text: "Приоритет"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    for p[idx] in ["Нет", "Низкий", "Средний", "Высокий", "Крит."] : Rectangle {
+                        horizontal_stretch: 1;
+                        height: 28px;
+                        border_radius: 8px;
+                        background: root.detail_priority == idx ? MaterialPalette.primary : MaterialPalette.surface_container;
+                        Text {
+                            text: p;
+                            font_size: 11px;
+                            color: root.detail_priority == idx ? MaterialPalette.on_primary : MaterialPalette.on_surface;
+                            horizontal_alignment: center;
+                            vertical_alignment: center;
+                        }
+                        TouchArea { mouse_cursor: pointer; clicked => { root.detail_priority = idx; } }
+                    }
                 }
 
                 HorizontalLayout {
@@ -958,22 +1083,28 @@ export component KanbanView inherits Rectangle {
                         Rectangle {
                             height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                             TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_deadline; font_family: OxidiumTheme.font_mono; color: MaterialPalette.on_surface; }
+                            if root.detail_deadline == "" : Text { x: 8px; height: 100%; text: "YYYY-MM-DD"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                         }
                     }
                     VerticalLayout {
                         horizontal_stretch: 1;
-                        Text { text: "Добавить тег (" + root.detail_tags_text + ")"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                        Text { text: "Добавить тег (" + (root.detail_tags_text != "" ? root.detail_tags_text : "нет") + ")"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
                         HorizontalLayout {
                             spacing: 4px;
                             Rectangle {
                                 horizontal_stretch: 1; height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                                 TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_new_tag; color: MaterialPalette.on_surface; }
+                                if root.detail_new_tag == "" : Text { x: 8px; height: 100%; text: "Новый тег"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                             }
-                            TonalButton {
-                                text: "+";
-                                clicked => {
-                                    root.add_tag_to_task(root.detail_task_id, root.detail_new_tag);
-                                    root.detail_new_tag = "";
+                            VerticalLayout {
+                                alignment: center;
+                                TonalButton {
+                                    text: "+";
+                                    height: 34px;
+                                    clicked => {
+                                        root.add_tag_to_task(root.detail_task_id, root.detail_new_tag);
+                                        root.detail_new_tag = "";
+                                    }
                                 }
                             }
                         }
@@ -987,20 +1118,30 @@ export component KanbanView inherits Rectangle {
                     Rectangle {
                         horizontal_stretch: 1; height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
                         TextInput { x: 8px; width: parent.width - 16px; height: 100%; vertical_alignment: center; text <=> root.detail_new_checklist; color: MaterialPalette.on_surface; }
+                        if root.detail_new_checklist == "" : Text { x: 8px; height: 100%; text: "Новый пункт чек-листа..."; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(60%); vertical_alignment: center; }
                     }
-                    TonalButton {
-                        text: "Добавить пункт";
-                        clicked => {
-                            root.add_checklist_item(root.detail_task_id, root.detail_new_checklist);
-                            root.detail_new_checklist = "";
+                    VerticalLayout {
+                        alignment: center;
+                        TonalButton {
+                            text: "Добавить пункт";
+                            height: 34px;
+                            clicked => {
+                                root.add_checklist_item(root.detail_task_id, root.detail_new_checklist);
+                                root.detail_new_checklist = "";
+                            }
                         }
                     }
                 }
 
                 ScrollView {
                     vertical_stretch: 1;
-                    VerticalLayout {
+                    viewport_width: self.visible_width;
+                    viewport_height: max(self.visible_height, td_checklist_col.preferred_height);
+                    td_checklist_col := VerticalLayout {
+                        x: 0px; y: 0px;
+                        width: parent.visible_width;
                         spacing: 4px;
+                        alignment: start;
                         for ci in root.detail_checklist : HorizontalLayout {
                             spacing: 8px;
                             alignment: space-between;
