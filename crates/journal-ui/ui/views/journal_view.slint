@@ -16,6 +16,13 @@ export component JournalView inherits Rectangle {
 
     in_out property <int> active_row: -1;
     in_out property <int> active_col: -1;
+    in_out property <bool> hand_mode: false;
+    in_out property <string> subject_filter: "";
+    property <length> pan_start_x: 0px;
+    property <length> pan_start_y: 0px;
+    property <length> pan_start_vx: 0px;
+    property <length> pan_start_vy: 0px;
+    property <bool> is_panning: false;
     in_out property <bool> quick_picker_open: false;
     in_out property <string> picker_subject_id;
     in_out property <string> picker_subject_name;
@@ -38,8 +45,11 @@ export component JournalView inherits Rectangle {
     callback select_period(string);
     callback open_subjects_manager();
     callback open_periods_manager();
+    callback open_onboarding();
+    callback subject_filter_changed(string);
     callback cell_clicked(string, string, int, int, bool); // subject_id, date_iso, row, col, has_entries
     callback quick_mark_selected(string, string, string); // subject_id, date_iso, mark_code
+    callback clear_cell_entries(string, string); // subject_id, date_iso
     callback open_cell_detail(string, string);
     callback add_detailed_entry(string, string, string, string, int, string, string);
     callback delete_cell_entry(string, bool); // entry_id, is_attendance
@@ -62,12 +72,12 @@ export component JournalView inherits Rectangle {
             border_color: OxidiumTheme.cell_border;
 
             HorizontalLayout {
-                padding: 12px;
-                spacing: 10px;
+                padding: 10px;
+                spacing: 8px;
                 alignment: space-between;
 
                 HorizontalLayout {
-                    spacing: 6px;
+                    spacing: 4px;
                     alignment: start;
 
                     IconButton {
@@ -77,28 +87,28 @@ export component JournalView inherits Rectangle {
                     }
 
                     Rectangle {
-                        min_width: 168px;
+                        min_width: 136px;
                         height: 36px;
                         border_radius: 18px;
                         background: MaterialPalette.primary_container;
                         HorizontalLayout {
-                            padding_left: 14px;
-                            padding_right: 14px;
+                            padding_left: 12px;
+                            padding_right: 12px;
                             alignment: center;
                             spacing: 6px;
                             VerticalLayout {
                                 alignment: center;
                                 Icon {
                                     source: OxidiumIcons.calendar;
-                                    width: 16px;
-                                    height: 16px;
+                                    width: 15px;
+                                    height: 15px;
                                     colorize: MaterialPalette.on_primary_container;
                                 }
                             }
                             Text {
                                 text: root.month_title;
                                 font_family: OxidiumTheme.font_sans;
-                                font_size: 14px;
+                                font_size: 13px;
                                 font_weight: 600;
                                 color: MaterialPalette.on_primary_container;
                                 vertical_alignment: center;
@@ -132,7 +142,7 @@ export component JournalView inherits Rectangle {
                             root.tr.journal_week,
                             root.tr.journal_month,
                             root.tr.journal_semester,
-                            root.tr.journal_year
+                            "Год"
                         ] : Rectangle {
                             background: root.view_mode == idx ? MaterialPalette.secondary_container : transparent;
                             TouchArea {
@@ -140,8 +150,8 @@ export component JournalView inherits Rectangle {
                                 clicked => { root.change_view_mode(idx); }
                             }
                             HorizontalLayout {
-                                padding_left: 14px;
-                                padding_right: 14px;
+                                padding_left: 10px;
+                                padding_right: 10px;
                                 Text {
                                     text: mode_item;
                                     font_family: OxidiumTheme.font_sans;
@@ -157,8 +167,71 @@ export component JournalView inherits Rectangle {
                 }
 
                 HorizontalLayout {
-                    spacing: 8px;
+                    spacing: 6px;
                     alignment: end;
+
+                    // Cursor / Hand (Pan) Mode Toggle (Stitch A01)
+                    Rectangle {
+                        height: 36px;
+                        border_radius: 18px;
+                        background: MaterialPalette.surface_container;
+                        HorizontalLayout {
+                            padding: 3px;
+                            spacing: 2px;
+                            Rectangle {
+                                width: 30px; height: 30px; border_radius: 15px;
+                                background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                Icon {
+                                    source: OxidiumIcons.cursor;
+                                    width: 16px; height: 16px;
+                                    colorize: !root.hand_mode ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = false; } }
+                            }
+                            Rectangle {
+                                width: 30px; height: 30px; border_radius: 15px;
+                                background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                Icon {
+                                    source: OxidiumIcons.hand;
+                                    width: 16px; height: 16px;
+                                    colorize: root.hand_mode ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = true; root.quick_picker_open = false; } }
+                            }
+                        }
+                    }
+
+                    // Inline Live Subject Filter (Stitch A01)
+                    Rectangle {
+                        width: 136px;
+                        height: 36px;
+                        border_radius: 18px;
+                        background: MaterialPalette.surface_container_high;
+                        HorizontalLayout {
+                            padding_left: 10px; padding_right: 10px; spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon { source: OxidiumIcons.search; width: 15px; height: 15px; colorize: MaterialPalette.on_surface_variant; }
+                            }
+                            TextInput {
+                                horizontal_stretch: 1;
+                                vertical_alignment: center;
+                                text <=> root.subject_filter;
+                                font_size: 12px;
+                                color: MaterialPalette.on_surface;
+                                edited => { root.subject_filter_changed(root.subject_filter); }
+                            }
+                        }
+                        if root.subject_filter == "" : Text {
+                            x: 31px;
+                            y: 0px;
+                            height: 100%;
+                            text: "Предмет...";
+                            font_size: 12px;
+                            color: MaterialPalette.on_surface_variant;
+                            vertical_alignment: center;
+                        }
+                    }
 
                     // Overall Period Average Pill
                     Rectangle {
@@ -166,11 +239,11 @@ export component JournalView inherits Rectangle {
                         border_radius: 18px;
                         background: MaterialPalette.surface_container_high;
                         HorizontalLayout {
-                            padding_left: 12px;
-                            padding_right: 12px;
-                            spacing: 6px;
+                            padding_left: 10px;
+                            padding_right: 10px;
+                            spacing: 5px;
                             Text {
-                                text: root.average_mode_label + ":";
+                                text: "Ср.:";
                                 font_size: 12px;
                                 color: MaterialPalette.on_surface_variant;
                                 vertical_alignment: center;
@@ -192,7 +265,7 @@ export component JournalView inherits Rectangle {
                     }
 
                     FilledButton {
-                        text: root.tr.journal_add_subject;
+                        text: "Предметы";
                         icon: OxidiumIcons.add;
                         clicked => { root.open_subjects_manager(); }
                     }
@@ -239,7 +312,13 @@ export component JournalView inherits Rectangle {
 
                 HorizontalLayout {
                     alignment: center;
+                    spacing: 10px;
                     FilledButton {
+                        text: "Быстрая настройка (30 сек)";
+                        icon: OxidiumIcons.arrow_forward;
+                        clicked => { root.open_onboarding(); }
+                    }
+                    TonalButton {
                         text: root.tr.journal_add_subject;
                         icon: OxidiumIcons.add;
                         clicked => { root.open_subjects_manager(); }
@@ -494,131 +573,178 @@ export component JournalView inherits Rectangle {
                         }
                     }
 
-                    // Center Scrollable Cells Grid
-                    grid_scroll := ScrollView {
+                    // Center Scrollable Cells Grid (with optional Hand-Pan overlay)
+                    Rectangle {
                         horizontal_stretch: 1;
                         vertical_stretch: 1;
-                        viewport_width: max(root.days.length * OxidiumTheme.cell_width, self.visible_width);
-                        viewport_height: max(root.rows.length * OxidiumTheme.row_height, self.visible_height);
 
-                        Rectangle {
-                            x: 0px;
-                            y: 0px;
-                            width: root.days.length * OxidiumTheme.cell_width;
-                            height: root.rows.length * OxidiumTheme.row_height;
+                        grid_scroll := ScrollView {
+                            width: 100%;
+                            height: 100%;
+                            viewport_width: max(root.days.length * OxidiumTheme.cell_width, self.visible_width);
+                            viewport_height: max(root.rows.length * OxidiumTheme.row_height, self.visible_height);
 
-                            for row in root.rows : Rectangle {
+                            Rectangle {
                                 x: 0px;
-                                y: row.row_index * OxidiumTheme.row_height;
-                                width: parent.width;
-                                height: OxidiumTheme.row_height;
+                                y: 0px;
+                                width: root.days.length * OxidiumTheme.cell_width;
+                                height: root.rows.length * OxidiumTheme.row_height;
 
-                                for cell in row.cells : Rectangle {
-                                    x: cell.day_index * OxidiumTheme.cell_width;
-                                    y: 0px;
-                                    width: OxidiumTheme.cell_width;
-                                    height: parent.height;
-                                    background: cell_ta.has_hover ? MaterialPalette.primary.with_alpha(12%)
-                                        : cell.is_today ? OxidiumTheme.today_tint
-                                        : cell.is_holiday ? OxidiumTheme.holiday_tint
-                                        : cell.is_weekend ? OxidiumTheme.weekend_tint
-                                        : transparent;
-                                    border_width: (root.active_row == row.row_index && root.active_col == cell.day_index) ? 2px : 0px;
-                                    border_color: MaterialPalette.primary;
+                                for row in root.rows : Rectangle {
+                                    x: 0px;
+                                    y: row.row_index * OxidiumTheme.row_height;
+                                    width: parent.width;
+                                    height: OxidiumTheme.row_height;
 
-                                    if cell.has_entries : HorizontalLayout {
-                                        alignment: center;
-                                        spacing: 2px;
-                                        padding: 3px;
+                                    for cell in row.cells : Rectangle {
+                                        x: cell.day_index * OxidiumTheme.cell_width;
+                                        y: 0px;
+                                        width: OxidiumTheme.cell_width;
+                                        height: parent.height;
+                                        background: cell_ta.has_hover && !root.hand_mode ? MaterialPalette.primary_container.with_alpha(45%)
+                                            : cell.is_today ? OxidiumTheme.today_tint
+                                            : cell.is_holiday ? OxidiumTheme.holiday_tint
+                                            : cell.is_weekend ? OxidiumTheme.weekend_tint
+                                            : transparent;
+                                        border_width: (root.active_row == row.row_index && root.active_col == cell.day_index) ? 2px : 0px;
+                                        border_color: MaterialPalette.primary;
+
+                                        if cell.has_entries : HorizontalLayout {
+                                            alignment: center;
+                                            spacing: 2px;
+                                            padding: 3px;
+
+                                            Rectangle {
+                                                height: cell.secondary_label == "" ? 28px : 22px;
+                                                min_width: cell.secondary_label == "" ? 28px : 19px;
+                                                y: (parent.height - self.height) / 2;
+                                                border_radius: 8px;
+                                                background: cell.primary_bg;
+
+                                                HorizontalLayout {
+                                                    padding_left: 5px;
+                                                    padding_right: 5px;
+                                                    Text {
+                                                        text: cell.primary_label;
+                                                        font_family: OxidiumTheme.font_mono;
+                                                        font_size: cell.secondary_label == "" ? 12px : 10px;
+                                                        font_weight: 700;
+                                                        color: cell.primary_fg;
+                                                        horizontal_alignment: center;
+                                                        vertical_alignment: center;
+                                                    }
+                                                }
+                                            }
+
+                                            if cell.secondary_label != "" : Rectangle {
+                                                height: 22px;
+                                                min_width: 18px;
+                                                y: (parent.height - self.height) / 2;
+                                                border_radius: 6px;
+                                                background: cell.secondary_bg;
+                                                HorizontalLayout {
+                                                    padding_left: 3px;
+                                                    padding_right: 3px;
+                                                    Text {
+                                                        text: cell.secondary_label;
+                                                        font_family: OxidiumTheme.font_mono;
+                                                        font_size: 10px;
+                                                        font_weight: 700;
+                                                        color: cell.secondary_fg;
+                                                        horizontal_alignment: center;
+                                                        vertical_alignment: center;
+                                                    }
+                                                }
+                                            }
+
+                                            if cell.extra_count > 0 : Text {
+                                                text: "+" + cell.extra_count;
+                                                font_family: OxidiumTheme.font_mono;
+                                                font_size: 9px;
+                                                color: MaterialPalette.on_surface_variant;
+                                                vertical_alignment: center;
+                                            }
+                                        }
+
+                                        // Subtle MCP AI source micro-indicator
+                                        if cell.has_mcp : Rectangle {
+                                            x: parent.width - 11px;
+                                            y: 3px;
+                                            width: 8px;
+                                            height: 8px;
+                                            border_radius: 4px;
+                                            background: MaterialPalette.primary;
+                                        }
 
                                         Rectangle {
-                                            height: cell.secondary_label == "" ? 26px : 22px;
-                                            min_width: cell.secondary_label == "" ? 28px : 20px;
-                                            y: (parent.height - self.height) / 2;
-                                            border_radius: 7px;
-                                            background: cell.primary_color.with_alpha(OxidiumTheme.dark_mode ? 30% : 16%);
-                                            border_width: 1px;
-                                            border_color: cell.primary_color.with_alpha(55%);
+                                            x: parent.width - 1px;
+                                            width: 1px;
+                                            height: 100%;
+                                            background: OxidiumTheme.cell_border;
+                                        }
+                                        Rectangle {
+                                            y: parent.height - 1px;
+                                            height: 1px;
+                                            width: 100%;
+                                            background: OxidiumTheme.cell_border;
+                                        }
 
-                                            HorizontalLayout {
-                                                padding_left: 4px;
-                                                padding_right: 4px;
-                                                Text {
-                                                    text: cell.primary_label;
-                                                    font_family: OxidiumTheme.font_mono;
-                                                    font_size: cell.secondary_label == "" ? 12px : 10px;
-                                                    font_weight: 700;
-                                                    color: cell.primary_color;
-                                                    horizontal_alignment: center;
-                                                    vertical_alignment: center;
+                                        cell_ta := TouchArea {
+                                            mouse_cursor: root.hand_mode ? grab : pointer;
+                                            clicked => {
+                                                if (!root.hand_mode) {
+                                                    root.active_row = row.row_index;
+                                                    root.active_col = cell.day_index;
+                                                    root.picker_subject_id = row.subject_id;
+                                                    root.picker_subject_name = row.subject_name;
+                                                    root.picker_date_iso = cell.date_iso;
+                                                    root.cell_clicked(row.subject_id, cell.date_iso, row.row_index, cell.day_index, cell.has_entries);
+                                                }
+                                            }
+                                            pointer-event(ev) => {
+                                                if (!root.hand_mode && ev.button == PointerEventButton.right && ev.kind == PointerEventKind.down) {
+                                                    root.active_row = row.row_index;
+                                                    root.active_col = cell.day_index;
+                                                    root.picker_subject_id = row.subject_id;
+                                                    root.picker_subject_name = row.subject_name;
+                                                    root.picker_date_iso = cell.date_iso;
+                                                    root.open_cell_detail(row.subject_id, cell.date_iso);
                                                 }
                                             }
                                         }
-
-                                        if cell.secondary_label != "" : Rectangle {
-                                            height: 22px;
-                                            min_width: 18px;
-                                            y: (parent.height - self.height) / 2;
-                                            border_radius: 6px;
-                                            background: cell.secondary_color.with_alpha(OxidiumTheme.dark_mode ? 30% : 16%);
-                                            HorizontalLayout {
-                                                padding_left: 3px;
-                                                padding_right: 3px;
-                                                Text {
-                                                    text: cell.secondary_label;
-                                                    font_family: OxidiumTheme.font_mono;
-                                                    font_size: 10px;
-                                                    font_weight: 700;
-                                                    color: cell.secondary_color;
-                                                    horizontal_alignment: center;
-                                                    vertical_alignment: center;
-                                                }
-                                            }
-                                        }
-
-                                        if cell.extra_count > 0 : Text {
-                                            text: "+" + cell.extra_count;
-                                            font_family: OxidiumTheme.font_mono;
-                                            font_size: 9px;
-                                            color: MaterialPalette.on_surface_variant;
-                                            vertical_alignment: center;
-                                        }
                                     }
+                                }
+                            }
+                        }
 
-                                    Rectangle {
-                                        x: parent.width - 1px;
-                                        width: 1px;
-                                        height: 100%;
-                                        background: OxidiumTheme.cell_border;
-                                    }
-                                    Rectangle {
-                                        y: parent.height - 1px;
-                                        height: 1px;
-                                        width: 100%;
-                                        background: OxidiumTheme.cell_border;
-                                    }
-
-                                    cell_ta := TouchArea {
-                                        mouse_cursor: pointer;
-                                        clicked => {
-                                            root.active_row = row.row_index;
-                                            root.active_col = cell.day_index;
-                                            root.picker_subject_id = row.subject_id;
-                                            root.picker_subject_name = row.subject_name;
-                                            root.picker_date_iso = cell.date_iso;
-                                            root.cell_clicked(row.subject_id, cell.date_iso, row.row_index, cell.day_index, cell.has_entries);
-                                        }
-                                        pointer-event(ev) => {
-                                            if (ev.button == PointerEventButton.right && ev.kind == PointerEventKind.down) {
-                                                root.active_row = row.row_index;
-                                                root.active_col = cell.day_index;
-                                                root.picker_subject_id = row.subject_id;
-                                                root.picker_subject_name = row.subject_name;
-                                                root.picker_date_iso = cell.date_iso;
-                                                root.open_cell_detail(row.subject_id, cell.date_iso);
-                                            }
-                                        }
-                                    }
+                        // Hand-Pan Gesture Overlay when hand_mode is active
+                        if root.hand_mode : TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            mouse_cursor: root.is_panning ? grabbing : grab;
+                            pointer-event(ev) => {
+                                if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.down) {
+                                    root.is_panning = true;
+                                    root.pan_start_x = self.mouse_x;
+                                    root.pan_start_y = self.mouse_y;
+                                    root.pan_start_vx = grid_scroll.viewport_x;
+                                    root.pan_start_vy = grid_scroll.viewport_y;
+                                } else if (ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel) {
+                                    root.is_panning = false;
+                                }
+                            }
+                            moved => {
+                                if (root.is_panning) {
+                                    grid_scroll.viewport_x = clamp(
+                                        root.pan_start_vx + (self.mouse_x - root.pan_start_x),
+                                        min(0px, grid_scroll.visible_width - grid_scroll.viewport_width),
+                                        0px
+                                    );
+                                    grid_scroll.viewport_y = clamp(
+                                        root.pan_start_vy + (self.mouse_y - root.pan_start_y),
+                                        min(0px, grid_scroll.visible_height - grid_scroll.viewport_height),
+                                        0px
+                                    );
                                 }
                             }
                         }
@@ -681,6 +807,63 @@ export component JournalView inherits Rectangle {
                         }
                     }
                 }
+
+                // ===== COMPACT LEGEND FOOTER (Stitch A01) =====
+                Rectangle {
+                    height: 34px;
+                    background: MaterialPalette.surface_container;
+
+                    Rectangle {
+                        y: 0px;
+                        height: 1px;
+                        width: 100%;
+                        background: OxidiumTheme.cell_border;
+                    }
+
+                    HorizontalLayout {
+                        padding_left: 16px;
+                        padding_right: 16px;
+                        spacing: 14px;
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 12px;
+                            Text { text: "Обозначения:"; font_size: 11px; font_weight: 600; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
+
+                            for leg in [
+                                { label: "5 Отлично", bg: OxidiumTheme.grade_5_bg, bd: OxidiumTheme.grade_5 },
+                                { label: "4 Хорошо", bg: OxidiumTheme.grade_4_bg, bd: OxidiumTheme.grade_4 },
+                                { label: "3 Удовл.", bg: OxidiumTheme.grade_3_bg, bd: OxidiumTheme.grade_3 },
+                                { label: "Н/Б Пропуск", bg: OxidiumTheme.grade_1_bg, bd: OxidiumTheme.grade_1 },
+                                { label: "Уваж.", bg: OxidiumTheme.info_bg, bd: OxidiumTheme.mark_excused },
+                            ] : HorizontalLayout {
+                                spacing: 5px;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle { width: 11px; height: 11px; border_radius: 3px; background: leg.bg; border_width: 1px; border_color: leg.bd; }
+                                }
+                                Text { text: leg.label; font_size: 11px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 5px;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle { width: 8px; height: 8px; border_radius: 4px; background: MaterialPalette.primary; }
+                                }
+                                Text { text: "Добавлено через MCP"; font_size: 11px; font_weight: 600; color: MaterialPalette.primary; vertical_alignment: center; }
+                            }
+                        }
+
+                        Text {
+                            text: root.hand_mode ? "Ладошка: перетаскивайте таблицу мышью" : "Клик — ввод · ПКМ — детали · 1–5 — оценка";
+                            font_family: OxidiumTheme.font_mono;
+                            font_size: 11px;
+                            color: MaterialPalette.on_surface_variant;
+                            vertical_alignment: center;
+                        }
+                    }
+                }
             }
         }
     }
@@ -735,28 +918,31 @@ export component JournalView inherits Rectangle {
                     }
                 }
 
-                // Numeric grades 5..1
+                // Connected Expressive Numeric Grades 5..1 (Stitch A05 accessible containers)
                 HorizontalLayout {
-                    spacing: 8px;
-                    for g in [
-                        { code: "grade_5", label: "5", col: OxidiumTheme.grade_5 },
-                        { code: "grade_4", label: "4", col: OxidiumTheme.grade_4 },
-                        { code: "grade_3", label: "3", col: OxidiumTheme.grade_3 },
-                        { code: "grade_2", label: "2", col: OxidiumTheme.grade_2 },
-                        { code: "grade_1", label: "1", col: OxidiumTheme.grade_1 },
+                    spacing: 4px;
+                    for g[g_idx] in [
+                        { code: "grade_5", label: "5", bg: OxidiumTheme.grade_5_bg, fg: OxidiumTheme.grade_5_fg },
+                        { code: "grade_4", label: "4", bg: OxidiumTheme.grade_4_bg, fg: OxidiumTheme.grade_4_fg },
+                        { code: "grade_3", label: "3", bg: OxidiumTheme.grade_3_bg, fg: OxidiumTheme.grade_3_fg },
+                        { code: "grade_2", label: "2", bg: OxidiumTheme.grade_2_bg, fg: OxidiumTheme.grade_2_fg },
+                        { code: "grade_1", label: "1", bg: OxidiumTheme.grade_1_bg, fg: OxidiumTheme.grade_1_fg },
                     ] : Rectangle {
                         horizontal_stretch: 1;
                         height: 44px;
-                        border_radius: 12px;
-                        background: g.col.with_alpha(g_ta.has_hover ? 32% : 18%);
-                        border_width: 1px;
-                        border_color: g.col.with_alpha(65%);
+                        border_top_left_radius: g_idx == 0 ? 22px : 8px;
+                        border_bottom_left_radius: g_idx == 0 ? 22px : 8px;
+                        border_top_right_radius: g_idx == 4 ? 22px : 8px;
+                        border_bottom_right_radius: g_idx == 4 ? 22px : 8px;
+                        background: g.bg;
+                        border_width: g_ta.has_hover ? 2px : 0px;
+                        border_color: g.fg;
                         Text {
                             text: g.label;
                             font_family: OxidiumTheme.font_mono;
-                            font_size: 18px;
+                            font_size: 17px;
                             font_weight: 700;
-                            color: g.col;
+                            color: g.fg;
                             horizontal_alignment: center;
                             vertical_alignment: center;
                         }
@@ -772,25 +958,25 @@ export component JournalView inherits Rectangle {
 
                 // Attendance & Pass/Fail marks
                 HorizontalLayout {
-                    spacing: 8px;
+                    spacing: 6px;
                     for m in [
-                        { code: "absent", label: "Н/Б", col: OxidiumTheme.mark_absent },
-                        { code: "excused", label: "Уваж.", col: OxidiumTheme.mark_excused },
-                        { code: "pass", label: "Зач.", col: OxidiumTheme.mark_pass },
-                        { code: "fail", label: "Н/З", col: OxidiumTheme.mark_fail },
+                        { code: "absent", label: "Н/Б", bg: OxidiumTheme.grade_1_bg, fg: OxidiumTheme.grade_1_fg },
+                        { code: "excused", label: "Уваж.", bg: OxidiumTheme.info_bg, fg: OxidiumTheme.info_fg },
+                        { code: "pass", label: "Зач.", bg: OxidiumTheme.grade_5_bg, fg: OxidiumTheme.grade_5_fg },
+                        { code: "fail", label: "Н/З", bg: OxidiumTheme.grade_1_bg, fg: OxidiumTheme.grade_1_fg },
                     ] : Rectangle {
                         horizontal_stretch: 1;
-                        height: 38px;
+                        height: 36px;
                         border_radius: 10px;
-                        background: m.col.with_alpha(m_ta.has_hover ? 32% : 16%);
-                        border_width: 1px;
-                        border_color: m.col.with_alpha(55%);
+                        background: m.bg;
+                        border_width: m_ta.has_hover ? 1px : 0px;
+                        border_color: m.fg;
                         Text {
                             text: m.label;
                             font_family: OxidiumTheme.font_mono;
                             font_size: 12px;
                             font_weight: 700;
-                            color: m.col;
+                            color: m.fg;
                             horizontal_alignment: center;
                             vertical_alignment: center;
                         }
@@ -806,8 +992,15 @@ export component JournalView inherits Rectangle {
 
                 HorizontalLayout {
                     alignment: space-between;
+                    OutlineButton {
+                        text: "Очистить";
+                        clicked => {
+                            root.quick_picker_open = false;
+                            root.clear_cell_entries(root.picker_subject_id, root.picker_date_iso);
+                        }
+                    }
                     TonalButton {
-                        text: "Подробнее (вес, тема, заметка)...";
+                        text: "Подробнее →";
                         clicked => {
                             root.quick_picker_open = false;
                             root.open_cell_detail(root.picker_subject_id, root.picker_date_iso);

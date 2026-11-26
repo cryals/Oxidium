@@ -3,7 +3,7 @@ use chrono::{Datelike, Duration, NaiveDate, Utc};
 use journal_app::{
     AddAttendanceInput, AddGradeInput, AppServices, CreateAcademicPeriodInput, CreateBoardInput,
     CreateColumnInput, CreateProfileInput, CreateSubjectInput, CreateTaskInput, StatisticsFilter,
-    UpdateTaskInput, i18n,
+    UpdateProfileInput, UpdateTaskInput, i18n,
 };
 use journal_domain::{
     AttendanceStatus, AverageMode, AveragePrecision, CalendarViewMode, GradeSample, Language,
@@ -36,6 +36,7 @@ pub struct UiViewState {
     pub kanban_filter_query: String,
     pub kanban_filter_mode: i32,
     pub kanban_subject_filter: Option<Uuid>,
+    pub journal_subject_filter: String,
     pub visible_days: Vec<NaiveDate>,
     pub visible_subject_ids: Vec<Uuid>,
 }
@@ -54,6 +55,7 @@ impl Default for UiViewState {
             kanban_filter_query: String::new(),
             kanban_filter_mode: 0,
             kanban_subject_filter: None,
+            journal_subject_filter: String::new(),
             visible_days: Vec::new(),
             visible_subject_ids: Vec::new(),
         }
@@ -106,6 +108,199 @@ impl UiController {
                         ctrl.refresh_kanban(&win);
                     } else {
                         ctrl.refresh_journal(&win);
+                    }
+                }
+            });
+        }
+
+        // 1-Click Theme Toggle (persists Light <-> Dark directly to SQLite)
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_theme_quick_toggle(move || {
+                if let Some(win) = w.upgrade()
+                    && let Ok(mut s) = ctrl.app.get_settings()
+                {
+                    let is_dark = win.global::<OxidiumTheme>().get_dark_mode();
+                    s.theme_mode = if is_dark {
+                        ThemeMode::Light
+                    } else {
+                        ThemeMode::Dark
+                    };
+                    if ctrl.app.update_settings(&s, RecordSource::Gui).is_ok() {
+                        ctrl.apply_settings_and_theme(&win);
+                        ctrl.refresh_journal(&win);
+                        if win.get_active_section() == 1 {
+                            ctrl.refresh_statistics(&win);
+                        }
+                    }
+                }
+            });
+        }
+
+        // 4-Step Expressive Setup Wizard completion
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_onboarding_complete(
+                move |prof_name, inst, grp, subj_csv, en_http, autostart, acc_idx| {
+                    if let Some(win) = w.upgrade() {
+                        if let Ok(active) = ctrl.app.get_active_profile() {
+                            let pname = prof_name.trim().to_string();
+                            let _ = ctrl.app.update_profile(
+                                active.id,
+                                UpdateProfileInput {
+                                    name: if pname.is_empty() { None } else { Some(pname) },
+                                    icon: None,
+                                    color: None,
+                                    institution: Some(inst.trim().to_string()),
+                                    group_name: Some(grp.trim().to_string()),
+                                    academic_year: None,
+                                    description: None,
+                                },
+                                RecordSource::Gui,
+                                None,
+                            );
+
+                            let palette = [
+                                "#146C2E", "#006A60", "#4A4459", "#1A5F9E", "#8D4E00", "#B33B00",
+                            ];
+                            let existing_names: std::collections::HashSet<String> = ctrl
+                                .app
+                                .list_subjects(active.id, false)
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|s| s.name.to_lowercase())
+                                .collect();
+                            for (idx, raw) in subj_csv.split(',').enumerate() {
+                                let name = raw.trim();
+                                if !name.is_empty()
+                                    && !existing_names.contains(&name.to_lowercase())
+                                {
+                                    let _ = ctrl.app.create_subject(
+                                        CreateSubjectInput {
+                                            profile_id: active.id,
+                                            name: name.to_string(),
+                                            short_name: None,
+                                            teacher: None,
+                                            color: Some(palette[idx % palette.len()].to_string()),
+                                            icon: None,
+                                            description: None,
+                                            academic_period_id: None,
+                                            target_average: None,
+                                        },
+                                        RecordSource::Gui,
+                                        None,
+                                    );
+                                }
+                            }
+                        }
+
+                        if let Ok(mut s) = ctrl.app.get_settings() {
+                            s.mcp_http_autostart = autostart;
+                            s.mcp_permission_mode = if acc_idx == 0 {
+                                McpPermissionMode::ReadOnly
+                            } else {
+                                McpPermissionMode::ReadWrite
+                            };
+                            s.mcp_allow_destructive = acc_idx >= 2;
+                            let _ = ctrl.app.update_settings(&s, RecordSource::Gui);
+                            if en_http && let Some(ref rt) = ctrl.rt_handle {
+                                let _ = ctrl.mcp.start(rt, s.mcp_http_port);
+                            }
+                        }
+                        ctrl.refresh_all(&win);
+                        show_toast(&win, "Настройка Oxidium завершена");
+                    }
+                },
+            );
+        }
+
+        // Inline Journal subject live filter
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_journal_subject_filter_changed(move |q| {
+                if let Ok(mut st) = ctrl.state.lock() {
+                    st.journal_subject_filter = q.to_string();
+                }
+                if let Some(win) = w.upgrade() {
+                    ctrl.refresh_journal(&win);
+                }
+            });
+        }
+
+        // Quick clear all entries in a single journal cell (with Undo)
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_journal_clear_cell(move |sid_str, date_iso| {
+                if let Some(win) = w.upgrade()
+                    && let Ok(profile) = ctrl.app.get_active_profile()
+                    && let (Ok(sid), Ok(date)) = (
+                        Uuid::parse_str(&sid_str),
+                        NaiveDate::parse_from_str(&date_iso, "%Y-%m-%d"),
+                    )
+                {
+                    let mut removed = 0usize;
+                    if let Ok(grades) = ctrl.app.list_grades(
+                        profile.id,
+                        Some(sid),
+                        Some(date),
+                        Some(date),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ) {
+                        for g in grades {
+                            if ctrl.app.delete_grade(g.id, RecordSource::Gui, None).is_ok() {
+                                removed += 1;
+                            }
+                        }
+                    }
+                    if let Ok(atts) =
+                        ctrl.app
+                            .list_attendance(profile.id, Some(sid), Some(date), Some(date))
+                    {
+                        for a in atts {
+                            if ctrl
+                                .app
+                                .delete_attendance(a.id, RecordSource::Gui, None)
+                                .is_ok()
+                            {
+                                removed += 1;
+                            }
+                        }
+                    }
+                    ctrl.refresh_all(&win);
+                    if removed > 0 {
+                        show_toast(
+                            &win,
+                            &format!("Ячейка очищена (удалено записей: {removed})"),
+                        );
+                    }
+                }
+            });
+        }
+
+        // 1-Click Export Report from Statistics header
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_stats_export_report(move || {
+                if let Some(win) = w.upgrade()
+                    && let Ok(p) = ctrl.app.get_active_profile()
+                {
+                    let out_path = ctrl.app.data_dir.join(format!(
+                        "oxidium-report-{}.md",
+                        Utc::now().format("%Y%m%d-%H%M%S")
+                    ));
+                    match ctrl.app.export_profile_markdown(p.id, &out_path) {
+                        Ok(()) => {
+                            show_toast(&win, &format!("Отчёт сохранён: {}", out_path.display()))
+                        }
+                        Err(e) => show_toast(&win, &format!("Ошибка экспорта: {e}")),
                     }
                 }
             });
@@ -1876,15 +2071,16 @@ impl UiController {
             return;
         };
         win.set_active_profile_name(active.name.clone().into());
+        win.set_active_profile_initials(compute_initials(&active.name).into());
         let sub = [active.institution.as_str(), active.group_name.as_str()]
             .into_iter()
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>()
-            .join(" / ");
+            .join(" · ");
         win.set_active_profile_sub(sub.into());
         win.set_active_profile_color(parse_hex_color(
             &active.color,
-            Color::from_rgb_u8(68, 94, 145),
+            Color::from_rgb_u8(74, 68, 89),
         ));
 
         let profiles = self.app.list_profiles(true).unwrap_or_default();
@@ -1892,11 +2088,12 @@ impl UiController {
             .into_iter()
             .map(|p| ProfileItem {
                 id: p.id.to_string().into(),
+                initials: compute_initials(&p.name).into(),
                 name: p.name.into(),
                 institution: p.institution.into(),
                 group_name: p.group_name.into(),
                 academic_year: p.academic_year.into(),
-                color: parse_hex_color(&p.color, Color::from_rgb_u8(68, 94, 145)),
+                color: parse_hex_color(&p.color, Color::from_rgb_u8(74, 68, 89)),
                 is_active: p.id == active.id,
                 is_archived: p.is_archived,
             })
@@ -2030,45 +2227,87 @@ impl UiController {
             })
             .collect();
 
+        let subject_filter = self
+            .state
+            .lock()
+            .map(|st| st.journal_subject_filter.trim().to_lowercase())
+            .unwrap_or_default();
+        let dark = win.global::<OxidiumTheme>().get_dark_mode();
+
+        let filtered_rows: Vec<_> = matrix
+            .rows
+            .into_iter()
+            .filter(|r| {
+                subject_filter.is_empty()
+                    || r.subject.name.to_lowercase().contains(&subject_filter)
+                    || r.subject
+                        .short_name
+                        .to_lowercase()
+                        .contains(&subject_filter)
+                    || r.subject.teacher.to_lowercase().contains(&subject_filter)
+            })
+            .collect();
+
         if let Ok(mut st) = self.state.lock() {
             st.visible_days = matrix.days.iter().map(|d| d.date).collect();
-            st.visible_subject_ids = matrix.rows.iter().map(|r| r.subject.id).collect();
+            st.visible_subject_ids = filtered_rows.iter().map(|r| r.subject.id).collect();
         }
 
-        let mut ui_rows = Vec::with_capacity(matrix.rows.len());
-        for (r_idx, row) in matrix.rows.into_iter().enumerate() {
+        let mut ui_rows = Vec::with_capacity(filtered_rows.len());
+        for (r_idx, row) in filtered_rows.into_iter().enumerate() {
             let mut ui_cells = Vec::with_capacity(matrix.days.len());
             for (d_idx, day) in matrix.days.iter().enumerate() {
-                let mut badges: Vec<(String, Color)> = Vec::new();
+                let mut badges: Vec<(String, Color, Color, Color)> = Vec::new();
+                let mut has_mcp = false;
                 if let Some(cell) = row.cells_by_date.get(&day.date) {
                     for g in &cell.grades {
+                        if g.source == RecordSource::Mcp {
+                            has_mcp = true;
+                        }
+                        let (bg, fg) = mark_container_pair(&g.mark_code, dark);
                         badges.push((
                             g.mark_label.clone(),
                             color_for_mark_code(&g.mark_code, &settings.mark_colors),
+                            bg,
+                            fg,
                         ));
                     }
                     for a in &cell.attendance {
+                        if a.source == RecordSource::Mcp {
+                            has_mcp = true;
+                        }
                         let (lbl, code) = match &a.status {
                             AttendanceStatus::Absent => ("Н/Б", "absent"),
                             AttendanceStatus::Excused => ("Уваж.", "excused"),
                             AttendanceStatus::Present => ("Прис.", "present"),
                             AttendanceStatus::Custom(c) => (c.as_str(), "custom"),
                         };
+                        let (bg, fg) = mark_container_pair(code, dark);
                         badges.push((
                             lbl.to_string(),
                             color_for_mark_code(code, &settings.mark_colors),
+                            bg,
+                            fg,
                         ));
                     }
                 }
                 let has_entries = !badges.is_empty();
-                let (p_lbl, p_col) = badges
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| (String::new(), Color::from_rgb_u8(120, 120, 120)));
-                let (s_lbl, s_col) = badges
-                    .get(1)
-                    .cloned()
-                    .unwrap_or_else(|| (String::new(), Color::from_rgb_u8(120, 120, 120)));
+                let (p_lbl, p_col, p_bg, p_fg) = badges.first().cloned().unwrap_or_else(|| {
+                    (
+                        String::new(),
+                        Color::from_rgb_u8(120, 120, 120),
+                        Color::from_rgb_u8(120, 120, 120),
+                        Color::from_rgb_u8(255, 255, 255),
+                    )
+                });
+                let (s_lbl, s_col, s_bg, s_fg) = badges.get(1).cloned().unwrap_or_else(|| {
+                    (
+                        String::new(),
+                        Color::from_rgb_u8(120, 120, 120),
+                        Color::from_rgb_u8(120, 120, 120),
+                        Color::from_rgb_u8(255, 255, 255),
+                    )
+                });
                 let extra = badges.len().saturating_sub(2) as i32;
 
                 ui_cells.push(JournalCellItem {
@@ -2079,10 +2318,15 @@ impl UiController {
                     is_holiday: settings.highlight_holidays && day.holiday_name.is_some(),
                     primary_label: p_lbl.into(),
                     primary_color: p_col,
+                    primary_bg: p_bg,
+                    primary_fg: p_fg,
                     secondary_label: s_lbl.into(),
                     secondary_color: s_col,
+                    secondary_bg: s_bg,
+                    secondary_fg: s_fg,
                     extra_count: extra,
                     has_entries,
+                    has_mcp,
                     tooltip: SharedString::new(),
                 });
             }
@@ -2301,20 +2545,55 @@ impl UiController {
             win.set_stats_comparison_summary(SharedString::new());
         }
 
-        // Render 2x-DPI AA charts
+        // Render 2x-DPI AA charts with smart Y-axis labels & target reference line
         let dark = win.global::<OxidiumTheme>().get_dark_mode();
-        let primary_c = parse_hex_color(&settings.accent_color, Color::from_rgb_u8(68, 94, 145));
+        let primary_c = if dark {
+            Color::from_rgb_u8(0xCA, 0xC3, 0xDC)
+        } else {
+            parse_hex_color(&settings.accent_color, Color::from_rgb_u8(74, 68, 89))
+        };
         let line_pts: Vec<f32> = rep
             .average_dynamics
             .iter()
             .filter_map(|p| p.cumulative_average.to_string().parse::<f32>().ok())
             .collect();
+        let mean_target = {
+            let targets: Vec<f32> = rep
+                .subject_stats
+                .iter()
+                .filter_map(|s| {
+                    s.target_average
+                        .and_then(|d| d.to_string().parse::<f32>().ok())
+                })
+                .collect();
+            if targets.is_empty() {
+                4.5f32
+            } else {
+                targets.iter().sum::<f32>() / targets.len() as f32
+            }
+        };
+        let min_val = line_pts
+            .iter()
+            .copied()
+            .chain(std::iter::once(mean_target))
+            .fold(5.0f32, f32::min);
+        if min_val >= 3.3 {
+            win.set_stats_chart_y_top("5.0".into());
+            win.set_stats_chart_y_mid("4.0".into());
+            win.set_stats_chart_y_bot("3.0".into());
+        } else {
+            win.set_stats_chart_y_top("5.0".into());
+            win.set_stats_chart_y_mid("3.0".into());
+            win.set_stats_chart_y_bot("1.0".into());
+        }
+        win.set_stats_chart_target_label(format!("Цель {mean_target:.2}").into());
         win.set_stats_line_chart(render_line_chart(
             &line_pts,
-            720,
-            260,
+            760,
+            280,
             dark,
             [primary_c.red(), primary_c.green(), primary_c.blue()],
+            Some(mean_target),
         ));
 
         let g5_c = color_for_mark_code("grade_5", &settings.mark_colors);
@@ -2629,6 +2908,8 @@ impl UiController {
                         checklist_ratio: cl_ratio,
                         linked_grades_count: t.linked_grade_ids.len() as i32,
                         has_description: !t.description.is_empty(),
+                        is_mcp: t.badges.iter().any(|b| b.name.eq_ignore_ascii_case("MCP"))
+                            || t.tags.iter().any(|tg| tg.name.eq_ignore_ascii_case("MCP")),
                     }
                 })
                 .collect();
@@ -2733,6 +3014,83 @@ fn color_for_mark_code(code: &str, palette: &journal_domain::MarkColorPalette) -
         "pass" => parse_hex_color(&palette.pass, Color::from_rgb_u8(13, 148, 136)),
         "fail" => parse_hex_color(&palette.fail, Color::from_rgb_u8(185, 28, 28)),
         _ => Color::from_rgb_u8(100, 116, 139),
+    }
+}
+
+fn mark_container_pair(code: &str, dark: bool) -> (Color, Color) {
+    match (code, dark) {
+        ("grade_5" | "pass", false) => (
+            Color::from_rgb_u8(0xD4, 0xF2, 0xDB),
+            Color::from_rgb_u8(0x0B, 0x3D, 0x1A),
+        ),
+        ("grade_5" | "pass", true) => (
+            Color::from_rgb_u8(0x18, 0x4E, 0x27),
+            Color::from_rgb_u8(0xC2, 0xF2, 0xCD),
+        ),
+        ("grade_4", false) => (
+            Color::from_rgb_u8(0xCC, 0xEB, 0xE6),
+            Color::from_rgb_u8(0x00, 0x37, 0x31),
+        ),
+        ("grade_4", true) => (
+            Color::from_rgb_u8(0x16, 0x4E, 0x47),
+            Color::from_rgb_u8(0xBC, 0xEF, 0xE7),
+        ),
+        ("grade_3", false) => (
+            Color::from_rgb_u8(0xFF, 0xE6, 0xC7),
+            Color::from_rgb_u8(0x3E, 0x20, 0x00),
+        ),
+        ("grade_3", true) => (
+            Color::from_rgb_u8(0x5C, 0x39, 0x0B),
+            Color::from_rgb_u8(0xFF, 0xE0, 0xBC),
+        ),
+        ("grade_2", false) => (
+            Color::from_rgb_u8(0xFF, 0xE1, 0xD6),
+            Color::from_rgb_u8(0x4A, 0x15, 0x00),
+        ),
+        ("grade_2", true) => (
+            Color::from_rgb_u8(0x6B, 0x26, 0x0B),
+            Color::from_rgb_u8(0xFF, 0xD8, 0xC9),
+        ),
+        ("grade_1" | "absent" | "fail", false) => (
+            Color::from_rgb_u8(0xF9, 0xDE, 0xDC),
+            Color::from_rgb_u8(0x41, 0x0E, 0x0B),
+        ),
+        ("grade_1" | "absent" | "fail", true) => (
+            Color::from_rgb_u8(0x7A, 0x1F, 0x1A),
+            Color::from_rgb_u8(0xF9, 0xDE, 0xDC),
+        ),
+        ("excused" | "present", false) => (
+            Color::from_rgb_u8(0xD8, 0xE9, 0xFA),
+            Color::from_rgb_u8(0x0A, 0x2E, 0x52),
+        ),
+        ("excused" | "present", true) => (
+            Color::from_rgb_u8(0x1A, 0x44, 0x6E),
+            Color::from_rgb_u8(0xD6, 0xEA, 0xFF),
+        ),
+        (_, false) => (
+            Color::from_rgb_u8(0xE6, 0xE0, 0xF0),
+            Color::from_rgb_u8(0x1A, 0x16, 0x26),
+        ),
+        (_, true) => (
+            Color::from_rgb_u8(0x4A, 0x44, 0x59),
+            Color::from_rgb_u8(0xE7, 0xDF, 0xF8),
+        ),
+    }
+}
+
+fn compute_initials(name: &str) -> String {
+    let words: Vec<&str> = name.split_whitespace().collect();
+    if words.len() >= 2 {
+        let a = words[0].chars().next().unwrap_or('O');
+        let b = words[1].chars().next().unwrap_or('X');
+        format!("{a}{b}").to_uppercase()
+    } else {
+        let s: String = name.chars().take(2).collect();
+        if s.is_empty() {
+            "OX".to_string()
+        } else {
+            s.to_uppercase()
+        }
     }
 }
 

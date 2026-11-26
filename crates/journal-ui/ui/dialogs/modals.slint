@@ -583,6 +583,7 @@ export component SettingsModal inherits Rectangle {
     callback trigger_restore();
     callback export_data(string); // json, csv, xlsx, md
     callback import_data(string); // json, csv, telegram
+    callback open_onboarding();
 
     width: 100%; height: 100%;
     background: #00000055;
@@ -707,10 +708,20 @@ export component SettingsModal inherits Rectangle {
                             }
                         }
 
-                        FilledButton {
-                            text: "Применить и сохранить";
-                            clicked => {
-                                root.save_appearance(root.theme_mode_idx, root.lang_idx, root.accent_hex, root.compact_mode, root.reduced_motion, root.scale_percent);
+                        HorizontalLayout {
+                            spacing: 10px;
+                            FilledButton {
+                                text: "Применить и сохранить";
+                                clicked => {
+                                    root.save_appearance(root.theme_mode_idx, root.lang_idx, root.accent_hex, root.compact_mode, root.reduced_motion, root.scale_percent);
+                                }
+                            }
+                            OutlineButton {
+                                text: "Запустить мастер настройки";
+                                clicked => {
+                                    root.close();
+                                    root.open_onboarding();
+                                }
                             }
                         }
                     }
@@ -1003,6 +1014,444 @@ export component ShortcutsModal inherits Rectangle {
                     HorizontalLayout {
                         padding_left: 8px; padding_right: 8px;
                         Text { text: sc.k; font_family: OxidiumTheme.font_mono; font_size: 11px; font_weight: 600; color: MaterialPalette.primary; vertical_alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Quick Profile Switcher Popover (Stitch A01 — bottom-left next to rail)
+// ============================================================================
+export component QuickProfilePopover inherits Rectangle {
+    in property <[ProfileItem]> profiles;
+    in property <length> rail_width: 88px;
+    callback close();
+    callback switch_profile(string);
+    callback open_full_manager();
+
+    width: 100%; height: 100%;
+    background: #00000028;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        x: root.rail_width + 12px;
+        y: max(20px, parent.height - self.height - 18px);
+        width: 310px;
+        height: min(400px, qp_layout.preferred_height + 24px);
+        border_radius: 24px;
+        background: MaterialPalette.surface_container_high;
+        border_width: 1px;
+        border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 24px;
+        drop_shadow_color: #00000050;
+        TouchArea {}
+
+        qp_layout := VerticalLayout {
+            padding: 14px;
+            spacing: 8px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: "Учебные профили";
+                    font_size: 12px;
+                    font_weight: 600;
+                    color: MaterialPalette.on_surface_variant;
+                    vertical_alignment: center;
+                }
+                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+            }
+
+            for p in root.profiles : Rectangle {
+                height: 50px;
+                border_radius: 14px;
+                background: p.is_active ? MaterialPalette.secondary_container : p_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+
+                HorizontalLayout {
+                    padding_left: 10px;
+                    padding_right: 8px;
+                    spacing: 10px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        horizontal_stretch: 1;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 34px; height: 34px; border_radius: 17px;
+                                background: p.is_active ? MaterialPalette.primary : MaterialPalette.tertiary_container;
+                                Text {
+                                    text: p.initials;
+                                    font_family: OxidiumTheme.font_display;
+                                    font_size: 12px; font_weight: 700;
+                                    color: p.is_active ? MaterialPalette.on_primary : MaterialPalette.on_tertiary_container;
+                                    horizontal_alignment: center; vertical_alignment: center;
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal_stretch: 1;
+                            Text {
+                                text: p.name;
+                                font_size: 13px; font_weight: 600;
+                                color: p.is_active ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface;
+                                overflow: elide;
+                            }
+                            if p.institution != "" || p.group_name != "" : Text {
+                                text: p.institution + (p.institution != "" && p.group_name != "" ? " · " : "") + p.group_name;
+                                font_size: 11px;
+                                color: MaterialPalette.on_surface_variant;
+                                overflow: elide;
+                            }
+                        }
+                    }
+
+                    if p.is_active : VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            icon: OxidiumIcons.chevron_right;
+                            tooltip: "Редактировать профили";
+                            clicked => {
+                                root.close();
+                                root.open_full_manager();
+                            }
+                        }
+                    }
+                }
+
+                p_ta := TouchArea {
+                    mouse_cursor: pointer;
+                    clicked => {
+                        if (!p.is_active) {
+                            root.switch_profile(p.id);
+                        }
+                        root.close();
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: MaterialPalette.outline_variant; }
+
+            Rectangle {
+                height: 38px;
+                border_radius: 12px;
+                background: addp_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+                HorizontalLayout {
+                    padding_left: 10px; padding_right: 10px; spacing: 8px;
+                    VerticalLayout { alignment: center; Icon { source: OxidiumIcons.add; width: 18px; height: 18px; colorize: MaterialPalette.primary; } }
+                    Text { text: "Управление и добавление профилей"; font_size: 12px; font_weight: 600; color: MaterialPalette.primary; vertical_alignment: center; }
+                }
+                addp_ta := TouchArea {
+                    mouse_cursor: pointer;
+                    clicked => {
+                        root.close();
+                        root.open_full_manager();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// 4-Step Expressive Setup Wizard (Stitch E06 — Welcome, Profile, Subjects, MCP)
+// ============================================================================
+export component OnboardingModal inherits Rectangle {
+    in_out property <int> step: 1; // 1..4
+    in_out property <string> profile_name: "Основной профиль";
+    in_out property <string> institution: "";
+    in_out property <string> group_name: "";
+    in_out property <string> subjects_csv: "";
+    in_out property <string> new_subject_draft: "";
+    in_out property <bool> mcp_enable_http: false;
+    in_out property <bool> mcp_autostart: false;
+    in_out property <int> mcp_access_idx: 1; // 0=ReadOnly, 1=ReadWrite, 2=Full+Delete
+
+    callback close();
+    callback toggle_theme();
+    callback complete(string, string, string, string, bool, bool, int);
+
+    width: 100%; height: 100%;
+    background: #00000066;
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 680px;
+        height: 560px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border_radius: 28px;
+        background: MaterialPalette.surface_container_low;
+        border_width: 1px;
+        border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 32px;
+        drop_shadow_color: #00000060;
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 28px;
+            spacing: 20px;
+            alignment: space-between;
+
+            // Top Brand + Expressive 4-Step Progress Dots + Theme Toggle
+            HorizontalLayout {
+                alignment: space-between;
+                HorizontalLayout {
+                    spacing: 10px;
+                    Rectangle {
+                        width: 34px; height: 34px; border_radius: 10px;
+                        background: MaterialPalette.primary_container;
+                        Image { source: OxidiumIcons.app_logo; width: 22px; height: 22px; x: 6px; y: 6px; image_fit: contain; }
+                    }
+                    Text { text: "Oxidium"; font_family: OxidiumTheme.font_display; font_size: 16px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    for s in [1, 2, 3, 4] : VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: root.step == s ? 30px : 10px;
+                            height: 10px;
+                            border_radius: 5px;
+                            background: root.step == s ? MaterialPalette.primary : MaterialPalette.surface_container_highest;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 4px;
+                    IconButton {
+                        icon: OxidiumTheme.dark_mode ? OxidiumIcons.light_mode : OxidiumIcons.dark_mode;
+                        tooltip: "Переключить тему";
+                        clicked => { root.toggle_theme(); }
+                    }
+                    IconButton {
+                        icon: OxidiumIcons.close;
+                        tooltip: "Закрыть";
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+
+            // STEP 1: Welcome
+            if root.step == 1 : VerticalLayout {
+                vertical_stretch: 1;
+                alignment: center;
+                spacing: 18px;
+
+                Text {
+                    text: "Здравствуйте! Давайте настроим всё по-вашему";
+                    font_family: OxidiumTheme.font_display;
+                    font_size: 26px;
+                    font_weight: 600;
+                    color: MaterialPalette.on_surface;
+                    horizontal_alignment: center;
+                    wrap: word_wrap;
+                }
+                Text {
+                    text: "Личный учебный журнал, статистика и канбан-доска без регистрации, рекламы и облака. Быстрая настройка займёт меньше минуты.";
+                    font_size: 15px;
+                    color: MaterialPalette.on_surface_variant;
+                    horizontal_alignment: center;
+                    wrap: word_wrap;
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    padding_top: 8px;
+                    Rectangle {
+                        width: 72px; height: 72px; border_radius: 36px;
+                        background: MaterialPalette.primary;
+                        Icon { source: OxidiumIcons.arrow_forward; width: 30px; height: 30px; colorize: MaterialPalette.on_primary; }
+                        TouchArea { mouse_cursor: pointer; clicked => { root.step = 2; } }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    OutlineButton { text: "Пропустить"; clicked => { root.close(); } }
+                }
+            }
+
+            // STEP 2: Profile Details
+            if root.step == 2 : VerticalLayout {
+                vertical_stretch: 1;
+                spacing: 14px;
+
+                Text { text: "Шаг 2 из 4"; font_size: 12px; font_weight: 600; color: MaterialPalette.primary; }
+                Text { text: "Ваш учебный профиль"; font_family: OxidiumTheme.font_display; font_size: 24px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Text { text: "Укажите название профиля, учебное заведение и группу — их можно изменить в любой момент."; font_size: 13px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+
+                VerticalLayout {
+                    spacing: 4px;
+                    Text { text: "Название профиля"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                    Rectangle {
+                        height: 42px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                        TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.profile_name; color: MaterialPalette.on_surface; }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        horizontal_stretch: 1; spacing: 4px;
+                        Text { text: "ВУЗ / Колледж / Школа"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 42px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.institution; color: MaterialPalette.on_surface; }
+                        }
+                    }
+                    VerticalLayout {
+                        horizontal_stretch: 1; spacing: 4px;
+                        Text { text: "Группа / Класс"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                        Rectangle {
+                            height: 42px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                            TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.group_name; color: MaterialPalette.on_surface; }
+                        }
+                    }
+                }
+
+                Rectangle { vertical_stretch: 1; }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    OutlineButton { text: "Назад"; clicked => { root.step = 1; } }
+                    FilledButton { text: "Далее"; icon: OxidiumIcons.arrow_forward; clicked => { root.step = 3; } }
+                }
+            }
+
+            // STEP 3: Subjects Quick Picker
+            if root.step == 3 : VerticalLayout {
+                vertical_stretch: 1;
+                spacing: 14px;
+
+                Text { text: "Шаг 3 из 4"; font_size: 12px; font_weight: 600; color: MaterialPalette.primary; }
+                Text { text: "Список предметов"; font_family: OxidiumTheme.font_display; font_size: 24px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Text { text: "Введите свои предметы через запятую или добавьте популярные дисциплины одним нажатием."; font_size: 13px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    for tpl in ["Математика", "Программирование", "Базы данных", "Английский язык", "Философия"] : Rectangle {
+                        height: 32px; border_radius: 16px;
+                        background: MaterialPalette.secondary_container;
+                        HorizontalLayout {
+                            padding_left: 12px; padding_right: 12px;
+                            Text { text: "+ " + tpl; font_size: 12px; font_weight: 600; color: MaterialPalette.on_secondary_container; vertical_alignment: center; }
+                        }
+                        TouchArea {
+                            mouse_cursor: pointer;
+                            clicked => {
+                                root.subjects_csv = root.subjects_csv == "" ? tpl : root.subjects_csv + ", " + tpl;
+                            }
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 4px;
+                    Text { text: "Предметы для добавления (через запятую)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                    Rectangle {
+                        height: 44px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                        TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.subjects_csv; color: MaterialPalette.on_surface; }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    Rectangle {
+                        horizontal_stretch: 1; height: 40px; border_radius: 12px; background: MaterialPalette.surface_container; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                        TextInput { x: 12px; width: parent.width - 24px; height: 100%; vertical_alignment: center; text <=> root.new_subject_draft; color: MaterialPalette.on_surface; }
+                    }
+                    TonalButton {
+                        text: "Добавить";
+                        clicked => {
+                            if (root.new_subject_draft != "") {
+                                root.subjects_csv = root.subjects_csv == "" ? root.new_subject_draft : root.subjects_csv + ", " + root.new_subject_draft;
+                                root.new_subject_draft = "";
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { vertical_stretch: 1; }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    OutlineButton { text: "Назад"; clicked => { root.step = 2; } }
+                    FilledButton { text: "Далее"; icon: OxidiumIcons.arrow_forward; clicked => { root.step = 4; } }
+                }
+            }
+
+            // STEP 4: MCP & AI Data Permissions
+            if root.step == 4 : VerticalLayout {
+                vertical_stretch: 1;
+                spacing: 12px;
+
+                Text { text: "Шаг 4 из 4"; font_size: 12px; font_weight: 600; color: MaterialPalette.primary; }
+                Text { text: "MCP и доступ для ИИ"; font_family: OxidiumTheme.font_display; font_size: 24px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Text { text: "Локальный MCP-сервер (только 127.0.0.1 + Bearer-токен) позволяет AI-ассистенту вести журнал на естественном языке."; font_size: 13px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+
+                Rectangle {
+                    border_radius: 16px; background: MaterialPalette.surface_container;
+                    VerticalLayout {
+                        padding: 14px; spacing: 10px;
+                        HorizontalLayout {
+                            alignment: space-between;
+                            VerticalLayout {
+                                Text { text: "Запустить встроенный HTTP MCP сейчас"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: "Локальный доступ по 127.0.0.1:38421"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                            }
+                            Switch { checked <=> root.mcp_enable_http; }
+                        }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            VerticalLayout {
+                                Text { text: "Автозапуск при открытии Oxidium"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: "Поднимать локальный сервер автоматически"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
+                            }
+                            Switch { checked <=> root.mcp_autostart; }
+                        }
+                    }
+                }
+
+                Text { text: "Права доступа для AI-ассистента"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    for perm[idx] in ["Только чтение", "Чтение и добавление", "Полный доступ (с удалением)"] : Rectangle {
+                        horizontal_stretch: 1; height: 42px; border_radius: 12px;
+                        background: root.mcp_access_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface_container;
+                        border_width: 1px; border_color: root.mcp_access_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                        Text {
+                            text: perm; font_size: 11px; font_weight: 600;
+                            color: root.mcp_access_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface;
+                            horizontal_alignment: center; vertical_alignment: center; wrap: word_wrap;
+                        }
+                        TouchArea { mouse_cursor: pointer; clicked => { root.mcp_access_idx = idx; } }
+                    }
+                }
+
+                Rectangle { vertical_stretch: 1; }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    OutlineButton { text: "Назад"; clicked => { root.step = 3; } }
+                    FilledButton {
+                        text: "Открыть журнал";
+                        icon: OxidiumIcons.check;
+                        clicked => {
+                            root.complete(
+                                root.profile_name,
+                                root.institution,
+                                root.group_name,
+                                root.subjects_csv,
+                                root.mcp_enable_http,
+                                root.mcp_autostart,
+                                root.mcp_access_idx
+                            );
+                        }
                     }
                 }
             }

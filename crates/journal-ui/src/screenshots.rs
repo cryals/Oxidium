@@ -93,8 +93,9 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         s.theme_mode = ThemeMode::Dark;
         let _ = app.update_settings(&s, RecordSource::Gui);
     }
-    controller.refresh_all(&win);
+    controller.apply_settings_and_theme(&win);
     win.invoke_apply_color_scheme(1);
+    controller.refresh_all(&win);
     capture("journal-dark.png")?;
 
     // 3. Statistics & Real Charts (Light)
@@ -127,12 +128,46 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
     win.invoke_apply_color_scheme(1);
     capture("settings-mcp.png")?;
 
+    // 6. Statistics Dark Mode
+    win.set_settings_modal_open(false);
+    win.set_active_section(1);
+    controller.refresh_statistics(&win);
+    win.invoke_apply_color_scheme(1);
+    capture("statistics-dark.png")?;
+
+    // 7. Kanban Dark Mode
+    win.set_active_section(2);
+    controller.refresh_kanban(&win);
+    win.invoke_apply_color_scheme(1);
+    capture("kanban-dark.png")?;
+
+    // 8. 4-Step Expressive Setup Wizard (Dark)
+    win.set_active_section(0);
+    win.set_onboarding_step(1);
+    win.set_onboarding_open(true);
+    win.invoke_apply_color_scheme(1);
+    capture("onboarding.png")?;
+
     let _ = std::fs::remove_dir_all(&tmp_dir);
     Ok(())
 }
 
 fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
     let p = app.get_active_profile()?;
+    let _ = app.update_profile(
+        p.id,
+        journal_app::UpdateProfileInput {
+            name: Some("Алексей Соколов".into()),
+            icon: None,
+            color: Some("#4A4459".into()),
+            institution: Some("ИТМО".into()),
+            group_name: Some("ИТ-24".into()),
+            academic_year: Some("2026/2027".into()),
+            description: None,
+        },
+        RecordSource::Gui,
+        None,
+    );
     let mut settings = app.get_settings()?;
     settings.theme_mode = ThemeMode::Light;
     settings.accent_color = "#4A4459".to_string();

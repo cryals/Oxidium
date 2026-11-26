@@ -8,17 +8,20 @@ Replace clunky institutional portals, scattered spreadsheets, notes, and Telegra
 
 ## Screenshots
 
-### Electronic Journal (Light & Dark Themes)
-![Journal Light](docs/screenshots/journal-light.png)
+### Electronic Journal (Dark & Light Themes)
 ![Journal Dark](docs/screenshots/journal-dark.png)
+![Journal Light](docs/screenshots/journal-light.png)
 
-### Statistics & Analytics
-![Statistics](docs/screenshots/statistics.png)
+### Statistics & Analytics (Dark & Light Themes)
+![Statistics Dark](docs/screenshots/statistics-dark.png)
+![Statistics Light](docs/screenshots/statistics.png)
 
-### Kanban Board
-![Kanban](docs/screenshots/kanban.png)
+### Kanban Board (Dark & Light Themes)
+![Kanban Dark](docs/screenshots/kanban-dark.png)
+![Kanban Light](docs/screenshots/kanban.png)
 
-### Settings & Built-in MCP Server
+### Setup Wizard & Built-in MCP Server Settings
+![Setup Wizard](docs/screenshots/onboarding.png)
 ![Settings & MCP](docs/screenshots/settings-mcp.png)
 
 ## Highlights

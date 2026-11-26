@@ -24,10 +24,15 @@ export struct JournalCellItem {
     is_holiday: bool,
     primary_label: string,
     primary_color: color,
+    primary_bg: color,
+    primary_fg: color,
     secondary_label: string,
     secondary_color: color,
+    secondary_bg: color,
+    secondary_fg: color,
     extra_count: int,
     has_entries: bool,
+    has_mcp: bool,
     tooltip: string,
 }
 
@@ -60,6 +65,7 @@ export struct CellDetailEntry {
 export struct ProfileItem {
     id: string,
     name: string,
+    initials: string,
     institution: string,
     group_name: string,
     academic_year: string,
@@ -133,6 +139,7 @@ export struct KanbanTaskCard {
     checklist_ratio: float,
     linked_grades_count: int,
     has_description: bool,
+    is_mcp: bool,
 }
 
 export struct KanbanColumnModel {

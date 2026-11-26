@@ -1003,7 +1003,7 @@ impl Default for AppSettings {
             active_profile_id: None,
             language: Language::Ru,
             theme_mode: ThemeMode::System,
-            accent_color: "#445E91".into(),
+            accent_color: "#4A4459".into(),
             ui_scale: 1.0,
             font_size_delta: 0,
             compact_mode: false,

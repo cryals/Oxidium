@@ -62,6 +62,40 @@ impl Canvas {
         }
     }
 
+    fn draw_dashed_line(
+        &mut self,
+        p0: (f32, f32),
+        p1: (f32, f32),
+        thickness: f32,
+        dash_gap: (f32, f32),
+        color: [u8; 4],
+    ) {
+        let (x0, y0) = p0;
+        let (x1, y1) = p1;
+        let (dash, gap) = dash_gap;
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let total = (dx * dx + dy * dy).sqrt();
+        if total < 1.0 {
+            return;
+        }
+        let ux = dx / total;
+        let uy = dy / total;
+        let mut dist = 0.0;
+        while dist < total {
+            let end = (dist + dash).min(total);
+            self.draw_line(
+                x0 + ux * dist,
+                y0 + uy * dist,
+                x0 + ux * end,
+                y0 + uy * end,
+                thickness,
+                color,
+            );
+            dist += dash + gap;
+        }
+    }
+
     fn draw_circle(&mut self, cx: f32, cy: f32, radius: f32, color: [u8; 4]) {
         let min_x = (cx - radius - 2.0).floor().max(0.0) as i32;
         let max_x = (cx + radius + 2.0).ceil().min(self.w as f32 - 1.0) as i32;
@@ -88,33 +122,69 @@ impl Canvas {
     }
 }
 
-/// Renders a crisp 2x-DPI cumulative average dynamics line chart with translucent area fill.
+/// Renders a crisp 2x-DPI cumulative average dynamics line chart with translucent area fill,
+/// smart Y-axis zoom, dashed horizontal gridlines, and optional target average reference line.
 pub fn render_line_chart(
     points: &[f32],
     width: usize,
     height: usize,
     dark_mode: bool,
     line_rgb: [u8; 3],
+    target_avg: Option<f32>,
 ) -> Image {
     let bg = [0, 0, 0, 0];
     let mut canvas = Canvas::new(width, height, bg);
-    let pad_l = 18.0;
-    let pad_r = 18.0;
-    let pad_t = 16.0;
+    let pad_l = 16.0;
+    let pad_r = 20.0;
+    let pad_t = 18.0;
     let pad_b = 18.0;
     let plot_w = (width as f32 - pad_l - pad_r).max(10.0);
     let plot_h = (height as f32 - pad_t - pad_b).max(10.0);
 
+    // Smart dynamic Y-axis range: zooms into [3.0, 5.0] when all grades >= 3.3, else [1.0, 5.0]
+    let min_val = points
+        .iter()
+        .copied()
+        .chain(target_avg)
+        .fold(5.0f32, f32::min);
+    let y_min = if min_val >= 3.3 { 3.0f32 } else { 1.0f32 };
+    let y_max = 5.0f32;
+    let y_span = (y_max - y_min).max(0.5);
+
     let grid_color = if dark_mode {
-        [255, 255, 255, 26]
+        [201, 197, 209, 34]
     } else {
-        [15, 23, 42, 24]
+        [72, 69, 78, 30]
     };
 
-    // Horizontal reference grid lines for grades 1..5
+    // Dashed horizontal reference grid lines (4 intervals)
     for step in 0..=4 {
         let y = pad_t + plot_h * (step as f32 / 4.0);
-        canvas.draw_line(pad_l, y, pad_l + plot_w, y, 1.2, grid_color);
+        if step == 4 {
+            canvas.draw_line(pad_l, y, pad_l + plot_w, y, 1.4, grid_color);
+        } else {
+            canvas.draw_dashed_line((pad_l, y), (pad_l + plot_w, y), 1.2, (6.0, 6.0), grid_color);
+        }
+    }
+
+    // Optional target average reference line (teal grade-4 accent)
+    if let Some(target) = target_avg
+        && (y_min..=y_max).contains(&target)
+    {
+        let norm = ((target - y_min) / y_span).clamp(0.0, 1.0);
+        let ty = pad_t + plot_h * (1.0 - norm);
+        let target_col = if dark_mode {
+            [122, 215, 202, 220]
+        } else {
+            [0, 106, 96, 210]
+        };
+        canvas.draw_dashed_line(
+            (pad_l, ty),
+            (pad_l + plot_w, ty),
+            2.2,
+            (10.0, 7.0),
+            target_col,
+        );
     }
 
     if points.is_empty() {
@@ -130,7 +200,7 @@ pub fn render_line_chart(
             } else {
                 pad_l + plot_w * (i as f32 / (points.len() - 1) as f32)
             };
-            let norm = ((val - 1.0) / 4.0).clamp(0.0, 1.0);
+            let norm = ((val - y_min) / y_span).clamp(0.0, 1.0);
             let y = pad_t + plot_h * (1.0 - norm);
             (x, y)
         })
@@ -153,7 +223,7 @@ pub fn render_line_chart(
                 let cy = y0 + (y1 - y0) * t;
                 for y in (cy.ceil() as i32)..=base_y {
                     let fade = 1.0 - ((y as f32 - cy) / (base_y as f32 - cy).max(1.0));
-                    canvas.blend_pixel(x, y, [line_rgb[0], line_rgb[1], line_rgb[2], 58], fade);
+                    canvas.blend_pixel(x, y, [line_rgb[0], line_rgb[1], line_rgb[2], 46], fade);
                 }
             }
         }
@@ -166,22 +236,25 @@ pub fn render_line_chart(
             seg[0].1,
             seg[1].0,
             seg[1].1,
-            3.5,
+            4.0,
             [line_rgb[0], line_rgb[1], line_rgb[2], 255],
         );
     }
 
-    // Data point nodes
+    // Data point nodes (larger highlight ring on final latest value)
     let ring = if dark_mode {
-        [24, 26, 32, 255]
+        [28, 27, 31, 255]
     } else {
-        [255, 255, 255, 255]
+        [245, 241, 246, 255]
     };
-    let step = (coords.len() / 24).max(1);
+    let step = (coords.len() / 20).max(1);
     for (i, &(x, y)) in coords.iter().enumerate() {
-        if i % step == 0 || i == coords.len() - 1 {
-            canvas.draw_circle(x, y, 6.2, ring);
-            canvas.draw_circle(x, y, 4.2, [line_rgb[0], line_rgb[1], line_rgb[2], 255]);
+        let is_last = i == coords.len() - 1;
+        if i % step == 0 || is_last {
+            let r_outer = if is_last { 8.0 } else { 6.0 };
+            let r_inner = if is_last { 5.4 } else { 4.0 };
+            canvas.draw_circle(x, y, r_outer, ring);
+            canvas.draw_circle(x, y, r_inner, [line_rgb[0], line_rgb[1], line_rgb[2], 255]);
         }
     }
 

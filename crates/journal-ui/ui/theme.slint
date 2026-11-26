@@ -15,35 +15,50 @@ export global OxidiumTheme {
     in_out property <int> font_size_delta: 0;
 
     out property <string> font_sans: "Roboto";
+    out property <string> font_display: "Roboto Flex";
     out property <string> font_mono: "Roboto Mono";
-    out property <duration> anim_fast: root.reduced_motion ? 0ms : 140ms;
+    out property <duration> anim_fast: root.reduced_motion ? 0ms : 120ms;
     out property <duration> anim_medium: root.reduced_motion ? 0ms : 220ms;
 
-    // Semantic grade & mark colors (customizable by user, legible in light & dark themes)
-    in_out property <color> grade_5: #2E7D32;
-    in_out property <color> grade_4: #00897B;
-    in_out property <color> grade_3: #D97706;
-    in_out property <color> grade_2: #EA580C;
-    in_out property <color> grade_1: #DC2626;
-    in_out property <color> mark_absent: #E11D48;
-    in_out property <color> mark_excused: #2563EB;
-    in_out property <color> mark_pass: #0D9488;
-    in_out property <color> mark_fail: #B91C1C;
+    // Semantic grade & mark accents (customizable by user, paired with high-contrast Light/Dark containers)
+    in_out property <color> grade_5: root.dark_mode ? #8CD99E : #146C2E;
+    in_out property <color> grade_4: root.dark_mode ? #7AD7CA : #006A60;
+    in_out property <color> grade_3: root.dark_mode ? #FFB969 : #8D4E00;
+    in_out property <color> grade_2: root.dark_mode ? #FF9F7A : #B33B00;
+    in_out property <color> grade_1: root.dark_mode ? #F2B8B5 : #B3261E;
+    in_out property <color> mark_absent: root.dark_mode ? #F2B8B5 : #B3261E;
+    in_out property <color> mark_excused: root.dark_mode ? #9EC8F5 : #1A5F9E;
+    in_out property <color> mark_pass: root.dark_mode ? #8CD99E : #146C2E;
+    in_out property <color> mark_fail: root.dark_mode ? #F2B8B5 : #B3261E;
+
+    // Accessible MD3 Expressive Container / On-Container pairs (Mono Lavender system)
+    out property <color> grade_5_bg: root.dark_mode ? #184E27 : #D4F2DB;
+    out property <color> grade_5_fg: root.dark_mode ? #C2F2CD : #0B3D1A;
+    out property <color> grade_4_bg: root.dark_mode ? #164E47 : #CCEBE6;
+    out property <color> grade_4_fg: root.dark_mode ? #BCEFE7 : #003731;
+    out property <color> grade_3_bg: root.dark_mode ? #5C390B : #FFE6C7;
+    out property <color> grade_3_fg: root.dark_mode ? #FFE0BC : #3E2000;
+    out property <color> grade_2_bg: root.dark_mode ? #6B260B : #FFE1D6;
+    out property <color> grade_2_fg: root.dark_mode ? #FFD8C9 : #4A1500;
+    out property <color> grade_1_bg: root.dark_mode ? #7A1F1A : #F9DEDC;
+    out property <color> grade_1_fg: root.dark_mode ? #F9DEDC : #410E0B;
+    out property <color> info_bg: root.dark_mode ? #1A446E : #D8E9FA;
+    out property <color> info_fg: root.dark_mode ? #D6EAFF : #0A2E52;
 
     // Surface & highlight roles
-    out property <color> weekend_tint: root.dark_mode ? #ffffff0b : #0f172a09;
-    out property <color> holiday_tint: root.dark_mode ? #f59e0b1f : #f59e0b1c;
-    out property <color> today_tint: MaterialPalette.primary_container.with_alpha(root.dark_mode ? 45% : 55%);
-    out property <color> cell_border: MaterialPalette.outline_variant.with_alpha(45%);
-    out property <color> success_color: root.dark_mode ? #4ade80 : #15803d;
-    out property <color> warning_color: root.dark_mode ? #fbbf24 : #b45309;
-    out property <color> danger_color: root.dark_mode ? #f87171 : #b91c1c;
+    out property <color> weekend_tint: root.dark_mode ? #2B292D80 : #E9E5EA80;
+    out property <color> holiday_tint: root.dark_mode ? #5C390B44 : #FFE6C770;
+    out property <color> today_tint: MaterialPalette.primary_container.with_alpha(root.dark_mode ? 32% : 45%);
+    out property <color> cell_border: MaterialPalette.outline_variant.with_alpha(root.dark_mode ? 65% : 60%);
+    out property <color> success_color: root.dark_mode ? #8CD99E : #146C2E;
+    out property <color> warning_color: root.dark_mode ? #FFB969 : #8D4E00;
+    out property <color> danger_color: root.dark_mode ? #F2B8B5 : #B3261E;
 
     // Spacing & row sizing responding to compact mode & scale
-    out property <length> row_height: (root.compact_mode ? 38px : 46px) * root.ui_scale;
-    out property <length> cell_width: (root.compact_mode ? 40px : 48px) * root.ui_scale;
-    out property <length> subject_col_width: (root.compact_mode ? 185px : 220px) * root.ui_scale;
-    out property <length> avg_col_width: (root.compact_mode ? 84px : 96px) * root.ui_scale;
+    out property <length> row_height: (root.compact_mode ? 38px : 48px) * root.ui_scale;
+    out property <length> cell_width: (root.compact_mode ? 40px : 46px) * root.ui_scale;
+    out property <length> subject_col_width: (root.compact_mode ? 190px : 232px) * root.ui_scale;
+    out property <length> avg_col_width: (root.compact_mode ? 84px : 94px) * root.ui_scale;
 }
 
 export global OxidiumIcons {
@@ -88,4 +103,11 @@ export global OxidiumIcons {
     out property <image> check_box: @image-url("../../../assets/icons/check_box.svg");
     out property <image> arrow_up: @image-url("../../../assets/icons/arrow_up.svg");
     out property <image> arrow_down: @image-url("../../../assets/icons/arrow_down.svg");
+    out property <image> menu: @image-url("../../../assets/icons/menu.svg");
+    out property <image> cursor: @image-url("../../../assets/icons/cursor.svg");
+    out property <image> hand: @image-url("../../../assets/icons/hand.svg");
+    out property <image> bot: @image-url("../../../assets/icons/bot.svg");
+    out property <image> school: @image-url("../../../assets/icons/school.svg");
+    out property <image> flag: @image-url("../../../assets/icons/flag.svg");
+    out property <image> arrow_forward: @image-url("../../../assets/icons/arrow_forward.svg");
 }

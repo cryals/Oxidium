@@ -8,17 +8,20 @@
 
 ## Скриншоты интерфейса
 
-### Электронный журнал (светлая и тёмная темы)
-![Журнал — светлая тема](docs/screenshots/journal-light.png)
+### Электронный журнал (тёмная и светлая темы)
 ![Журнал — тёмная тема](docs/screenshots/journal-dark.png)
+![Журнал — светлая тема](docs/screenshots/journal-light.png)
 
-### Статистика и аналитика
-![Статистика](docs/screenshots/statistics.png)
+### Статистика и аналитика (тёмная и светлая темы)
+![Статистика — тёмная тема](docs/screenshots/statistics-dark.png)
+![Статистика — светлая тема](docs/screenshots/statistics.png)
 
-### Канбан-доска
-![Канбан](docs/screenshots/kanban.png)
+### Канбан-доска (тёмная и светлая темы)
+![Канбан — тёмная тема](docs/screenshots/kanban-dark.png)
+![Канбан — светлая тема](docs/screenshots/kanban.png)
 
-### Настройки и встроенный MCP-сервер
+### Мастер быстрой настройки и встроенный MCP-сервер
+![Мастер настройки](docs/screenshots/onboarding.png)
 ![Настройки и MCP](docs/screenshots/settings-mcp.png)
 
 ## Ключевые возможности

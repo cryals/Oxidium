@@ -174,4 +174,27 @@ fn headless_ui_end_to_end_flows() {
     let ui_ms = t_ui.elapsed().as_secs_f64() * 1000.0;
     assert_eq!(win.get_journal_rows().row_count(), 100);
     println!("[UI-STRESS] refresh_journal(100 subjects) = {ui_ms:.2}ms");
+
+    // 10. Inline live journal subject filter, 1-click theme toggle, and 4-step setup wizard
+    win.invoke_journal_subject_filter_changed("Предмет #042".into());
+    assert_eq!(win.get_journal_rows().row_count(), 1);
+    win.invoke_journal_subject_filter_changed("".into());
+    assert_eq!(win.get_journal_rows().row_count(), 100);
+
+    let was_dark = win.global::<OxidiumTheme>().get_dark_mode();
+    win.invoke_theme_quick_toggle();
+    assert_ne!(win.global::<OxidiumTheme>().get_dark_mode(), was_dark);
+
+    win.invoke_onboarding_complete(
+        "Алексей Соколов".into(),
+        "ИТМО".into(),
+        "ИТ-24".into(),
+        "Квантовая механика, Компиляторы".into(),
+        false,
+        false,
+        1,
+    );
+    assert_eq!(win.get_active_profile_name().as_str(), "Алексей Соколов");
+    assert_eq!(win.get_active_profile_initials().as_str(), "АС");
+    assert_eq!(win.get_journal_rows().row_count(), 102);
 }

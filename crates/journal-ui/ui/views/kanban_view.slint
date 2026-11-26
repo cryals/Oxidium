@@ -10,6 +10,10 @@ export component KanbanView inherits Rectangle {
     in property <[SubjectItem]> subjects;
     in_out property <string> filter_query: "";
     in_out property <int> filter_mode: 0; // 0=All, 1=Overdue, 2=HighPriority
+    in_out property <bool> hand_mode: false;
+    property <length> pan_start_x: 0px;
+    property <length> pan_start_vx: 0px;
+    property <bool> is_panning: false;
 
     // Pointer Drag-and-Drop state
     in_out property <bool> dragging_task: false;
@@ -122,20 +126,83 @@ export component KanbanView inherits Rectangle {
                 HorizontalLayout {
                     spacing: 8px;
 
+                    // Cursor / Hand (Pan) Mode Toggle (Stitch D01)
+                    Rectangle {
+                        height: 36px;
+                        border_radius: 18px;
+                        background: MaterialPalette.surface_container;
+                        HorizontalLayout {
+                            padding: 3px;
+                            spacing: 2px;
+                            Rectangle {
+                                width: 30px; height: 30px; border_radius: 15px;
+                                background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                Icon {
+                                    source: OxidiumIcons.cursor;
+                                    width: 16px; height: 16px;
+                                    colorize: !root.hand_mode ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = false; } }
+                            }
+                            Rectangle {
+                                width: 30px; height: 30px; border_radius: 15px;
+                                background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                Icon {
+                                    source: OxidiumIcons.hand;
+                                    width: 16px; height: 16px;
+                                    colorize: root.hand_mode ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
+                                }
+                                TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = true; root.dragging_task = false; } }
+                            }
+                        }
+                    }
+
+                    // Inline Live Task Search (Stitch D01)
+                    Rectangle {
+                        width: 146px;
+                        height: 36px;
+                        border_radius: 18px;
+                        background: MaterialPalette.surface_container_high;
+                        HorizontalLayout {
+                            padding_left: 10px; padding_right: 10px; spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon { source: OxidiumIcons.search; width: 15px; height: 15px; colorize: MaterialPalette.on_surface_variant; }
+                            }
+                            TextInput {
+                                horizontal_stretch: 1;
+                                vertical_alignment: center;
+                                text <=> root.filter_query;
+                                font_size: 12px;
+                                color: MaterialPalette.on_surface;
+                                edited => { root.filter_changed(root.filter_query, root.filter_mode); }
+                            }
+                        }
+                        if root.filter_query == "" : Text {
+                            x: 32px;
+                            y: 0px;
+                            height: 100%;
+                            text: "Поиск задач...";
+                            font_size: 12px;
+                            color: MaterialPalette.on_surface_variant;
+                            vertical_alignment: center;
+                        }
+                    }
+
                     // Filter mode chips
                     for fm[idx] in ["Все", "Просрочено", "Срочные"] : Rectangle {
-                        height: 32px;
-                        border_radius: 16px;
+                        height: 34px;
+                        border_radius: 17px;
                         background: root.filter_mode == idx ? MaterialPalette.secondary_container : MaterialPalette.surface;
                         border_width: 1px;
-                        border_color: MaterialPalette.outline_variant;
+                        border_color: root.filter_mode == idx ? transparent : MaterialPalette.outline_variant;
                         HorizontalLayout {
-                            padding_left: 10px;
-                            padding_right: 10px;
+                            padding_left: 11px;
+                            padding_right: 11px;
                             Text {
                                 text: fm;
                                 font_size: 11px;
-                                font_weight: root.filter_mode == idx ? 600 : 400;
+                                font_weight: root.filter_mode == idx ? 600 : 500;
                                 color: root.filter_mode == idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
                                 vertical_alignment: center;
                             }
@@ -198,29 +265,33 @@ export component KanbanView inherits Rectangle {
             }
         }
 
-        // Horizontal Columns Scroll Area
-        ScrollView {
+        // Horizontal Columns Scroll Area (with optional Hand-Pan overlay)
+        Rectangle {
             vertical_stretch: 1;
-            viewport_width: max(root.columns.length * 328px + 24px, self.visible_width);
 
-            HorizontalLayout {
-                x: 0px;
-                y: 0px;
-                height: parent.visible_height;
-                spacing: 14px;
-                padding_bottom: 8px;
-                alignment: start;
+            kanban_scroll := ScrollView {
+                width: 100%;
+                height: 100%;
+                viewport_width: max(root.columns.length * 328px + 24px, self.visible_width);
 
-                for col[c_idx] in root.columns : Rectangle {
-                    width: col.is_collapsed ? 64px : 314px;
-                    vertical_stretch: 1;
-                    border_radius: 18px;
-                    background: MaterialPalette.surface_container_low;
-                    border_width: root.dragging_task && col.id != root.drag_source_col_id ? 2px : 1px;
-                    border_color: root.dragging_task && col.id != root.drag_source_col_id
-                        ? MaterialPalette.primary
-                        : col.over_wip ? OxidiumTheme.danger_color
-                        : OxidiumTheme.cell_border;
+                HorizontalLayout {
+                    x: 0px;
+                    y: 0px;
+                    height: parent.visible_height;
+                    spacing: 14px;
+                    padding_bottom: 8px;
+                    alignment: start;
+
+                    for col[c_idx] in root.columns : Rectangle {
+                        width: col.is_collapsed ? 64px : 314px;
+                        vertical_stretch: 1;
+                        border_radius: 20px;
+                        background: MaterialPalette.surface_container;
+                        border_width: root.dragging_task && col.id != root.drag_source_col_id ? 2px : 1px;
+                        border_color: root.dragging_task && col.id != root.drag_source_col_id
+                            ? MaterialPalette.primary
+                            : col.over_wip ? OxidiumTheme.danger_color
+                            : OxidiumTheme.cell_border;
 
                     VerticalLayout {
                         padding: 12px;
@@ -333,117 +404,139 @@ export component KanbanView inherits Rectangle {
                                 alignment: start;
 
                                 for task in col.tasks : Rectangle {
-                                    border_radius: 14px;
-                                    background: MaterialPalette.surface_container_lowest;
+                                    border_radius: 16px;
+                                    background: MaterialPalette.surface_container_low;
                                     border_width: 1px;
-                                    border_color: task.is_overdue ? OxidiumTheme.danger_color : OxidiumTheme.cell_border;
+                                    border_color: task.is_overdue && !task.is_completed ? OxidiumTheme.danger_color : OxidiumTheme.cell_border;
+                                    opacity: task.is_completed ? 0.78 : 1.0;
 
                                     VerticalLayout {
-                                        padding: OxidiumTheme.compact_mode ? 8px : 12px;
-                                        spacing: 6px;
+                                        padding: OxidiumTheme.compact_mode ? 10px : 14px;
+                                        spacing: 8px;
 
+                                        // Top Metadata Row: Priority/Done Pill + Deadline + Drag Handle (Stitch D01)
                                         HorizontalLayout {
                                             spacing: 6px;
                                             alignment: space-between;
 
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                if task.is_completed : Rectangle {
+                                                    height: 22px; border_radius: 6px;
+                                                    background: OxidiumTheme.grade_5_bg;
+                                                    HorizontalLayout {
+                                                        padding_left: 7px; padding_right: 7px; spacing: 4px;
+                                                        VerticalLayout { alignment: center; Icon { source: OxidiumIcons.check; width: 12px; height: 12px; colorize: OxidiumTheme.grade_5_fg; } }
+                                                        Text { text: "Выполнено"; font_size: 10px; font_weight: 600; color: OxidiumTheme.grade_5_fg; vertical_alignment: center; }
+                                                    }
+                                                }
+                                                if !task.is_completed && task.priority_level > 0 : Rectangle {
+                                                    height: 22px; border_radius: 6px;
+                                                    background: task.priority_level >= 4 ? OxidiumTheme.grade_1_bg
+                                                        : task.priority_level == 3 ? OxidiumTheme.grade_3_bg
+                                                        : task.priority_level == 2 ? MaterialPalette.secondary_container
+                                                        : OxidiumTheme.info_bg;
+                                                    HorizontalLayout {
+                                                        padding_left: 7px; padding_right: 7px; spacing: 4px;
+                                                        VerticalLayout {
+                                                            alignment: center;
+                                                            Icon {
+                                                                source: OxidiumIcons.flag; width: 11px; height: 11px;
+                                                                colorize: task.priority_level >= 4 ? OxidiumTheme.grade_1_fg
+                                                                    : task.priority_level == 3 ? OxidiumTheme.grade_3_fg
+                                                                    : task.priority_level == 2 ? MaterialPalette.on_secondary_container
+                                                                    : OxidiumTheme.info_fg;
+                                                            }
+                                                        }
+                                                        Text {
+                                                            text: task.priority_label;
+                                                            font_size: 10px; font_weight: 600;
+                                                            color: task.priority_level >= 4 ? OxidiumTheme.grade_1_fg
+                                                                : task.priority_level == 3 ? OxidiumTheme.grade_3_fg
+                                                                : task.priority_level == 2 ? MaterialPalette.on_secondary_container
+                                                                : OxidiumTheme.info_fg;
+                                                            vertical_alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                                if task.is_mcp : Rectangle {
+                                                    height: 22px; border_radius: 6px;
+                                                    background: MaterialPalette.primary_container;
+                                                    HorizontalLayout {
+                                                        padding_left: 6px; padding_right: 6px; spacing: 3px;
+                                                        VerticalLayout { alignment: center; Icon { source: OxidiumIcons.bot; width: 11px; height: 11px; colorize: MaterialPalette.on_primary_container; } }
+                                                        Text { text: "MCP"; font_family: OxidiumTheme.font_mono; font_size: 10px; font_weight: 700; color: MaterialPalette.on_primary_container; vertical_alignment: center; }
+                                                    }
+                                                }
+                                            }
+
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                if task.deadline_text != "" : Text {
+                                                    text: (task.is_overdue && !task.is_completed ? "⚠ " : "") + task.deadline_text;
+                                                    font_family: OxidiumTheme.font_mono;
+                                                    font_size: 11px;
+                                                    font_weight: task.is_overdue && !task.is_completed ? 700 : 500;
+                                                    color: task.is_overdue && !task.is_completed ? OxidiumTheme.danger_color : MaterialPalette.on_surface_variant;
+                                                    vertical_alignment: center;
+                                                }
+                                                Rectangle {
+                                                    width: 22px; height: 22px; border_radius: 6px;
+                                                    background: drag_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+                                                    Icon { source: OxidiumIcons.drag; width: 14px; height: 14px; colorize: MaterialPalette.on_surface_variant; }
+                                                    drag_ta := TouchArea {
+                                                        mouse_cursor: grab;
+                                                        clicked => {
+                                                            root.dragging_task = true;
+                                                            root.drag_task_id = task.id;
+                                                            root.drag_task_title = task.title;
+                                                            root.drag_source_col_id = col.id;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Task Title & Subject Subtitle
+                                        VerticalLayout {
+                                            spacing: 3px;
                                             Text {
-                                                horizontal_stretch: 1;
                                                 text: task.title;
-                                                font_size: 13px;
+                                                font_family: OxidiumTheme.font_display;
+                                                font_size: 14px;
                                                 font_weight: 600;
                                                 color: task.is_completed ? MaterialPalette.on_surface_variant : MaterialPalette.on_surface;
                                                 wrap: word_wrap;
                                             }
-
-                                            // Drag handle
-                                            Rectangle {
-                                                width: 24px;
-                                                height: 24px;
-                                                border_radius: 6px;
-                                                background: drag_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                                                Icon {
-                                                    source: OxidiumIcons.drag;
-                                                    width: 16px;
-                                                    height: 16px;
-                                                    colorize: MaterialPalette.on_surface_variant;
+                                            if task.subject_name != "" : HorizontalLayout {
+                                                spacing: 6px;
+                                                alignment: start;
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Rectangle { width: 7px; height: 7px; border_radius: 4px; background: task.subject_color; }
                                                 }
-                                                drag_ta := TouchArea {
-                                                    mouse_cursor: grab;
-                                                    clicked => {
-                                                        root.dragging_task = true;
-                                                        root.drag_task_id = task.id;
-                                                        root.drag_task_title = task.title;
-                                                        root.drag_source_col_id = col.id;
-                                                    }
+                                                Text {
+                                                    text: task.subject_name;
+                                                    font_size: 12px;
+                                                    color: MaterialPalette.on_surface_variant;
+                                                    overflow: elide;
                                                 }
                                             }
                                         }
 
-                                        // Subject & Priority Chips
-                                        HorizontalLayout {
+                                        // Tags, Badges & Linked Grades
+                                        if task.tags_text != "" || task.badges_text != "" || task.linked_grades_count > 0 : HorizontalLayout {
                                             spacing: 6px;
                                             alignment: start;
-
-                                            if task.subject_name != "" : Rectangle {
-                                                height: 22px;
-                                                border_radius: 6px;
-                                                background: task.subject_color.with_alpha(18%);
+                                            if task.tags_text != "" : Rectangle {
+                                                height: 20px; border_radius: 6px; background: MaterialPalette.primary_container;
                                                 HorizontalLayout {
-                                                    padding_left: 7px;
-                                                    padding_right: 7px;
-                                                    Text {
-                                                        text: task.subject_name;
-                                                        font_size: 10px;
-                                                        font_weight: 600;
-                                                        color: task.subject_color;
-                                                        vertical_alignment: center;
-                                                    }
+                                                    padding_left: 6px; padding_right: 6px;
+                                                    Text { text: "#" + task.tags_text; font_size: 10px; font_weight: 600; color: MaterialPalette.on_primary_container; vertical_alignment: center; }
                                                 }
                                             }
-
-                                            if task.priority_level > 0 : Rectangle {
-                                                height: 22px;
-                                                border_radius: 6px;
-                                                background: task.priority_color.with_alpha(18%);
-                                                HorizontalLayout {
-                                                    padding_left: 7px;
-                                                    padding_right: 7px;
-                                                    Text {
-                                                        text: task.priority_label;
-                                                        font_size: 10px;
-                                                        font_weight: 600;
-                                                        color: task.priority_color;
-                                                        vertical_alignment: center;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // Deadline & Linked Grades
-                                        if task.deadline_text != "" || task.linked_grades_count > 0 : HorizontalLayout {
-                                            spacing: 8px;
-                                            alignment: start;
-                                            if task.deadline_text != "" : Text {
-                                                text: (task.is_overdue ? "⚠ " : "⏰ ") + task.deadline_text;
-                                                font_family: OxidiumTheme.font_mono;
-                                                font_size: 11px;
-                                                font_weight: task.is_overdue ? 700 : 500;
-                                                color: task.is_overdue ? OxidiumTheme.danger_color : MaterialPalette.on_surface_variant;
-                                            }
-                                            if task.linked_grades_count > 0 : Text {
-                                                text: "★ Оценок: " + task.linked_grades_count;
-                                                font_family: OxidiumTheme.font_mono;
-                                                font_size: 10px;
-                                                color: OxidiumTheme.grade_5;
-                                            }
-                                        }
-
-                                        // Tags & Badges
-                                        if task.tags_text != "" || task.badges_text != "" : Text {
-                                            text: (task.tags_text != "" ? "#" + task.tags_text : "") + (task.badges_text != "" ? "  " + task.badges_text : "");
-                                            font_size: 10px;
-                                            color: MaterialPalette.primary;
-                                            overflow: elide;
+                                            if task.badges_text != "" : Text { text: task.badges_text; font_size: 10px; font_weight: 600; color: OxidiumTheme.warning_color; vertical_alignment: center; }
+                                            if task.linked_grades_count > 0 : Text { text: "★ Оценок: " + task.linked_grades_count; font_family: OxidiumTheme.font_mono; font_size: 10px; color: OxidiumTheme.grade_5; vertical_alignment: center; }
                                         }
 
                                         // Checklist Progress Bar
@@ -509,6 +602,32 @@ export component KanbanView inherits Rectangle {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+            // Hand-Pan Gesture Overlay when hand_mode is active
+            if root.hand_mode : TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse_cursor: root.is_panning ? grabbing : grab;
+                pointer-event(ev) => {
+                    if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.down) {
+                        root.is_panning = true;
+                        root.pan_start_x = self.mouse_x;
+                        root.pan_start_vx = kanban_scroll.viewport_x;
+                    } else if (ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel) {
+                        root.is_panning = false;
+                    }
+                }
+                moved => {
+                    if (root.is_panning) {
+                        kanban_scroll.viewport_x = clamp(
+                            root.pan_start_vx + (self.mouse_x - root.pan_start_x),
+                            min(0px, kanban_scroll.visible_width - kanban_scroll.viewport_width),
+                            0px
+                        );
                     }
                 }
             }
