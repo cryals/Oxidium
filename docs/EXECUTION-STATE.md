@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-26 (Phase 00)
+Last updated: 2026-11-26 (Phase 08)
 
 ## Current Phase
-- **Active**: Phase 08 (early acyclic build) — MCP Server (`crates/journal-mcp` + `apps/student-journal-mcp`), then Phase 04–07 Slint UI
-- **Next**: Phase 04–07 — Slint MD3 Expressive UI (`crates/journal-ui` + `apps/student-journal`)
+- **Active**: Phases 04–07, 09–11 — Slint MD3 Expressive UI (`crates/journal-ui` + `apps/student-journal`)
+- **Next**: Phase 12–13 — Security Audit, Real Performance Benchmarks, Headless UI Tests & Visual Screenshot QA
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |
@@ -13,12 +13,12 @@ Last updated: 2026-11-26 (Phase 00)
 | 01 | Cargo Workspace & `journal-domain` | DONE | `cargo test -p journal-domain` + `proptest` + `clippy -D warnings` PASSED |
 | 02 | SQLite Persistence & Migrations (`journal-storage`) | DONE | `cargo test -p journal-storage` (5 integration tests: migrations, FTS5, WAL concurrency, backup/restore) + `clippy -D warnings` PASSED |
 | 03 | Shared Application Services (`journal-app`) | DONE | `cargo test -p journal-app` + `clippy -D warnings` PASSED (isolation, stats, forecast, undo, kanban, export/import/backup, secrets, i18n) |
-| 04 | Slint MD3 Shell & Electronic Journal | PENDING | — |
-| 05 | Profiles, Subjects & Academic Periods UI | PENDING | — |
-| 06 | Statistics, Charts & Forecast Calculator UI | PENDING | — |
-| 07 | Kanban Board & Drag-and-Drop UI | PENDING | — |
-| 08 | MCP Server (`rmcp 3.11`, STDIO + Streamable HTTP, 80+ tools, Resources, Prompts) | PENDING | — |
-| 09 | GUI ↔ MCP Cross-Process Synchronization | PENDING | — |
+| 04 | Slint MD3 Shell & Electronic Journal | IN_PROGRESS | Written on disk; adding to workspace and compiling |
+| 05 | Profiles, Subjects & Academic Periods UI | IN_PROGRESS | Written on disk; adding to workspace and compiling |
+| 06 | Statistics, Charts & Forecast Calculator UI | IN_PROGRESS | Written on disk; adding to workspace and compiling |
+| 07 | Kanban Board & Drag-and-Drop UI | IN_PROGRESS | Written on disk; adding to workspace and compiling |
+| 08 | MCP Server (`rmcp 3.11`, STDIO + Streamable HTTP, 80+ tools, Resources, Prompts) | DONE | 80 tools, 6 resources, 7 prompts; `cargo test -p journal-mcp` + `stdio_tests` + `clippy -D warnings` PASSED; `docs/mcp/*` created |
+| 09 | GUI ↔ MCP Cross-Process Synchronization | IN_PROGRESS | Core `SyncCoordinator` + STDIO external-write detection verified; wiring into live Slint controller |
 | 10 | Settings Persistence, Localization & Notifications | PENDING | — |
 | 11 | Import, Export & Online Backup/Restore | PENDING | — |
 | 12 | Security Hardening & Real Performance Benchmarks | PENDING | — |

@@ -1,0 +1,23 @@
+[package]
+name = "student-journal-mcp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "student-journal-mcp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+journal-app.workspace = true
+journal-mcp.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+winresource.workspace = true

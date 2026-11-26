@@ -4,6 +4,8 @@ members = [
     "crates/journal-domain",
     "crates/journal-storage",
     "crates/journal-app",
+    "crates/journal-mcp",
+    "apps/student-journal-mcp",
 ]
 
 [workspace.package]
