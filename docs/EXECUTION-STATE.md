@@ -3,15 +3,15 @@
 Last updated: 2026-11-26 (Phase 00)
 
 ## Current Phase
-- **Active**: Phase 01 — Cargo Workspace & `crates/journal-domain`
-- **Next**: Phase 02 — SQLite Persistence & Migrations (`crates/journal-storage`)
+- **Active**: Phase 02 — SQLite Persistence & Migrations (`crates/journal-storage`)
+- **Next**: Phase 03 — Shared Application Services (`crates/journal-app`)
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |
 | --- | --- | --- | --- |
 | 00 | Environment, Assets & Docs | DONE | Toolchain (`rustc 1.100.0`), 8 local Roboto/RobotoFlex/RobotoMono TTFs, 42 Material Symbols SVGs, `oxidium.ico`, root & `docs/` created |
-| 01 | Cargo Workspace & `journal-domain` | IN PROGRESS | — |
-| 02 | SQLite Persistence & Migrations (`journal-storage`) | PENDING | — |
+| 01 | Cargo Workspace & `journal-domain` | DONE | `cargo test -p journal-domain` + `proptest` + `clippy -D warnings` PASSED |
+| 02 | SQLite Persistence & Migrations (`journal-storage`) | IN PROGRESS | — |
 | 03 | Shared Application Services (`journal-app`) | PENDING | — |
 | 04 | Slint MD3 Shell & Electronic Journal | PENDING | — |
 | 05 | Profiles, Subjects & Academic Periods UI | PENDING | — |

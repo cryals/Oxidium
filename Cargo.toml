@@ -1,30 +1,72 @@
-[package]
-name = "my_app"
+[workspace]
+resolver = "3"
+members = [
+    "crates/journal-domain",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+repository = "https://github.com/cryals/Oxidium"
+authors = ["Oxidium Contributors"]
 
-[lib]
-crate-type = ["lib", "cdylib"]
-path = "src/lib.rs"
-name = "my_app_lib"
+[workspace.dependencies]
+journal-domain = { path = "crates/journal-domain" }
+journal-storage = { path = "crates/journal-storage" }
+journal-app = { path = "crates/journal-app" }
+journal-mcp = { path = "crates/journal-mcp" }
+journal-ui = { path = "crates/journal-ui" }
 
-[[bin]]
-path = "src/main.rs"
-name = "my_app"
+slint = "1.19.1"
+slint-build = "1.19.1"
+i-slint-backend-testing = "1.19.1"
 
-[dependencies]
-slint = { version = "1.19", features = ["backend-android-activity-06"] }
+rusqlite = { version = "0.43.0", features = ["bundled", "backup", "chrono", "uuid", "serde_json"] }
+rmcp = { version = "3.11.0", features = ["server", "macros", "schemars", "transport-io", "transport-streamable-http-server"] }
+axum = "0.8.9"
+tower = "0.5.3"
+http = "1.5.0"
+http-body-util = "0.1.5"
+tokio = { version = "1.54.1", features = ["full"] }
+tokio-util = "0.7.20"
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = { version = "0.2" }
-console_error_panic_hook = "0.1.5"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+schemars = "1.2.3"
+chrono = { version = "0.4.45", features = ["serde"] }
+uuid = { version = "1.29.3", features = ["v4", "serde"] }
+rust_decimal = { version = "1.43.0", features = ["serde-with-str"] }
 
-[build-dependencies]
-slint-build = { version = "1.19" }
+thiserror = "2.0.21"
+anyhow = "1.0.105"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 
-[package.metadata.android]
-package = "dev.slint.material_template"
-apk_name = "my_app"
+directories = "6.0.0"
+rfd = "0.18.0"
+csv = "1.4.0"
+rust_xlsxwriter = "0.104.0"
+zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
+png = "0.18.1"
+winresource = "0.1.34"
 
-[package.metadata.android.application]
-label = "My Application"
+rand = "0.10.4"
+sha2 = "0.11.2"
+subtle = "2.6.1"
+hex = "0.4.3"
+base64 = "0.23.1"
+
+notify-rust = { version = "4.19.0", default-features = false, features = ["z"] }
+tauri-winrt-notification = "0.8.1"
+
+proptest = "1.12.0"
+tempfile = "3.27.0"
+reqwest = { version = "0.13.2", default-features = false, features = ["json"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
