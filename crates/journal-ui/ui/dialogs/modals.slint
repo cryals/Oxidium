@@ -3,7 +3,7 @@ import { OxidiumTheme, OxidiumMotion, OxidiumTooltipState, OxidiumIcons } from "
 import { OxidiumIconButton } from "../components.slint";
 import {
     ProfileItem, SubjectItem, PeriodItem, SearchHitItem,
-    ActivityRowItem, NotificationRowItem, UiStrings
+    ActivityRowItem, NotificationRowItem, SyncDeviceItem, UiStrings
 } from "../types.slint";
 
 // ============================================================================
@@ -717,7 +717,7 @@ component SettingsToggleRow inherits Rectangle {
 // ============================================================================
 export component SettingsModal inherits Rectangle {
     in property <bool> open: false;
-    in_out property <int> active_tab: 0; // 0=Appearance, 1=Journal, 2=Kanban, 3=MCP, 4=Data, 5=About
+    in_out property <int> active_tab: 0; // 0=Appearance, 1=Journal, 2=Kanban, 3=MCP, 4=Data, 5=Sync, 6=About
     in property <UiStrings> tr;
 
     // Appearance settings
@@ -765,6 +765,42 @@ export component SettingsModal inherits Rectangle {
     in property <bool> update_checking: false;
     in property <string> update_latest_version: "";
     in property <string> update_status_text: "";
+
+    // Zero-Knowledge E2EE Sync Node
+    in property <bool> sync_enabled: false;
+    in_out property <bool> sync_auto_sync: true;
+    in property <string> sync_status_text: "Не подключено";
+    in property <int> sync_status_level: 0; // 0=neutral, 1=synced, 2=syncing, 3=error/offline
+    in property <string> sync_server_url: "";
+    in property <string> sync_server_fingerprint: "";
+    in property <string> sync_device_pub: "";
+    in property <string> sync_device_fingerprint: "";
+    in property <string> sync_device_name: "Oxidium-Desktop";
+    in property <string> sync_vault_id: "";
+    in property <string> sync_vault_code_masked: "";
+    in property <string> sync_vault_code_full: "";
+    in_out property <bool> sync_vault_revealed: false;
+    in property <string> sync_last_sync_text: "—";
+    in property <string> sync_seq_text: "0";
+    in property <string> sync_merge_summary_text: "";
+    in property <string> sync_error_text: "";
+    in property <bool> sync_busy: false;
+    in property <[SyncDeviceItem]> sync_devices;
+
+    in_out property <string> sync_invite_draft: "";
+    in_out property <string> sync_device_name_draft: "";
+    in_out property <string> sync_vault_import_draft: "";
+    in_out property <string> sync_manual_url_draft: "";
+    in_out property <string> sync_manual_fp_draft: "";
+
+    callback sync_pair_invite(string, string, string);
+    callback sync_connect_manual(string, string, string, string);
+    callback sync_now_clicked();
+    callback sync_disconnect_clicked();
+    callback sync_toggle_auto(bool);
+    callback sync_import_vault_key(string);
+    callback sync_refresh_devices();
+    callback sync_revoke_device(string);
 
     callback close();
     callback save_appearance(int, int, string, bool, bool, int);
@@ -814,7 +850,7 @@ export component SettingsModal inherits Rectangle {
                     padding: 14px; spacing: 6px;
                     Text { text: "Настройки"; font_size: 18px; font_weight: 700; color: MaterialPalette.on_surface; }
                     Rectangle { height: 6px; }
-                    for tab_label[idx] in ["Внешний вид", "Журнал", "Канбан и уведомления", "MCP-сервер", "Данные и бэкапы", "О приложении"] : Rectangle {
+                    for tab_label[idx] in ["Внешний вид", "Журнал", "Канбан и уведомления", "MCP-сервер", "Данные и бэкапы", "Синхронизация", "О приложении"] : Rectangle {
                         height: 38px;
                         border_radius: root.active_tab == idx ? 10px : 14px;
                         background: root.active_tab == idx ? MaterialPalette.secondary_container
@@ -1293,8 +1329,290 @@ export component SettingsModal inherits Rectangle {
                         }
                     }
 
-                    // TAB 5: ABOUT
+                    // TAB 5: ZERO-KNOWLEDGE E2EE SYNC NODE
                     if root.active_tab == 5 : VerticalLayout {
+                        spacing: 12px;
+                        alignment: start;
+
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text {
+                                text: "Синхронизация с VPS-нодой (E2EE + SSH Ed25519)";
+                                font_family: OxidiumTheme.font_display;
+                                font_size: 17px;
+                                font_weight: 600;
+                                color: MaterialPalette.on_surface;
+                                vertical_alignment: center;
+                            }
+                            Rectangle {
+                                height: 28px;
+                                border_radius: 14px;
+                                background: root.sync_status_level == 1 ? OxidiumTheme.grade_5_bg
+                                    : root.sync_status_level == 2 ? MaterialPalette.primary_container
+                                    : root.sync_status_level == 3 ? OxidiumTheme.absent_red_bg
+                                    : MaterialPalette.surface_container;
+                                HorizontalLayout {
+                                    padding_left: 12px;
+                                    padding_right: 12px;
+                                    Text {
+                                        text: root.sync_status_text;
+                                        font_size: 12px;
+                                        font_weight: 700;
+                                        color: root.sync_status_level == 1 ? OxidiumTheme.grade_5_fg
+                                            : root.sync_status_level == 2 ? MaterialPalette.on_primary_container
+                                            : root.sync_status_level == 3 ? OxidiumTheme.absent_red
+                                            : MaterialPalette.on_surface_variant;
+                                        vertical_alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Status & Connection Summary Card
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px;
+                                spacing: 10px;
+                                alignment: start;
+
+                                if root.sync_enabled : VerticalLayout {
+                                    spacing: 6px;
+                                    Text {
+                                        text: "Нода: " + root.sync_server_url + "  •  Seq #" + root.sync_seq_text + "  •  Последняя: " + root.sync_last_sync_text;
+                                        font_family: OxidiumTheme.font_mono;
+                                        font_size: 11px;
+                                        color: MaterialPalette.on_surface;
+                                        wrap: word_wrap;
+                                    }
+                                    Text {
+                                        text: "Отпечаток сервера: " + root.sync_server_fingerprint + "  •  Устройство: " + root.sync_device_name;
+                                        font_family: OxidiumTheme.font_mono;
+                                        font_size: 11px;
+                                        color: MaterialPalette.on_surface_variant;
+                                        wrap: word_wrap;
+                                    }
+                                    if root.sync_merge_summary_text != "" : Text {
+                                        text: root.sync_merge_summary_text;
+                                        font_size: 11px;
+                                        font_weight: 600;
+                                        color: MaterialPalette.primary;
+                                        wrap: word_wrap;
+                                    }
+                                    SettingsToggleRow {
+                                        title: "Автосинхронизация в фоне (батч 8 сек + WebSocket)";
+                                        subtitle: "Объединяет правки в пакет и автоматически делает 3-way SQLite слияние при конфликте";
+                                        checked <=> root.sync_auto_sync;
+                                        toggled(v) => { root.sync_toggle_auto(v); }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        alignment: start;
+                                        FilledButton {
+                                            text: root.sync_busy ? "Синхронизация..." : "Синхронизировать сейчас";
+                                            height: 38px;
+                                            icon: OxidiumIcons.refresh;
+                                            enabled: !root.sync_busy;
+                                            clicked => { root.sync_now_clicked(); }
+                                        }
+                                        OutlineButton {
+                                            text: "Отключить ноду";
+                                            height: 38px;
+                                            enabled: !root.sync_busy;
+                                            clicked => { root.sync_disconnect_clicked(); }
+                                        }
+                                    }
+                                }
+
+                                if !root.sync_enabled : Text {
+                                    text: "Сквозное шифрование XChaCha20-Poly1305: сервер видит только зашифрованный блоб OXE1 и отпечаток устройства, а приватные ключи остаются только у вас (вне SQLite).";
+                                    font_size: 12px;
+                                    color: MaterialPalette.on_surface_variant;
+                                    wrap: word_wrap;
+                                }
+                            }
+                        }
+
+                        if root.sync_error_text != "" : Rectangle {
+                            border_radius: 12px;
+                            background: OxidiumTheme.absent_red_bg;
+                            HorizontalLayout {
+                                padding: 12px;
+                                Text {
+                                    text: root.sync_error_text;
+                                    font_size: 12px;
+                                    color: OxidiumTheme.absent_red;
+                                    wrap: word_wrap;
+                                }
+                            }
+                        }
+
+                        // Pairing via One-Time Invite Code (oxsync-v1:...)
+                        if !root.sync_enabled : SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px;
+                                spacing: 8px;
+                                alignment: start;
+                                Text { text: "Быстрое подключение по инвайт-коду (oxsync-v1:...)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: "Выполните на сервере: docker compose exec oxidium-node oxidium-node invite --ttl 15m"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+
+                                Rectangle {
+                                    height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                    TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface; text <=> root.sync_invite_draft; }
+                                    if root.sync_invite_draft == "" : Text { x: 10px; height: 100%; vertical_alignment: center; text: "Вставьте oxsync-v1:..."; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Rectangle {
+                                        horizontal_stretch: 1; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                        TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; font_size: 12px; color: MaterialPalette.on_surface; text <=> root.sync_device_name_draft; }
+                                        if root.sync_device_name_draft == "" : Text { x: 10px; height: 100%; vertical_alignment: center; text: "Имя устройства (" + root.sync_device_name + ")"; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); }
+                                    }
+                                    Rectangle {
+                                        horizontal_stretch: 1; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                        TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface; text <=> root.sync_vault_import_draft; }
+                                        if root.sync_vault_import_draft == "" : Text { x: 10px; height: 100%; vertical_alignment: center; text: "oxvault-v1-... (если 2-е устройство)"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    alignment: start;
+                                    FilledButton {
+                                        text: root.sync_busy ? "Подключение..." : "Подключить по инвайт-коду";
+                                        height: 38px;
+                                        icon: OxidiumIcons.link;
+                                        enabled: !root.sync_busy && root.sync_invite_draft != "";
+                                        clicked => {
+                                            root.sync_pair_invite(root.sync_invite_draft, root.sync_device_name_draft, root.sync_vault_import_draft);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // SSH Public Key & Manual Server Connection
+                        SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px;
+                                spacing: 8px;
+                                alignment: start;
+                                Text { text: "SSH-ключ этого устройства (Ed25519)"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: "Отпечаток: " + root.sync_device_fingerprint; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                Rectangle {
+                                    height: 34px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: OxidiumTheme.cell_border;
+                                    TextInput {
+                                        x: 8px; width: parent.width - 16px; height: 100%;
+                                        text: root.sync_device_pub;
+                                        read_only: true;
+                                        font_family: OxidiumTheme.font_mono; font_size: 10px;
+                                        color: MaterialPalette.on_surface_variant;
+                                        vertical_alignment: center;
+                                    }
+                                }
+
+                                if !root.sync_enabled : VerticalLayout {
+                                    spacing: 8px;
+                                    Text { text: "Или подключитесь вручную (после oxidium-node key add --pub ...)"; font_size: 12px; font_weight: 600; color: MaterialPalette.on_surface_variant; }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Rectangle {
+                                            horizontal_stretch: 1; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                            TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface; text <=> root.sync_manual_url_draft; }
+                                            if root.sync_manual_url_draft == "" : Text { x: 10px; height: 100%; vertical_alignment: center; text: "https://sync.example.com"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); }
+                                        }
+                                        Rectangle {
+                                            horizontal_stretch: 1; height: 38px; border_radius: 10px; background: MaterialPalette.surface; border_width: 1px; border_color: MaterialPalette.outline_variant;
+                                            TextInput { x: 10px; width: parent.width - 20px; height: 100%; vertical_alignment: center; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface; text <=> root.sync_manual_fp_draft; }
+                                            if root.sync_manual_fp_draft == "" : Text { x: 10px; height: 100%; vertical_alignment: center; text: "SHA256:... (отпечаток ноды)"; font_size: 11px; color: MaterialPalette.on_surface_variant.with_alpha(65%); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        alignment: start;
+                                        OutlineButton {
+                                            text: "Подключить вручную (SSH)";
+                                            height: 36px;
+                                            icon: OxidiumIcons.lock;
+                                            enabled: !root.sync_busy && root.sync_manual_url_draft != "" && root.sync_manual_fp_draft != "";
+                                            clicked => {
+                                                root.sync_connect_manual(root.sync_manual_url_draft, root.sync_manual_fp_draft, root.sync_device_name_draft, root.sync_vault_import_draft);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Vault Encryption Master Key Card
+                        if root.sync_vault_id != "" : SettingsSectionCard {
+                            VerticalLayout {
+                                padding: 14px;
+                                spacing: 8px;
+                                alignment: start;
+                                Text { text: "Мастер-ключ шифрования хранилища (Vault ID: " + root.sync_vault_id + ")"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; }
+                                Text { text: "Хранится в sync-vault.key (никогда не отправляется на VPS). Нужен для подключения 2-го устройства."; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Rectangle {
+                                        horizontal_stretch: 1; height: 36px; border_radius: 8px; background: MaterialPalette.surface; border_width: 1px; border_color: OxidiumTheme.cell_border;
+                                        TextInput {
+                                            x: 10px; width: parent.width - 20px; height: 100%;
+                                            text: root.sync_vault_revealed ? root.sync_vault_code_full : root.sync_vault_code_masked;
+                                            read_only: true;
+                                            font_family: OxidiumTheme.font_mono; font_size: 11px;
+                                            color: MaterialPalette.primary;
+                                            vertical_alignment: center;
+                                        }
+                                    }
+                                    TonalButton {
+                                        text: root.sync_vault_revealed ? "Скрыть" : "Показать ключ";
+                                        height: 36px;
+                                        clicked => { root.sync_vault_revealed = !root.sync_vault_revealed; }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Connected Devices List with Revocation
+                        if root.sync_enabled : VerticalLayout {
+                            spacing: 8px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                Text { text: "Авторизованные устройства (" + root.sync_devices.length + ")"; font_size: 13px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                                OutlineButton { text: "Обновить список"; height: 32px; icon: OxidiumIcons.refresh; clicked => { root.sync_refresh_devices(); } }
+                            }
+                            for dev in root.sync_devices : Rectangle {
+                                border_radius: 12px; background: MaterialPalette.surface_container;
+                                HorizontalLayout {
+                                    padding: 10px; spacing: 10px; alignment: space-between;
+                                    VerticalLayout {
+                                        horizontal_stretch: 1; spacing: 2px;
+                                        Text {
+                                            text: dev.name + (dev.is_current ? "  •  Это устройство" : "") + (dev.is_revoked ? "  •  ОТОЗВАНО" : "");
+                                            font_size: 12px; font_weight: 600;
+                                            color: dev.is_revoked ? OxidiumTheme.absent_red : MaterialPalette.on_surface;
+                                        }
+                                        Text {
+                                            text: dev.fingerprint + "  •  " + dev.last_seen;
+                                            font_family: OxidiumTheme.font_mono; font_size: 10px;
+                                            color: MaterialPalette.on_surface_variant;
+                                            overflow: elide;
+                                        }
+                                    }
+                                    if !dev.is_current && !dev.is_revoked : VerticalLayout {
+                                        alignment: center;
+                                        TonalButton {
+                                            text: "Отозвать";
+                                            height: 32px;
+                                            clicked => { root.sync_revoke_device(dev.id); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TAB 6: ABOUT
+                    if root.active_tab == 6 : VerticalLayout {
                         spacing: 14px;
                         alignment: start;
                         HorizontalLayout {

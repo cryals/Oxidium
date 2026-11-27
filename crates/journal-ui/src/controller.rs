@@ -7,8 +7,9 @@ use journal_app::{
 };
 use journal_domain::{
     AttendanceStatus, AverageMode, AveragePrecision, CalendarViewMode, GradeSample, Language,
-    McpPermissionMode, PeriodType, RecordSource, TaskPriority, ThemeMode, WeekStart, WorkType,
-    academic_year_bounds, format_average, month_bounds, next_month, prev_month, week_bounds,
+    McpPermissionMode, PeriodType, RecordSource, SyncConnectionStatus, TaskPriority, ThemeMode,
+    WeekStart, WorkType, academic_year_bounds, format_average, month_bounds, next_month,
+    prev_month, week_bounds,
 };
 use journal_mcp::{EmbeddedHttpManager, McpServerStatus};
 use journal_storage::SearchFilter;
@@ -1990,6 +1991,248 @@ impl UiController {
             });
         }
 
+        // Zero-Knowledge E2EE Remote Sync Node bindings (strictly async off Slint UI thread)
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_pair_invite(move |invite, dev_name, vault_code| {
+                let Some(ref rt) = ctrl.rt_handle else {
+                    return;
+                };
+                if let Some(win) = w.upgrade() {
+                    win.set_sync_busy(true);
+                    win.set_sync_status_level(2);
+                    win.set_sync_status_text("Подключение...".into());
+                    win.set_sync_error_text("".into());
+                }
+                let c = Arc::clone(&ctrl);
+                let w2 = w.clone();
+                let inv = invite.to_string();
+                let dname = dev_name.to_string();
+                let vmk = vault_code.to_string();
+                rt.spawn(async move {
+                    let opt_vmk = (!vmk.trim().is_empty()).then_some(vmk.as_str());
+                    let res = c.app.pair_with_invite(&inv, &dname, opt_vmk).await;
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(win) = w2.upgrade() {
+                            win.set_sync_busy(false);
+                            match res {
+                                Ok(_) => {
+                                    win.set_sync_invite_draft("".into());
+                                    win.set_sync_vault_import_draft("".into());
+                                    c.refresh_all(&win);
+                                    c.spawn_refresh_sync_devices(&win);
+                                    show_toast(&win, "Нода синхронизации успешно подключена");
+                                }
+                                Err(e) => {
+                                    win.set_sync_error_text(
+                                        journal_app::redact_secrets(&e.to_string()).into(),
+                                    );
+                                    c.refresh_sync_panel(&win);
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_connect_manual(move |url, fp, dev_name, vault_code| {
+                let Some(ref rt) = ctrl.rt_handle else {
+                    return;
+                };
+                if let Some(win) = w.upgrade() {
+                    win.set_sync_busy(true);
+                    win.set_sync_status_level(2);
+                    win.set_sync_status_text("Проверка ключей SSH...".into());
+                    win.set_sync_error_text("".into());
+                }
+                let c = Arc::clone(&ctrl);
+                let w2 = w.clone();
+                let url = url.to_string();
+                let fp = fp.to_string();
+                let dname = dev_name.to_string();
+                let vmk = vault_code.to_string();
+                rt.spawn(async move {
+                    let opt_vmk = (!vmk.trim().is_empty()).then_some(vmk.as_str());
+                    let res = c.app.connect_manual_node(&url, &fp, &dname, opt_vmk).await;
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(win) = w2.upgrade() {
+                            win.set_sync_busy(false);
+                            match res {
+                                Ok(_) => {
+                                    win.set_sync_manual_url_draft("".into());
+                                    win.set_sync_manual_fp_draft("".into());
+                                    win.set_sync_vault_import_draft("".into());
+                                    c.refresh_all(&win);
+                                    c.spawn_refresh_sync_devices(&win);
+                                    show_toast(&win, "Подключено по SSH-ключу Ed25519");
+                                }
+                                Err(e) => {
+                                    win.set_sync_error_text(
+                                        journal_app::redact_secrets(&e.to_string()).into(),
+                                    );
+                                    c.refresh_sync_panel(&win);
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_now_clicked(move || {
+                let Some(ref rt) = ctrl.rt_handle else {
+                    return;
+                };
+                if let Some(win) = w.upgrade() {
+                    win.set_sync_busy(true);
+                    win.set_sync_status_level(2);
+                    win.set_sync_status_text("Синхронизация...".into());
+                    win.set_sync_error_text("".into());
+                }
+                let c = Arc::clone(&ctrl);
+                let w2 = w.clone();
+                rt.spawn(async move {
+                    let res = c.app.sync_now().await;
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(win) = w2.upgrade() {
+                            win.set_sync_busy(false);
+                            match res {
+                                Ok(cfg) => {
+                                    c.refresh_all(&win);
+                                    c.spawn_refresh_sync_devices(&win);
+                                    let msg = cfg.last_merge_summary.unwrap_or_else(|| {
+                                        format!("Синхронизировано (seq #{})", cfg.last_synced_seq)
+                                    });
+                                    show_toast(&win, &msg);
+                                }
+                                Err(e) => {
+                                    win.set_sync_error_text(
+                                        journal_app::redact_secrets(&e.to_string()).into(),
+                                    );
+                                    c.refresh_sync_panel(&win);
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_disconnect_clicked(move || {
+                let Some(ref rt) = ctrl.rt_handle else {
+                    return;
+                };
+                let c = Arc::clone(&ctrl);
+                let w2 = w.clone();
+                rt.spawn(async move {
+                    let res = c.app.disconnect_sync().await;
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(win) = w2.upgrade() {
+                            match res {
+                                Ok(_) => {
+                                    win.set_sync_devices(ModelRc::default());
+                                    c.refresh_sync_panel(&win);
+                                    show_toast(
+                                        &win,
+                                        "Синхронизация отключена (локальная БД сохранена)",
+                                    );
+                                }
+                                Err(e) => show_toast(&win, &format!("Ошибка отключения: {e}")),
+                            }
+                        }
+                    });
+                });
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_toggle_auto(move |enabled| {
+                if let Some(win) = w.upgrade() {
+                    let debounce = ctrl
+                        .app
+                        .load_sync_config()
+                        .map(|c| c.batch_debounce_secs)
+                        .unwrap_or(8);
+                    match ctrl.app.update_sync_preferences(enabled, debounce) {
+                        Ok(_) => {
+                            ctrl.refresh_sync_panel(&win);
+                            show_toast(
+                                &win,
+                                if enabled {
+                                    "Автосинхронизация включена (батч 8 сек)"
+                                } else {
+                                    "Автосинхронизация приостановлена"
+                                },
+                            );
+                        }
+                        Err(e) => {
+                            show_toast(&win, &format!("Ошибка сохранения настроек sync: {e}"))
+                        }
+                    }
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_import_vault_key(move |code| {
+                if let Some(win) = w.upgrade() {
+                    match ctrl.app.import_vault_recovery_code(&code) {
+                        Ok(vid) => {
+                            win.set_sync_vault_import_draft("".into());
+                            ctrl.refresh_sync_panel(&win);
+                            show_toast(&win, &format!("Мастер-ключ импортирован (Vault {vid})"));
+                        }
+                        Err(e) => show_toast(&win, &format!("Ошибка ключа: {e}")),
+                    }
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_refresh_devices(move || {
+                if let Some(win) = w.upgrade() {
+                    ctrl.spawn_refresh_sync_devices(&win);
+                }
+            });
+        }
+        {
+            let ctrl = Arc::clone(self);
+            let w = win.as_weak();
+            win.on_sync_revoke_device(move |dev_id| {
+                let Some(ref rt) = ctrl.rt_handle else {
+                    return;
+                };
+                let c = Arc::clone(&ctrl);
+                let w2 = w.clone();
+                let id = dev_id.to_string();
+                rt.spawn(async move {
+                    let res = c.app.revoke_remote_device(&id).await;
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(win) = w2.upgrade() {
+                            match res {
+                                Ok(()) => {
+                                    c.spawn_refresh_sync_devices(&win);
+                                    show_toast(&win, "Устройство отозвано на ноде");
+                                }
+                                Err(e) => show_toast(&win, &format!("Ошибка отзыва: {e}")),
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
         // Backup / Restore / Export / Import (offloaded from UI thread via tokio::spawn_blocking)
         {
             let ctrl = Arc::clone(self);
@@ -2472,6 +2715,7 @@ impl UiController {
         self.refresh_kanban(win);
         self.refresh_notifications(win);
         self.refresh_mcp_panel(win);
+        self.refresh_sync_panel(win);
         self.refresh_undo_flags(win);
     }
 
@@ -3647,6 +3891,95 @@ impl UiController {
         win.set_activity_log_list(ModelRc::new(VecModel::from(rows)));
     }
 
+    pub fn refresh_sync_panel(&self, win: &MainWindow) {
+        if let Ok((pub_key, fp)) = self.app.sync_device_identity() {
+            win.set_sync_device_pub(pub_key.into());
+            win.set_sync_device_fingerprint(fp.into());
+        }
+        if let Ok(Some(code)) = self.app.sync_vault_recovery_code() {
+            let full = code.as_str();
+            let suffix: String = full
+                .chars()
+                .rev()
+                .take(8)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect();
+            win.set_sync_vault_code_masked(format!("oxvault-v1-••••-••••-••••-{suffix}").into());
+            win.set_sync_vault_code_full(full.into());
+        } else {
+            win.set_sync_vault_code_masked("".into());
+            win.set_sync_vault_code_full("".into());
+        }
+
+        let cfg = self.app.load_sync_config().unwrap_or_default();
+        win.set_sync_enabled(cfg.enabled);
+        win.set_sync_auto_sync(cfg.auto_sync);
+        win.set_sync_server_url(cfg.server_url.clone().into());
+        win.set_sync_server_fingerprint(cfg.server_fingerprint.clone().into());
+        if !cfg.device_name.is_empty() {
+            win.set_sync_device_name(cfg.device_name.clone().into());
+        }
+        win.set_sync_vault_id(cfg.vault_id.clone().into());
+        win.set_sync_seq_text(cfg.last_synced_seq.to_string().into());
+        win.set_sync_last_sync_text(
+            cfg.last_sync_at
+                .map(|t| t.format("%Y-%m-%d %H:%M UTC").to_string())
+                .unwrap_or_else(|| "—".into())
+                .into(),
+        );
+        win.set_sync_merge_summary_text(cfg.last_merge_summary.clone().unwrap_or_default().into());
+        win.set_sync_error_text(cfg.last_error.clone().unwrap_or_default().into());
+
+        let (label, level) = if !cfg.enabled {
+            ("Не подключено", 0)
+        } else {
+            match cfg.last_status {
+                SyncConnectionStatus::Synced => ("Синхронизировано", 1),
+                SyncConnectionStatus::Idle => ("Ожидание", 0),
+                SyncConnectionStatus::Syncing => ("Синхронизация...", 2),
+                SyncConnectionStatus::Offline => ("Офлайн", 3),
+                SyncConnectionStatus::Conflict => ("Нужен ключ", 3),
+                SyncConnectionStatus::Error => ("Ошибка", 3),
+                SyncConnectionStatus::Disconnected => ("Не подключено", 0),
+            }
+        };
+        win.set_sync_status_text(label.into());
+        win.set_sync_status_level(level);
+    }
+
+    pub fn spawn_refresh_sync_devices(self: &Arc<Self>, win: &MainWindow) {
+        let Some(ref rt) = self.rt_handle else {
+            return;
+        };
+        let c = Arc::clone(self);
+        let w = win.as_weak();
+        rt.spawn(async move {
+            if let Ok(devices) = c.app.list_remote_devices().await {
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(win) = w.upgrade() {
+                        let mapped: Vec<SyncDeviceItem> = devices
+                            .into_iter()
+                            .map(|d| SyncDeviceItem {
+                                id: d.id.into(),
+                                name: d.name.into(),
+                                fingerprint: d.fingerprint.into(),
+                                last_seen: d
+                                    .last_seen_at
+                                    .unwrap_or_else(|| "не в сети".into())
+                                    .into(),
+                                is_current: d.is_current,
+                                is_revoked: d.revoked_at.is_some(),
+                            })
+                            .collect();
+                        win.set_sync_devices(ModelRc::new(VecModel::from(mapped)));
+                    }
+                });
+            }
+        });
+    }
+
     /// Automatically opens the 4-step Setup Wizard on brand-new first run
     /// (when `onboarding_completed == false` and the active profile has no subjects yet).
     pub fn maybe_open_first_run_onboarding(&self, win: &MainWindow) -> bool {
@@ -4460,10 +4793,40 @@ pub fn run_desktop_app(app: Arc<AppServices>) -> Result<()> {
         }
     });
 
+    // Batched remote E2EE sync worker (8s coalesce + WebSocket /v1/ws live push + 3-way SQLite merge)
+    let sync_app = Arc::clone(&app);
+    let sync_ctrl = Arc::clone(&controller);
+    let sync_win = win.as_weak();
+    let sync_stop = Arc::clone(&stop_flag);
+    rt_handle.spawn(journal_app::run_remote_sync_worker(
+        sync_app,
+        sync_stop,
+        move || {
+            let c = Arc::clone(&sync_ctrl);
+            let w = sync_win.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(win) = w.upgrade() {
+                    c.refresh_all(&win);
+                    c.spawn_refresh_sync_devices(&win);
+                }
+            });
+        },
+    ));
+
     win.run()?;
 
-    // Graceful shutdown: stop background watcher, stop embedded HTTP MCP, checkpoint SQLite WAL
+    // Graceful shutdown: stop background workers, flush pending batched sync edits (max 5s), stop MCP, checkpoint WAL
     stop_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+    if let Ok(cfg) = app.load_sync_config()
+        && cfg.enabled
+        && cfg.auto_sync
+        && app.sync.current_revision() > cfg.last_synced_local_rev
+    {
+        let _ = rt_handle.block_on(tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            app.sync_now(),
+        ));
+    }
     mcp.stop();
     let _ = app.db.checkpoint_wal();
     drop(rt);

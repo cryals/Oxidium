@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-27 (Phase 19 — v0.1.4 GITHUB ACTIVITY GRAPH & M3 README)
+Last updated: 2026-11-27 (Phase 20 — ZERO-KNOWLEDGE E2EE SYNC NODE CLIENT & 3-WAY SQLITE AUTO-MERGE)
 
 ## Current Phase
-- **Active**: Completed Phase 19 — Full-width 53-week GitHub-style activity contribution graph with zero-jitter hover/card widths, `OxidiumTooltipState.prefer_above` floating day tooltips, and Material Design 3 `README.md` / `README.en.md` SVG banners & badges
-- **Next**: v0.1.4 release prepared after full verification, packaging, and isolated E2E validation
+- **Active**: Completed Phase 20 — Ed25519 mutual SSH-style auth & host pinning, zero-knowledge `OXE1` (`gzip` + `XChaCha20-Poly1305`) sync client, 8s batched worker + WebSocket listener, tombstone-aware 3-way SQLite auto-merge, `pre-sync-*.db` backups, and native Settings → «Синхронизация» tab in `Oxidium` (alongside production-ready `cryals/Oxidium-Sync` VPS node)
+- **Next**: Push `Oxidium` `main` and publish `v0.1.0` container release on `cryals/Oxidium-Sync` upon user confirmation
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |
@@ -26,6 +26,7 @@ Last updated: 2026-11-27 (Phase 19 — v0.1.4 GITHUB ACTIVITY GRAPH & M3 README)
 | 14 | Dynamic Updater, First-Run Onboarding & Release CI/CD | DONE | Semi-automatic GitHub Releases updater with `--wait-pid`/`--relaunch`/`.old` executable swap, tag/Cargo version guard & single-version release notes in `.github/workflows/release.yml`, unified `0.1.1` versioning |
 | 15 | M3 Expressive UI, Smooth Spline/Donut Charts, Multi-Type Heatmap & Motion | DONE | Fritsch-Carlson spline chart, rounded-cap donut, semantic bars, `5x7` mosaic heatmap, Settings layout fixes |
 | 16 | Independent Audit Remediation (`v0.1.1`) | DONE | All P0, P1 & polish findings from independent code & UX review resolved, zero Slint easing warnings, dark-mode contrast fixed |
+| 20 | Zero-Knowledge E2EE Sync Client & 3-Way Merge | DONE | Migration `0004` tombstones + 17 table triggers, `merge_remote_snapshot` + FTS5 rebuild, `OXE1` client + 8s batch worker, Settings → «Синхронизация» tab (`settings-sync.png` QA'd); `fmt`, `clippy -D warnings`, 31 workspace tests (incl. 3 `sync_e2e_tests`), `cargo audit` (0 vulns), `cargo deny check` PASSED |
 
 ## Resume Notes
 - App icons integrated from `assets/icon/` (`web/icon-192.png`, `web/icon-512.png`, `oxidium.ico`).

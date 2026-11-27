@@ -215,6 +215,15 @@ export struct ActivityRowItem {
     undone: bool,
 }
 
+export struct SyncDeviceItem {
+    id: string,
+    name: string,
+    fingerprint: string,
+    last_seen: string,
+    is_current: bool,
+    is_revoked: bool,
+}
+
 export struct NotificationRowItem {
     id: string,
     title: string,

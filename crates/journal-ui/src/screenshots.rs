@@ -134,7 +134,8 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         (2, "settings-kanban.png"),
         (3, "settings-mcp.png"),
         (4, "settings-data.png"),
-        (5, "settings-about.png"),
+        (5, "settings-sync.png"),
+        (6, "settings-about.png"),
     ] {
         win.set_settings_active_tab(tab);
         if tab == 3 {
@@ -147,6 +148,50 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         if tab == 4 {
             // Avoid leaking host developer username paths in committed documentation screenshots
             win.set_db_path_text(r"%LOCALAPPDATA%\oxidium\oxidium.db".into());
+        }
+        if tab == 5 {
+            win.set_sync_enabled(true);
+            win.set_sync_auto_sync(true);
+            win.set_sync_status_text("Синхронизировано".into());
+            win.set_sync_status_level(1);
+            win.set_sync_server_url("https://sync.example.com".into());
+            win.set_sync_server_fingerprint(
+                "SHA256:ELpoLIrRNROXHotWiBqri9cCu4B3luyoGTLHNalNbm0".into(),
+            );
+            win.set_sync_device_name("Workstation".into());
+            win.set_sync_device_pub(
+                "oxd-ed25519 oJql9HpnWYAv+VX43C0qFKXJnSO+l/hkEn/5ODRVpPA".into(),
+            );
+            win.set_sync_device_fingerprint(
+                "SHA256:EyW4UMKHGRbq4gPw78PImH9k5ePNsnZ55tH6l4CDV+Y".into(),
+            );
+            win.set_sync_vault_id("d46c6534f21c8dba".into());
+            win.set_sync_vault_code_masked("oxvault-v1-••••-••••-••••-S4M3-XM".into());
+            win.set_sync_vault_code_full("oxvault-v1-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZT-GMZ7-S4M3-XM".into());
+            win.set_sync_last_sync_text("18:10 UTC".into());
+            win.set_sync_seq_text("4".into());
+            win.set_sync_merge_summary_text(
+                "3-way слияние: +3 записей с ноды, применено удалений: 1, дедуплицировано: 0"
+                    .into(),
+            );
+            win.set_sync_devices(slint::ModelRc::new(slint::VecModel::from(vec![
+                crate::SyncDeviceItem {
+                    id: "dev-1".into(),
+                    name: "Workstation".into(),
+                    fingerprint: "SHA256:EyW4UMKHGRbq4gPw78PImH9k5ePNsnZ55tH6l4CDV+Y".into(),
+                    last_seen: "только что".into(),
+                    is_current: true,
+                    is_revoked: false,
+                },
+                crate::SyncDeviceItem {
+                    id: "dev-2".into(),
+                    name: "ThinkPad-Ubuntu".into(),
+                    fingerprint: "SHA256:k82mX1Qp8o5s2l9w0r4t3v7y8b1n6q9a2e4r7t8u0xY".into(),
+                    last_seen: "2026-11-27 17:42".into(),
+                    is_current: false,
+                    is_revoked: false,
+                },
+            ])));
         }
         win.invoke_apply_color_scheme(1);
         capture(shot)?;

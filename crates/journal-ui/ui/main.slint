@@ -6,7 +6,7 @@ import {
     DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
     PeriodItem, MarkTypeItem, StatBarItem, TrendPointItem, HeatmapWeekRow,
     KanbanColumnModel, BoardItem, ChecklistRowItem, SearchHitItem,
-    ActivityRowItem, NotificationRowItem, UiStrings
+    ActivityRowItem, NotificationRowItem, SyncDeviceItem, UiStrings
 } from "types.slint";
 import { JournalView } from "views/journal_view.slint";
 import { StatisticsView } from "views/statistics_view.slint";
@@ -22,7 +22,7 @@ export {
     DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
     PeriodItem, MarkTypeItem, StatBarItem, TrendPointItem, HeatmapWeekRow,
     KanbanColumnModel, BoardItem, ChecklistRowItem, SearchHitItem,
-    ActivityRowItem, NotificationRowItem, UiStrings
+    ActivityRowItem, NotificationRowItem, SyncDeviceItem, UiStrings
 }
 
 export component MainWindow inherits MaterialWindow {
@@ -280,6 +280,32 @@ export component MainWindow inherits MaterialWindow {
     in property <string> update_status_text: "";
     in property <bool> update_has_asset: false;
 
+    // Zero-Knowledge E2EE Sync state
+    in property <bool> sync_enabled: false;
+    in_out property <bool> sync_auto_sync: true;
+    in property <string> sync_status_text: "Не подключено";
+    in property <int> sync_status_level: 0;
+    in property <string> sync_server_url: "";
+    in property <string> sync_server_fingerprint: "";
+    in property <string> sync_device_pub: "";
+    in property <string> sync_device_fingerprint: "";
+    in property <string> sync_device_name: "Oxidium-Desktop";
+    in property <string> sync_vault_id: "";
+    in property <string> sync_vault_code_masked: "";
+    in property <string> sync_vault_code_full: "";
+    in_out property <bool> sync_vault_revealed: false;
+    in property <string> sync_last_sync_text: "—";
+    in property <string> sync_seq_text: "0";
+    in property <string> sync_merge_summary_text: "";
+    in property <string> sync_error_text: "";
+    in property <bool> sync_busy: false;
+    in property <[SyncDeviceItem]> sync_devices;
+    in_out property <string> sync_invite_draft: "";
+    in_out property <string> sync_device_name_draft: "";
+    in_out property <string> sync_vault_import_draft: "";
+    in_out property <string> sync_manual_url_draft: "";
+    in_out property <string> sync_manual_fp_draft: "";
+
     // Callbacks
     callback section_changed(int);
     callback theme_quick_toggle();
@@ -367,6 +393,14 @@ export component MainWindow inherits MaterialWindow {
     callback trigger_restore();
     callback export_data(string);
     callback import_data(string);
+    callback sync_pair_invite(string, string, string);
+    callback sync_connect_manual(string, string, string, string);
+    callback sync_now_clicked();
+    callback sync_disconnect_clicked();
+    callback sync_toggle_auto(bool);
+    callback sync_import_vault_key(string);
+    callback sync_refresh_devices();
+    callback sync_revoke_device(string);
 
     forward_focus: key_handler;
 
@@ -1137,6 +1171,31 @@ export component MainWindow inherits MaterialWindow {
         update_latest_version: root.update_latest_version;
         update_status_text: root.update_status_text;
 
+        sync_enabled: root.sync_enabled;
+        sync_auto_sync <=> root.sync_auto_sync;
+        sync_status_text: root.sync_status_text;
+        sync_status_level: root.sync_status_level;
+        sync_server_url: root.sync_server_url;
+        sync_server_fingerprint: root.sync_server_fingerprint;
+        sync_device_pub: root.sync_device_pub;
+        sync_device_fingerprint: root.sync_device_fingerprint;
+        sync_device_name: root.sync_device_name;
+        sync_vault_id: root.sync_vault_id;
+        sync_vault_code_masked: root.sync_vault_code_masked;
+        sync_vault_code_full: root.sync_vault_code_full;
+        sync_vault_revealed <=> root.sync_vault_revealed;
+        sync_last_sync_text: root.sync_last_sync_text;
+        sync_seq_text: root.sync_seq_text;
+        sync_merge_summary_text: root.sync_merge_summary_text;
+        sync_error_text: root.sync_error_text;
+        sync_busy: root.sync_busy;
+        sync_devices: root.sync_devices;
+        sync_invite_draft <=> root.sync_invite_draft;
+        sync_device_name_draft <=> root.sync_device_name_draft;
+        sync_vault_import_draft <=> root.sync_vault_import_draft;
+        sync_manual_url_draft <=> root.sync_manual_url_draft;
+        sync_manual_fp_draft <=> root.sync_manual_fp_draft;
+
         close => { root.settings_modal_open = false; }
         save_appearance(t, l, a, c, r, s) => { root.save_appearance(t, l, a, c, r, s); }
         save_journal_prefs(m, p, w, wk, h) => { root.save_journal_prefs(m, p, w, wk, h); }
@@ -1156,6 +1215,14 @@ export component MainWindow inherits MaterialWindow {
         check_updates => { root.check_updates_clicked(); }
         open_update_modal => { root.update_modal_open = true; }
         open_releases_page => { root.open_releases_page(); }
+        sync_pair_invite(inv, name, vmk) => { root.sync_pair_invite(inv, name, vmk); }
+        sync_connect_manual(url, fp, name, vmk) => { root.sync_connect_manual(url, fp, name, vmk); }
+        sync_now_clicked => { root.sync_now_clicked(); }
+        sync_disconnect_clicked => { root.sync_disconnect_clicked(); }
+        sync_toggle_auto(en) => { root.sync_toggle_auto(en); }
+        sync_import_vault_key(code) => { root.sync_import_vault_key(code); }
+        sync_refresh_devices => { root.sync_refresh_devices(); }
+        sync_revoke_device(id) => { root.sync_revoke_device(id); }
     }
 
     QuickProfilePopover {
