@@ -38,6 +38,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0003_sync_and_idempotency",
         sql: include_str!("../../../migrations/0003_sync_and_idempotency.sql"),
     },
+    Migration {
+        version: 4,
+        name: "0004_sync_remote_state",
+        sql: include_str!("../../../migrations/0004_sync_remote_state.sql"),
+    },
 ];
 
 #[derive(Debug, Clone)]

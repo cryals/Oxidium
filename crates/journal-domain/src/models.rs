@@ -1045,3 +1045,105 @@ impl Default for AppSettings {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncConnectionStatus {
+    #[default]
+    Disconnected,
+    Idle,
+    Syncing,
+    Synced,
+    Conflict,
+    Offline,
+    Error,
+}
+
+impl SyncConnectionStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Disconnected => "disconnected",
+            Self::Idle => "idle",
+            Self::Syncing => "syncing",
+            Self::Synced => "synced",
+            Self::Conflict => "conflict",
+            Self::Offline => "offline",
+            Self::Error => "error",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "idle" => Self::Idle,
+            "syncing" => Self::Syncing,
+            "synced" => Self::Synced,
+            "conflict" => Self::Conflict,
+            "offline" => Self::Offline,
+            "error" => Self::Error,
+            _ => Self::Disconnected,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SyncRemoteConfig {
+    pub enabled: bool,
+    pub auto_sync: bool,
+    pub server_url: String,
+    pub server_pub: String,
+    pub server_fingerprint: String,
+    pub device_id: String,
+    pub device_name: String,
+    pub vault_id: String,
+    pub last_synced_seq: i64,
+    pub last_synced_local_rev: i64,
+    pub last_sync_at: Option<DateTime<Utc>>,
+    pub last_status: SyncConnectionStatus,
+    pub last_error: Option<String>,
+    pub batch_debounce_secs: u64,
+    pub last_merge_summary: Option<String>,
+}
+
+impl Default for SyncRemoteConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            auto_sync: true,
+            server_url: String::new(),
+            server_pub: String::new(),
+            server_fingerprint: String::new(),
+            device_id: String::new(),
+            device_name: String::new(),
+            vault_id: String::new(),
+            last_synced_seq: 0,
+            last_synced_local_rev: 0,
+            last_sync_at: None,
+            last_status: SyncConnectionStatus::Disconnected,
+            last_error: None,
+            batch_debounce_secs: 8,
+            last_merge_summary: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SyncDeviceInfo {
+    pub id: String,
+    pub user_id: String,
+    pub name: String,
+    pub public_key: String,
+    pub fingerprint: String,
+    pub created_at: String,
+    pub last_seen_at: Option<String>,
+    pub revoked_at: Option<String>,
+    pub is_current: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SyncMergeReport {
+    pub merged_tables: usize,
+    pub records_from_remote: usize,
+    pub tombstones_applied: usize,
+    pub deduplicated_items: usize,
+    pub summary_ru: String,
+}

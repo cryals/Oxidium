@@ -5,6 +5,7 @@ pub mod journal_repo;
 pub mod kanban_repo;
 pub mod ops_repo;
 pub mod profiles_repo;
+pub mod sync_merge;
 
 pub use db::{AppliedMigration, Database, SyncState};
 pub use error::{StorageError, StorageResult};

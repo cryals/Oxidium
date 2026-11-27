@@ -54,13 +54,13 @@ fn migrations_are_idempotent_and_seed_builtins() {
     {
         let db = Database::open(&db_path).unwrap();
         assert!(db.check_integrity().unwrap());
-        assert_eq!(db.applied_migrations().unwrap().len(), 3);
+        assert_eq!(db.applied_migrations().unwrap().len(), 4);
         let marks = db.list_mark_types(None).unwrap();
         assert_eq!(marks.len(), 10);
     }
     // Re-open existing DB: migrations stay applied with zero error
     let db2 = Database::open(&db_path).unwrap();
-    assert_eq!(db2.applied_migrations().unwrap().len(), 3);
+    assert_eq!(db2.applied_migrations().unwrap().len(), 4);
     assert_eq!(db2.list_mark_types(None).unwrap().len(), 10);
 }
 
