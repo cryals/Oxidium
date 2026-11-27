@@ -1,0 +1,17 @@
+* text=auto
+*.sql text eol=lf
+*.sh text eol=lf
+*.rs text eol=lf
+*.slint text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.svg text eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.ttf binary
+*.otf binary

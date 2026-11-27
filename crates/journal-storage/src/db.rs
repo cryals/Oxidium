@@ -14,6 +14,14 @@ struct Migration {
     sql: &'static str,
 }
 
+fn canonical_migration_sql(sql: &str) -> String {
+    sql.replace("\r\n", "\n")
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+
 const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 1,
@@ -120,7 +128,9 @@ impl Database {
         )?;
 
         for m in MIGRATIONS {
-            let checksum = hex::encode(Sha256::digest(m.sql.as_bytes()));
+            let canonical_sql = canonical_migration_sql(m.sql);
+            let canonical_checksum = sha256_hex(canonical_sql.as_bytes());
+            let legacy_crlf_checksum = sha256_hex(canonical_sql.replace('\n', "\r\n").as_bytes());
             let existing: Option<String> = conn
                 .query_row(
                     "SELECT checksum FROM schema_migrations WHERE version = ?1",
@@ -130,22 +140,34 @@ impl Database {
                 .ok();
 
             if let Some(prev_checksum) = existing {
-                if prev_checksum != checksum {
-                    return Err(StorageError::Migration(format!(
-                        "checksum mismatch for migration {} ({})",
-                        m.version, m.name
-                    )));
+                if prev_checksum == canonical_checksum {
+                    continue;
                 }
-                continue;
+                if prev_checksum == legacy_crlf_checksum {
+                    conn.execute(
+                        "UPDATE schema_migrations SET checksum = ?1 WHERE version = ?2",
+                        params![canonical_checksum, m.version],
+                    )?;
+                    tracing::warn!(
+                        version = m.version,
+                        name = m.name,
+                        "normalized legacy CRLF migration checksum to canonical LF"
+                    );
+                    continue;
+                }
+                return Err(StorageError::Migration(format!(
+                    "checksum mismatch for migration {} ({})",
+                    m.version, m.name
+                )));
             }
 
             let tx = conn.transaction()?;
-            tx.execute_batch(m.sql).map_err(|e| {
+            tx.execute_batch(&canonical_sql).map_err(|e| {
                 StorageError::Migration(format!("migration {} ({}) failed: {e}", m.version, m.name))
             })?;
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, applied_at, checksum) VALUES (?1, ?2, ?3, ?4)",
-                params![m.version, m.name, Utc::now().to_rfc3339(), checksum],
+                params![m.version, m.name, Utc::now().to_rfc3339(), canonical_checksum],
             )?;
             tx.commit()?;
             tracing::info!(

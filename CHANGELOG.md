@@ -3,6 +3,13 @@
 All notable changes to **Oxidium** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/) and [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [0.1.2] - 2026-11-27
+
+### Fixed
+- **SQL Migration EOL Checksum Mismatch (CI Windows vs Local LF)**: Added `.gitattributes` enforcing canonical `LF` line endings across SQL migrations, scripts, and source files, normalized SQL text to `LF` before hashing in `journal-storage`, and added automatic migration checksum healing when opening databases previously initialized with `CRLF` migration hashes.
+- **Visible Startup Error Reporting on Windows**: Added structured startup error logging to `<db_dir>/startup-error.log` and a native `rfd::MessageDialog` error popup when launching the GUI fails (instead of exiting silently under `windows_subsystem = "windows"`), suppressible via `OXIDIUM_NO_ERROR_DIALOG=1`.
+- **Windows In-Place Installer `.old` Parking**: Added PID-suffixed `{exe}.{pid}.old` fallback and `.old` directory sweeping in `windows_installer.rs` so updates succeed cleanly even if an existing `.old` binary is locked by a running background MCP process.
+
 ## [0.1.1] - 2026-11-27
 
 ### Added

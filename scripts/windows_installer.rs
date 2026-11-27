@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 const APP_NAME: &str = "Oxidium";
 const APP_VERSION: &str = match option_env!("OXIDIUM_VERSION") {
     Some(v) => v,
-    None => "0.1.1",
+    None => "0.1.2",
 };
 const APP_PUBLISHER: &str = "Oxidium Contributors";
 const UNINSTALL_REG_KEY: &str =
@@ -90,19 +90,49 @@ fn wait_for_pid_exit(pid: u32) {
     }
 }
 
-fn park_existing_executables(install_dir: &Path) -> Vec<PathBuf> {
+fn park_existing_executables(install_dir: &Path) -> Vec<(PathBuf, PathBuf)> {
     let mut parked = Vec::new();
+    let pid = std::process::id();
     for exe in ["student-journal.exe", "student-journal-mcp.exe", "uninstall.exe"] {
         let live = install_dir.join(exe);
-        let old = install_dir.join(format!("{exe}.old"));
-        if old.exists() {
-            let _ = fs::remove_file(&old);
+        if !live.exists() {
+            continue;
         }
-        if live.exists() && fs::rename(&live, &old).is_ok() {
-            parked.push(old);
+        let default_old = install_dir.join(format!("{exe}.old"));
+        if default_old.exists() {
+            let _ = fs::remove_file(&default_old);
+        }
+        if fs::rename(&live, &default_old).is_ok() {
+            parked.push((live, default_old));
+            continue;
+        }
+        let pid_old = install_dir.join(format!("{exe}.{pid}.old"));
+        if pid_old.exists() {
+            let _ = fs::remove_file(&pid_old);
+        }
+        if fs::rename(&live, &pid_old).is_ok() {
+            parked.push((live, pid_old));
         }
     }
     parked
+}
+
+fn cleanup_old_files(install_dir: &Path, parked: Vec<(PathBuf, PathBuf)>) {
+    for (_, old) in parked {
+        let _ = fs::remove_file(old);
+    }
+    if let Ok(entries) = fs::read_dir(install_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.ends_with(".old"))
+            {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
 }
 
 fn create_shortcut(
@@ -201,16 +231,9 @@ fn do_install(
     let _ = fs::remove_file(&tmp_zip);
     if let Err(e) = extract_res {
         // Attempt rollback of parked binaries if extraction failed
-        for old in &parked_old {
-            if let Some(orig_name) = old
-                .file_name()
-                .and_then(|n| n.to_str())
-                .and_then(|n| n.strip_suffix(".old"))
-            {
-                let live = install_dir.join(orig_name);
-                if !live.exists() {
-                    let _ = fs::rename(old, &live);
-                }
+        for (live, old) in &parked_old {
+            if !live.exists() && old.exists() {
+                let _ = fs::rename(old, live);
             }
         }
         return Err(e);
@@ -225,9 +248,7 @@ fn do_install(
     }
 
     // Best-effort cleanup of .old binaries
-    for old in parked_old {
-        let _ = fs::remove_file(old);
-    }
+    cleanup_old_files(install_dir, parked_old);
 
     if create_shortcuts
         && let Some(sm_dir) = start_menu_dir()
@@ -296,6 +317,7 @@ fn do_uninstall(install_dir: &Path, remove_shortcuts: bool, unregister_hkcu: boo
             let _ = fs::remove_file(&p);
         }
     }
+    cleanup_old_files(install_dir, Vec::new());
     let uninst = install_dir.join("uninstall.exe");
     if uninst.exists() && env::current_exe().ok().as_deref() != Some(uninst.as_path()) {
         let _ = fs::remove_file(&uninst);

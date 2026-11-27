@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-27 (Phase 16 — INDEPENDENT AUDIT REMEDIATION & RELEASE v0.1.1)
+Last updated: 2026-11-27 (Phase 17 — HOTFIX v0.1.2: MIGRATION EOL NORMALIZATION & STARTUP DIAGNOSTICS)
 
 ## Current Phase
-- **Active**: Completed Phase 16 — Independent Review audit remediation, visual polish, updater/MCP security hardening, and version bump to `v0.1.1`
-- **Next**: Finalize verification, package Windows `0.1.1`, push `main`, tag `v0.1.1`, and publish GitHub Release `v0.1.1`
+- **Active**: Completed Phase 17 (`v0.1.2`) — Fixed cross-platform SQL migration `LF`/`CRLF` checksum mismatch, enforced `.gitattributes`, added native GUI startup error dialog + `startup-error.log`, and hardened `.old` executable parking in `windows_installer.rs`
+- **Next**: Ready for remote release if requested by user (`git push` / `v0.1.2` release)
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |

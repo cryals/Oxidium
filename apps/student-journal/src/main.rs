@@ -5,7 +5,8 @@
 
 use anyhow::Result;
 use journal_app::AppServices;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 enum CliMode {
@@ -72,8 +73,53 @@ fn main() -> Result<()> {
         CliMode::RenderScreenshots { out_dir } => journal_ui::render_screenshots_headless(&out_dir),
         CliMode::Gui { db_path } => {
             let db = db_path.unwrap_or_else(AppServices::default_db_path);
-            let app = AppServices::open_file(&db)?;
-            journal_ui::run_desktop_app(app)
+            let res: Result<()> = AppServices::open_file(&db)
+                .map_err(anyhow::Error::from)
+                .and_then(journal_ui::run_desktop_app);
+            if let Err(err) = res {
+                report_gui_startup_error(&db, &err);
+                return Err(err);
+            }
+            Ok(())
         }
+    }
+}
+
+fn report_gui_startup_error(db_path: &Path, err: &anyhow::Error) {
+    let log_dir = db_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let _ = std::fs::create_dir_all(log_dir);
+    let log_path = log_dir.join("startup-error.log");
+
+    let entry = format!(
+        "[{}] Oxidium v{} failed to start (db: {})\n{err:?}\n\n",
+        chrono::Utc::now().to_rfc3339(),
+        env!("CARGO_PKG_VERSION"),
+        db_path.display()
+    );
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        let _ = f.write_all(entry.as_bytes());
+    }
+
+    tracing::error!("{err:#}");
+    eprintln!("Error: {err:#}");
+
+    if std::env::var_os("OXIDIUM_NO_ERROR_DIALOG").is_none() {
+        rfd::MessageDialog::new()
+            .set_level(rfd::MessageLevel::Error)
+            .set_title("Oxidium — Ошибка запуска")
+            .set_description(format!(
+                "Не удалось запустить Oxidium v{}:\n\n{err:#}\n\nПодробности записаны в:\n{}",
+                env!("CARGO_PKG_VERSION"),
+                log_path.display()
+            ))
+            .set_buttons(rfd::MessageButtons::Ok)
+            .show();
     }
 }

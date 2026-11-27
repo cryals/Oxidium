@@ -340,3 +340,86 @@ fn concurrent_wal_multi_connection_writes() {
     assert_eq!(all.len(), 100);
     assert!(db.get_sync_state().unwrap().revision >= 102);
 }
+
+#[test]
+fn migrations_normalize_lf_and_heal_legacy_crlf_checksums() {
+    const LF_HASHES: &[(i64, &str)] = &[
+        (
+            1,
+            "479a8067d2162b14631ce071142fc6efb5ccddf91dca5211f41b1a234142c9e6",
+        ),
+        (
+            2,
+            "7a7f41403559e9b8dc6ed7225fbf38d8611782da2695d447901d19a30ca2bd2d",
+        ),
+        (
+            3,
+            "6a5145e6756ac4c6801010e28d245cb227d56afc2b3e06beb41930eecc2531a3",
+        ),
+    ];
+    const CRLF_HASHES: &[(i64, &str)] = &[
+        (
+            1,
+            "d1025f7905c7e6403e1b84afdbeefece385d6a90204f5f1d0e31d0994cc0c0bb",
+        ),
+        (
+            2,
+            "15341398585b2bde864781bc4b814dc9e12225e5090c68b4ed4c4a97d81cc4ca",
+        ),
+        (
+            3,
+            "b1d006f44949662945d270c457af686d56bd30749f7399cff237855b44605483",
+        ),
+    ];
+
+    let dir = TempDir::new().unwrap();
+    let db_path = dir.path().join("oxidium.db");
+    {
+        let db = Database::open(&db_path).unwrap();
+        let applied = db.applied_migrations().unwrap();
+        for ((ver, expected_hash), m) in LF_HASHES.iter().zip(applied.iter()) {
+            assert_eq!(m.version, *ver);
+            assert_eq!(m.checksum, *expected_hash);
+        }
+    }
+
+    // Simulate legacy CRLF-checked database created by an earlier CI build
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        for (ver, crlf_hash) in CRLF_HASHES {
+            conn.execute(
+                "UPDATE schema_migrations SET checksum = ?1 WHERE version = ?2",
+                rusqlite::params![crlf_hash, ver],
+            )
+            .unwrap();
+        }
+    }
+
+    // Re-opening must succeed and heal all checksums back to canonical LF
+    {
+        let db = Database::open(&db_path).unwrap();
+        let healed = db.applied_migrations().unwrap();
+        for ((ver, expected_hash), m) in LF_HASHES.iter().zip(healed.iter()) {
+            assert_eq!(m.version, *ver);
+            assert_eq!(m.checksum, *expected_hash);
+        }
+    }
+
+    // Arbitrary tampering with migration checksum must still fail closed
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE schema_migrations SET checksum = 'deadbeef' WHERE version = 1",
+            [],
+        )
+        .unwrap();
+    }
+    let err = match Database::open(&db_path) {
+        Ok(_) => panic!("tampered migration checksum must be rejected"),
+        Err(e) => e,
+    };
+    assert!(
+        err.to_string().contains("checksum mismatch"),
+        "unexpected error: {err}"
+    );
+}
