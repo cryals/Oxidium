@@ -3,6 +3,18 @@
 All notable changes to **Oxidium** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/) and [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [0.1.4] - 2026-11-27
+
+### Added
+
+- **GitHub-Style 53-Week Activity Contribution Graph**: Redesigned `ActivityHeatmapCard` into a full-width, 53-week (371-day) contribution matrix with month headers (`Jan`–`Dec` / `Янв`–`Дек`), sparse `Mon`/`Wed`/`Fri` weekday gutter (`Пн`/`Ср`/`Пт`), annual activity summary headline, 4-level emerald green ramp (`5`/`4`/`Зач.`), semantic mixed-day sub-cell splits (`3`, `2`, `Н/Б`, `Уваж.`, completed tasks), horizontal narrow-window `Flickable` scrolling, and `Less [][][][][] More` intensity legend.
+- **Above-Cell Floating Contribution Tooltips (`OxidiumTooltipState.prefer_above`)**: Hovering over any day square renders its unclipped summary and breakdown cleanly above the tile using `OxidiumTooltipState`.
+- **Material Design 3 README Redesign**: Updated [README.md](README.md) (Russian primary) and [README.en.md](README.en.md) with custom dark/light Mono Lavender M3 SVG banners, CTA pill buttons, assist chips, and theme-adaptive screenshot grids in `docs/assets/`.
+
+### Fixed
+
+- **Zero-Jitter Hover & Locked Card Widths**: Eliminated hover-induced width/height shifting across `StatisticsView` by moving `ActivityHeatmapCard` onto its own full-width row, locking horizontal stretch containers with `preferred_width: 0px` and `min_width: 0px` (without conflicting `space-between` / `start` container alignments), and using a fixed `24px` single-line elided footer.
+
 ## [0.1.3] - 2026-11-27
 
 ### Added

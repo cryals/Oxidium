@@ -22,7 +22,7 @@ def main() -> int:
 
     components = []
     seen = set()
-    app_version = "0.1.3"
+    app_version = "0.1.4"
     for pkg in meta.get("packages", []):
         name = pkg["name"]
         version = pkg["version"]

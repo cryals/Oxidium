@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-27 (Phase 18 — v0.1.3 RELEASE PREP & VERIFICATION)
+Last updated: 2026-11-27 (Phase 19 — v0.1.4 GITHUB ACTIVITY GRAPH & M3 README)
 
 ## Current Phase
-- **Active**: Completed Phase 18 — Material Design 3 Expressive spring motion curves/durations (`OxidiumMotion` + `OxidiumTheme`), zero-jitter 35-day heatmap hover card, top-level unclipped `OxidiumIconButton` tooltips, responsive narrow-window adaptives, `ShortcutsModal`/`QuickProfilePopover`/Settings MCP overflow fixes, and expanded rail cleanup (`Local-First · MCP` removed)
-- **Next**: v0.1.3 release prepared after full verification, packaging, and isolated E2E validation
+- **Active**: Completed Phase 19 — Full-width 53-week GitHub-style activity contribution graph with zero-jitter hover/card widths, `OxidiumTooltipState.prefer_above` floating day tooltips, and Material Design 3 `README.md` / `README.en.md` SVG banners & badges
+- **Next**: v0.1.4 release prepared after full verification, packaging, and isolated E2E validation
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |

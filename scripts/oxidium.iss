@@ -3,7 +3,7 @@
 
 #define MyAppName "Oxidium"
 #ifndef MyAppVersion
-#define MyAppVersion "0.1.3"
+#define MyAppVersion "0.1.4"
 #endif
 #define MyAppPublisher "Oxidium Contributors"
 #define MyAppURL "https://github.com/cryals/Oxidium"
