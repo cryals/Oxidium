@@ -154,7 +154,7 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
     win.set_mcp_http_running(false);
     win.set_mcp_status_text("Остановлен".into());
 
-    // 6. Statistics Dark Mode + Lower Activity Heatmap / Attendance / Forecast View
+    // 6. Statistics Dark Mode + Full-Width GitHub Contribution Graph / Attendance / Forecast View
     win.set_settings_modal_open(false);
     win.set_active_section(1);
     controller.refresh_statistics(&win);
@@ -163,7 +163,7 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
 
     let mixed_day = Utc::now().date_naive() - Duration::days(10);
     win.invoke_qa_scroll_stats_activity(
-        -520.0,
+        -760.0,
         mixed_day.format("%Y-%m-%d").to_string().into(),
         format!(
             "{} нояб. · смешанный день",
@@ -341,6 +341,33 @@ fn seed_visual_qa_dataset(app: &AppServices) -> Result<()> {
         (5, d_ago(12), 2, WorkType::Test, "Маршрутизация OSPF"),
         (5, d_ago(3), 4, WorkType::LabWork, "TCP Congestion"),
         (6, d_ago(8), 5, WorkType::ClassAnswer, "Speaking Test"),
+        // Historical academic year distribution for 53-week GitHub Contribution Graph
+        (0, d_ago(42), 5, WorkType::Homework, "Этика Аристотеля"),
+        (1, d_ago(55), 5, WorkType::LabWork, "Проектирование схемы"),
+        (1, d_ago(55), 5, WorkType::ClassAnswer, "Устный ответ по БД"),
+        (2, d_ago(68), 4, WorkType::LabWork, "Трейты и дженерики"),
+        (2, d_ago(75), 5, WorkType::Project, "Парсер JSON"),
+        (3, d_ago(75), 3, WorkType::Test, "Пределы и ряды"),
+        (4, d_ago(92), 5, WorkType::LabWork, "Системные вызовы"),
+        (5, d_ago(108), 4, WorkType::PracticalWork, "ARP и DNS"),
+        (1, d_ago(126), 5, WorkType::ControlWork, "Транзакции и MVCC"),
+        (2, d_ago(141), 5, WorkType::LabWork, "Многопоточность"),
+        (2, d_ago(141), 5, WorkType::Homework, "Бенчмарки Rust"),
+        (2, d_ago(141), 4, WorkType::ClassAnswer, "Код-ревью"),
+        (2, d_ago(141), 5, WorkType::Project, "Релиз CLI"),
+        (
+            6,
+            d_ago(160),
+            5,
+            WorkType::ClassAnswer,
+            "Technical Presentation",
+        ),
+        (3, d_ago(184), 2, WorkType::Test, "Интегрирование"),
+        (0, d_ago(205), 4, WorkType::Homework, "Логика Гегеля"),
+        (4, d_ago(228), 5, WorkType::LabWork, "Файловая система"),
+        (1, d_ago(255), 4, WorkType::LabWork, "Индексы GiST"),
+        (5, d_ago(280), 5, WorkType::LabWork, "TLS 1.3 анализ"),
+        (2, d_ago(312), 5, WorkType::Project, "Утилита мониторинга"),
     ];
     for (si, g_date, val, wt, topic) in grade_entries {
         app.add_grade(

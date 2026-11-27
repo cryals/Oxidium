@@ -3285,7 +3285,7 @@ impl UiController {
             .collect();
         win.set_stats_attendance_bars(ModelRc::new(VecModel::from(att_bars)));
 
-        // Multi-type 5x7 Activity Calendar Heatmap respecting user week_start & language
+        // GitHub-style 53-week Activity Contribution Graph respecting user week_start & language
         let heat_map: HashMap<NaiveDate, journal_app::ActivityHeatmapDay> = rep
             .activity_heatmap
             .into_iter()
@@ -3296,7 +3296,8 @@ impl UiController {
             WeekStart::Monday => today.weekday().num_days_from_monday() as i64,
         };
         let this_week_start = today - Duration::days(days_from_start);
-        let grid_start = this_week_start - Duration::weeks(4);
+        let total_weeks: i64 = 53;
+        let grid_start = this_week_start - Duration::weeks(total_weeks - 1);
         let task_accent = win.global::<OxidiumTheme>().get_task_accent();
 
         let wd_seq: [chrono::Weekday; 7] = match settings.week_start {
@@ -3321,15 +3322,45 @@ impl UiController {
         };
         let wd_labels: Vec<SharedString> = wd_seq
             .iter()
-            .map(|&w| i18n::weekday_short(settings.language, w).into())
+            .map(|&w| match w {
+                chrono::Weekday::Mon | chrono::Weekday::Wed | chrono::Weekday::Fri => {
+                    if settings.language == Language::En {
+                        match w {
+                            chrono::Weekday::Mon => "Mon",
+                            chrono::Weekday::Wed => "Wed",
+                            chrono::Weekday::Fri => "Fri",
+                            _ => "",
+                        }
+                        .into()
+                    } else {
+                        i18n::weekday_short(settings.language, w).into()
+                    }
+                }
+                _ => SharedString::new(),
+            })
             .collect();
         win.set_stats_heatmap_weekdays(ModelRc::new(VecModel::from(wd_labels)));
 
-        let mut week_rows = Vec::with_capacity(5);
-        for w in 0..5 {
+        let mut grid_grades: usize = 0;
+        let mut grid_absences: usize = 0;
+        let mut grid_tasks: usize = 0;
+        let mut week_rows = Vec::with_capacity(total_weeks as usize);
+
+        for w in 0..total_weeks {
+            let col_start = grid_start + Duration::days(w * 7);
             let mut row_days = Vec::with_capacity(7);
+            let mut month_label: &str = "";
+
             for d_off in 0..7 {
-                let d = grid_start + Duration::days(w * 7 + d_off);
+                let d = col_start + Duration::days(d_off);
+                if d.day() == 1 && month_label.is_empty() {
+                    month_label = short_month_localized(settings.language, d.month());
+                }
+                if let Some(rec) = heat_map.get(&d) {
+                    grid_grades += rec.grades_count;
+                    grid_absences += rec.absent_count;
+                    grid_tasks += rec.completed_tasks_count;
+                }
                 row_days.push(build_heatmap_day_item(
                     d,
                     today,
@@ -3339,15 +3370,33 @@ impl UiController {
                     settings.language,
                 ));
             }
+
+            if w == 0 && month_label.is_empty() {
+                let next_col_start = grid_start + Duration::days(7);
+                let next_starts_month =
+                    (0..7).any(|o| (next_col_start + Duration::days(o)).day() == 1);
+                if !next_starts_month {
+                    month_label = short_month_localized(settings.language, col_start.month());
+                }
+            }
+
             week_rows.push(HeatmapWeekRow {
-                week_label: (grid_start + Duration::days(w * 7))
-                    .format("%d.%m")
-                    .to_string()
-                    .into(),
+                col_index: w as i32,
+                month_label: month_label.into(),
+                week_label: col_start.format("%d.%m").to_string().into(),
                 days: ModelRc::new(VecModel::from(row_days)),
             });
         }
         win.set_stats_heatmap_weeks(ModelRc::new(VecModel::from(week_rows)));
+
+        let headline = format_heatmap_headline(
+            settings.language,
+            preset == 0,
+            grid_grades,
+            grid_absences,
+            grid_tasks,
+        );
+        win.set_stats_heatmap_headline(headline.into());
     }
 
     fn active_board_id_or_first(&self) -> Option<Uuid> {
@@ -3857,6 +3906,109 @@ fn format_date_long_localized(d: NaiveDate, lang: Language) -> String {
     format!("{} {}, {}", d.day(), month, wd)
 }
 
+fn short_month_localized(lang: Language, month: u32) -> &'static str {
+    match (lang, month) {
+        (Language::En, 1) => "Jan",
+        (Language::En, 2) => "Feb",
+        (Language::En, 3) => "Mar",
+        (Language::En, 4) => "Apr",
+        (Language::En, 5) => "May",
+        (Language::En, 6) => "Jun",
+        (Language::En, 7) => "Jul",
+        (Language::En, 8) => "Aug",
+        (Language::En, 9) => "Sep",
+        (Language::En, 10) => "Oct",
+        (Language::En, 11) => "Nov",
+        (Language::En, _) => "Dec",
+        (_, 1) => "Янв",
+        (_, 2) => "Фев",
+        (_, 3) => "Мар",
+        (_, 4) => "Апр",
+        (_, 5) => "Май",
+        (_, 6) => "Июн",
+        (_, 7) => "Июл",
+        (_, 8) => "Авг",
+        (_, 9) => "Сен",
+        (_, 10) => "Окт",
+        (_, 11) => "Ноя",
+        (_, _) => "Дек",
+    }
+}
+
+fn ru_plural(n: usize, one: &'static str, few: &'static str, many: &'static str) -> &'static str {
+    let m100 = n % 100;
+    let m10 = n % 10;
+    if (11..=14).contains(&m100) {
+        many
+    } else if m10 == 1 {
+        one
+    } else if (2..=4).contains(&m10) {
+        few
+    } else {
+        many
+    }
+}
+
+fn format_heatmap_headline(
+    lang: Language,
+    full_year: bool,
+    grades: usize,
+    absences: usize,
+    tasks: usize,
+) -> String {
+    let suffix = match (lang, full_year) {
+        (Language::En, true) => "in the last year",
+        (Language::En, false) => "in selected period",
+        (_, true) => "за последний год",
+        (_, false) => "за выбранный период",
+    };
+
+    let mut parts = Vec::new();
+    if lang == Language::En {
+        if grades > 0 {
+            parts.push(format!(
+                "{grades} {}",
+                if grades == 1 { "grade" } else { "grades" }
+            ));
+        }
+        if absences > 0 {
+            parts.push(format!(
+                "{absences} {}",
+                if absences == 1 { "absence" } else { "absences" }
+            ));
+        }
+        if tasks > 0 {
+            parts.push(format!(
+                "{tasks} {}",
+                if tasks == 1 { "task" } else { "tasks" }
+            ));
+        }
+        if parts.is_empty() {
+            return format!("No study activity {suffix}");
+        }
+    } else {
+        if grades > 0 {
+            parts.push(format!(
+                "{grades} {}",
+                ru_plural(grades, "оценка", "оценки", "оценок")
+            ));
+        }
+        if absences > 0 {
+            parts.push(format!("{absences} Н/Б"));
+        }
+        if tasks > 0 {
+            parts.push(format!(
+                "{tasks} {}",
+                ru_plural(tasks, "задача", "задачи", "задач")
+            ));
+        }
+        if parts.is_empty() {
+            return format!("Нет учебной активности {suffix}");
+        }
+    }
+    format!("{} {suffix}", parts.join(" · "))
+}
+
 fn build_heatmap_day_item(
     date: NaiveDate,
     today: NaiveDate,
@@ -3868,9 +4020,9 @@ fn build_heatmap_day_item(
     let is_today = date == today;
     let is_future = date > today;
     let empty_bg = if dark {
-        Color::from_rgb_u8(0x2B, 0x29, 0x31)
+        Color::from_rgb_u8(0x1E, 0x20, 0x26)
     } else {
-        Color::from_rgb_u8(0xEC, 0xE6, 0xF0)
+        Color::from_rgb_u8(0xEB, 0xED, 0xF0)
     };
     let empty_fg = if dark {
         Color::from_rgb_u8(0x9E, 0x9A, 0xA8)
@@ -3878,12 +4030,17 @@ fn build_heatmap_day_item(
         Color::from_rgb_u8(0x5E, 0x59, 0x69)
     };
     let full_date_label = format_date_long_localized(date, lang);
+    let no_records_lbl = if lang == Language::En {
+        "No activity"
+    } else {
+        "Нет записей за этот день"
+    };
 
     let Some(r) = rec else {
         return HeatmapDayItem {
             date_iso: date.format("%Y-%m-%d").to_string().into(),
             day_label: format!("{}", date.day()).into(),
-            full_date_label: full_date_label.into(),
+            full_date_label: full_date_label.clone().into(),
             is_today,
             is_future,
             total_count: 0,
@@ -3895,9 +4052,9 @@ fn build_heatmap_day_item(
             slot_1_color: empty_bg,
             slot_2_color: empty_bg,
             slot_3_color: empty_bg,
-            summary_line: "Нет записей за этот день".into(),
+            summary_line: no_records_lbl.into(),
             details_line: String::new().into(),
-            tooltip: String::new().into(),
+            tooltip: format!("{full_date_label} — {no_records_lbl}").into(),
         };
     };
 
@@ -3911,14 +4068,16 @@ fn build_heatmap_day_item(
         + r.excused_count
         + r.completed_tasks_count;
 
-    // Color scale for each semantic activity category (intensity deepens with count)
+    // GitHub-inspired 4-level emerald green ramp for positive grades (5/4/Зач.)
     let green_bg = match (good_count, dark) {
-        (1, false) => Color::from_rgb_u8(0xB8, 0xEB, 0xC6),
-        (1, true) => Color::from_rgb_u8(0x1E, 0x5A, 0x31),
-        (2, false) => Color::from_rgb_u8(0x6D, 0xCE, 0x89),
-        (2, true) => Color::from_rgb_u8(0x27, 0x7A, 0x41),
-        (_, false) => Color::from_rgb_u8(0x2E, 0x9B, 0x4E),
-        (_, true) => Color::from_rgb_u8(0x3E, 0xA8, 0x5D),
+        (1, false) => Color::from_rgb_u8(0x9B, 0xE9, 0xA8),
+        (1, true) => Color::from_rgb_u8(0x0E, 0x44, 0x29),
+        (2, false) => Color::from_rgb_u8(0x40, 0xC4, 0x63),
+        (2, true) => Color::from_rgb_u8(0x00, 0x6D, 0x32),
+        (3, false) => Color::from_rgb_u8(0x30, 0xA1, 0x4E),
+        (3, true) => Color::from_rgb_u8(0x26, 0xA6, 0x41),
+        (_, false) => Color::from_rgb_u8(0x21, 0x6E, 0x39),
+        (_, true) => Color::from_rgb_u8(0x39, 0xD3, 0x53),
     };
     let green_fg = if !dark && good_count >= 3 {
         Color::from_rgb_u8(0xFF, 0xFF, 0xFF)
@@ -4006,23 +4165,44 @@ fn build_heatmap_day_item(
 
     let mut summary_parts = Vec::new();
     if r.grades_count > 0 {
-        summary_parts.push(format!("Оценок: {}", r.grades_count));
+        summary_parts.push(if lang == Language::En {
+            format!("Grades: {}", r.grades_count)
+        } else {
+            format!("Оценок: {}", r.grades_count)
+        });
     }
     if r.absent_count > 0 {
-        summary_parts.push(format!("Н/Б: {}", r.absent_count));
+        summary_parts.push(if lang == Language::En {
+            format!("Absences: {}", r.absent_count)
+        } else {
+            format!("Н/Б: {}", r.absent_count)
+        });
     }
     if r.excused_count > 0 {
-        summary_parts.push(format!("Уваж.: {}", r.excused_count));
+        summary_parts.push(if lang == Language::En {
+            format!("Excused: {}", r.excused_count)
+        } else {
+            format!("Уваж.: {}", r.excused_count)
+        });
     }
     if r.completed_tasks_count > 0 {
-        summary_parts.push(format!("Задач: {}", r.completed_tasks_count));
+        summary_parts.push(if lang == Language::En {
+            format!("Tasks: {}", r.completed_tasks_count)
+        } else {
+            format!("Задач: {}", r.completed_tasks_count)
+        });
     }
     let summary_line = if summary_parts.is_empty() {
-        "Нет записей за этот день".to_string()
+        no_records_lbl.to_string()
     } else {
         summary_parts.join(" · ")
     };
     let details_line = r.details.join(" · ");
+    let tooltip = if details_line.is_empty() {
+        format!("{full_date_label} · {summary_line}")
+    } else {
+        format!("{full_date_label} · {summary_line}\n{details_line}")
+    };
 
     HeatmapDayItem {
         date_iso: date.format("%Y-%m-%d").to_string().into(),
@@ -4041,7 +4221,7 @@ fn build_heatmap_day_item(
         slot_3_color: slots.get(3).map(|s| s.0).unwrap_or(empty_bg),
         summary_line: summary_line.into(),
         details_line: details_line.into(),
-        tooltip: format!("{}: {}", date.format("%d.%m"), total).into(),
+        tooltip: tooltip.into(),
     }
 }
 

@@ -1,5 +1,5 @@
 import { MaterialPalette, FilledButton, TonalButton, OutlineButton, Icon, ScrollView } from "@material";
-import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
+import { OxidiumTheme, OxidiumMotion, OxidiumTooltipState, OxidiumIcons } from "../theme.slint";
 import { StatBarItem, TrendPointItem, HeatmapWeekRow, SubjectItem, UiStrings } from "../types.slint";
 
 component KpiCard inherits Rectangle {
@@ -10,6 +10,7 @@ component KpiCard inherits Rectangle {
     in property <color> icon_color: MaterialPalette.primary;
     in property <color> value_color: MaterialPalette.on_surface;
 
+    preferred_width: 0px;
     min_height: 110px;
     border_radius: kpi_ta.has_hover ? 24px : 20px;
     background: kpi_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface_container;
@@ -63,6 +64,7 @@ component KpiCard inherits Rectangle {
                 color: root.value_color;
             }
             if root.subtext != "" : Text {
+                preferred_width: 0px;
                 text: root.subtext;
                 font_size: 12px;
                 color: MaterialPalette.on_surface_variant;
@@ -88,6 +90,7 @@ component SplineChartCard inherits Rectangle {
     in_out property <string> hovered_trend_text: "";
     in_out property <float> hovered_trend_x: 0.0;
 
+    preferred_width: 0px;
     height: 292px;
     border_radius: 22px;
     background: MaterialPalette.surface_container_low;
@@ -100,10 +103,11 @@ component SplineChartCard inherits Rectangle {
         spacing: 8px;
 
         HorizontalLayout {
-            alignment: space-between;
             spacing: 8px;
             VerticalLayout {
                 horizontal_stretch: 1;
+                min_width: 0px;
+                preferred_width: 0px;
                 spacing: 2px;
                 HorizontalLayout {
                     spacing: 8px;
@@ -141,6 +145,7 @@ component SplineChartCard inherits Rectangle {
                 }
             }
             Rectangle {
+                horizontal_stretch: 0;
                 height: 26px;
                 border_radius: 13px;
                 background: OxidiumTheme.grade_4_bg;
@@ -237,6 +242,7 @@ component GradeDistCard inherits Rectangle {
     in property <string> overall_avg;
     in property <[StatBarItem]> grade_dist_bars;
 
+    preferred_width: 0px;
     height: 292px;
     border_radius: 22px;
     background: MaterialPalette.surface_container_low;
@@ -316,6 +322,7 @@ component SubjectAvgCard inherits Rectangle {
     in property <bool> compact: false;
     in property <[StatBarItem]> subject_avg_bars;
 
+    preferred_width: 0px;
     min_height: 248px;
     border_radius: 22px;
     background: MaterialPalette.surface_container_low;
@@ -412,6 +419,7 @@ component DonutChartCard inherits Rectangle {
     in property <image> donut_chart_image;
     in property <[StatBarItem]> donut_legend;
 
+    preferred_width: 0px;
     min_height: 248px;
     border_radius: 22px;
     background: MaterialPalette.surface_container_low;
@@ -519,7 +527,8 @@ component AttendanceCard inherits Rectangle {
     in property <bool> compact: false;
     in property <[StatBarItem]> attendance_bars;
 
-    min_height: 310px;
+    preferred_width: 0px;
+    min_height: 220px;
     border_radius: 22px;
     background: MaterialPalette.surface_container_low;
     border_width: 1px;
@@ -622,13 +631,21 @@ component AttendanceCard inherits Rectangle {
 component ActivityHeatmapCard inherits Rectangle {
     in property <[HeatmapWeekRow]> heatmap_weeks;
     in property <[string]> heatmap_weekdays;
+    in property <string> heatmap_headline: "";
     in property <string> completed_tasks_text;
     in_out property <string> hovered_day_key;
     in_out property <string> hovered_day_title;
     in_out property <string> hovered_day_summary;
     in_out property <string> hovered_day_details;
 
-    min_height: 310px;
+    // Discrete GitHub-style tile geometry (fits full 53 weeks cleanly at desktop, scrolls cleanly if narrow)
+    property <length> cell_sz: root.width >= 1120px ? 17px : (root.width >= 1000px ? 14px : (root.width >= 880px ? 13px : 12px));
+    property <length> cell_gap: root.width >= 1000px ? 3px : 2px;
+    property <length> col_step: root.cell_sz + root.cell_gap;
+    property <length> grid_w: max(1, root.heatmap_weeks.length) * root.col_step - root.cell_gap;
+    property <length> grid_h: 7 * root.cell_sz + 6 * root.cell_gap;
+
+    preferred_width: 0px;
     border_radius: 22px;
     background: MaterialPalette.surface_container_low;
     border_width: 1px;
@@ -637,22 +654,27 @@ component ActivityHeatmapCard inherits Rectangle {
 
     VerticalLayout {
         padding: 18px;
-        spacing: 8px;
+        spacing: 12px;
         alignment: start;
 
+        // GitHub-style Summary Header + Category Legend
         HorizontalLayout {
-            alignment: space-between;
-            spacing: 8px;
+            spacing: 12px;
             Text {
-                text: "Учебная активность (35 дней)";
+                horizontal_stretch: 1;
+                min_width: 0px;
+                preferred_width: 0px;
+                text: root.heatmap_headline != "" ? root.heatmap_headline : "Учебная активность за последний год";
                 font_family: OxidiumTheme.font_display;
                 font_size: 15px;
                 font_weight: 600;
                 color: MaterialPalette.on_surface;
                 overflow: elide;
+                vertical_alignment: center;
             }
             HorizontalLayout {
-                spacing: 7px;
+                horizontal_stretch: 0;
+                spacing: 8px;
                 for hleg in [
                     { l: "5/4", c: OxidiumTheme.grade_5 },
                     { l: "3", c: OxidiumTheme.grade_3 },
@@ -661,201 +683,220 @@ component ActivityHeatmapCard inherits Rectangle {
                     { l: "Ув.", c: OxidiumTheme.mark_excused },
                     { l: "Зад.", c: OxidiumTheme.task_accent },
                 ] : HorizontalLayout {
-                    spacing: 3px;
-                    VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border_radius: 2.5px; background: hleg.c; } }
+                    spacing: 4px;
+                    VerticalLayout { alignment: center; Rectangle { width: 9px; height: 9px; border_radius: 2.5px; background: hleg.c; } }
                     Text { text: hleg.l; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; vertical_alignment: center; }
                 }
             }
         }
 
-        // Weekday labels matching user week_start preference
-        HorizontalLayout {
-            spacing: 5px;
-            for wd in root.heatmap_weekdays : Text {
-                horizontal_stretch: 1;
-                text: wd;
-                font_size: 10px;
-                font_weight: 600;
-                color: MaterialPalette.on_surface_variant;
-                horizontal_alignment: center;
-            }
-        }
-
-        // 5x7 Matrix: single-type tinted OR multi-type split sub-cells (2x1 / 2x2 mosaic)
-        // Outer border_width stays constant (1px) and overlay ring fades opacity -> ZERO flicker/jitter!
-        VerticalLayout {
-            spacing: 5px;
-            for wk in root.heatmap_weeks : HorizontalLayout {
-                spacing: 5px;
-                for d in wk.days : Rectangle {
-                    horizontal_stretch: 1;
-                    height: 34px;
-                    border_radius: 9px;
-                    background: d.slot_count <= 1 ? d.cell_bg : MaterialPalette.surface_container_highest;
-                    opacity: d.is_future ? 0.35 : 1.0;
-                    border_width: 1px;
-                    border_color: OxidiumTheme.cell_border;
-                    clip: true;
-
-                    // 2 distinct event types -> crisp left/right split
-                    if d.slot_count == 2 : HorizontalLayout {
-                        spacing: 2px;
-                        Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
-                        Rectangle { horizontal_stretch: 1; background: d.slot_1_color; }
-                    }
-
-                    // 3 distinct event types -> left half + right top/bottom split
-                    if d.slot_count == 3 : HorizontalLayout {
-                        spacing: 2px;
-                        Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
-                        VerticalLayout {
-                            horizontal_stretch: 1;
-                            spacing: 2px;
-                            Rectangle { vertical_stretch: 1; background: d.slot_1_color; }
-                            Rectangle { vertical_stretch: 1; background: d.slot_2_color; }
-                        }
-                    }
-
-                    // 4+ distinct event types -> clean 2x2 quad mosaic
-                    if d.slot_count >= 4 : VerticalLayout {
-                        spacing: 2px;
-                        HorizontalLayout {
-                            vertical_stretch: 1; spacing: 2px;
-                            Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
-                            Rectangle { horizontal_stretch: 1; background: d.slot_1_color; }
-                        }
-                        HorizontalLayout {
-                            vertical_stretch: 1; spacing: 2px;
-                            Rectangle { horizontal_stretch: 1; background: d.slot_2_color; }
-                            Rectangle { horizontal_stretch: 1; background: d.slot_3_color; }
-                        }
-                    }
-
-                    // Crisp centered date pill (framed on split cells for effortless legibility)
-                    if d.slot_count >= 2 : Rectangle {
-                        width: 22px; height: 16px;
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                        border_radius: 6px;
-                        background: OxidiumTheme.dark_mode ? #141218D8 : #FFFFFFE2;
-                        Text {
-                            text: d.day_label;
-                            font_family: OxidiumTheme.font_mono;
-                            font_size: 10px; font_weight: 700;
-                            color: MaterialPalette.on_surface;
-                            horizontal_alignment: center; vertical_alignment: center;
-                        }
-                    }
-
-                    if d.slot_count < 2 : Text {
-                        text: d.day_label;
-                        font_family: OxidiumTheme.font_mono;
-                        font_size: 11px; font_weight: d.total_count > 0 || d.is_today ? 700 : 500;
-                        color: d.cell_fg;
-                        horizontal_alignment: center;
-                        vertical_alignment: center;
-                    }
-
-                    // Smooth hover / today focus ring without altering geometry or outer border_width
-                    Rectangle {
-                        width: 100%;
-                        height: 100%;
-                        border_radius: 9px;
-                        border_width: 2px;
-                        border_color: MaterialPalette.primary;
-                        background: transparent;
-                        opacity: h_ta.has_hover ? 1.0 : (d.is_today ? 0.85 : 0.0);
-                        animate opacity { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
-                    }
-
-                    h_ta := TouchArea {
-                        mouse_cursor: pointer;
-                        changed has_hover => {
-                            if (self.has_hover) {
-                                root.hovered_day_key = d.date_iso;
-                                root.hovered_day_title = d.full_date_label;
-                                root.hovered_day_summary = d.summary_line;
-                                root.hovered_day_details = d.details_line;
-                            } else if (root.hovered_day_key == d.date_iso) {
-                                root.hovered_day_key = "";
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fixed-height Hover Detail Box (64px constant height, single-line elide -> ZERO vertical jitter!)
+        // Framed 53-week x 7-day GitHub Contribution Graph
         Rectangle {
-            height: 64px;
             border_radius: 14px;
             background: MaterialPalette.surface_container;
             border_width: 1px;
-            border_color: root.hovered_day_key != "" ? MaterialPalette.primary.with_alpha(55%) : OxidiumTheme.cell_border;
+            border_color: OxidiumTheme.cell_border;
             clip: true;
-            animate border_color { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
 
-            VerticalLayout {
-                padding_left: 12px;
-                padding_right: 12px;
-                padding_top: 8px;
-                padding_bottom: 8px;
-                spacing: 3px;
-                alignment: center;
+            HorizontalLayout {
+                padding_left: 14px;
+                padding_right: 14px;
+                padding_top: 12px;
+                padding_bottom: 12px;
+                spacing: 8px;
 
-                if root.hovered_day_key == "" : HorizontalLayout {
-                    alignment: space-between;
-                    spacing: 8px;
-                    Text {
-                        horizontal_stretch: 1;
-                        text: "Наведите на любую ячейку дня, чтобы увидеть подробности оценок и пропусков";
-                        font_size: 11px;
+                // Sparse Weekday Axis (Mon / Wed / Fri)
+                VerticalLayout {
+                    horizontal_stretch: 0;
+                    width: 22px;
+                    padding_top: 18px;
+                    spacing: root.cell_gap;
+                    for wd in root.heatmap_weekdays : Text {
+                        height: root.cell_sz;
+                        text: wd;
+                        font_size: 10px;
+                        font_weight: 500;
                         color: MaterialPalette.on_surface_variant;
-                        overflow: elide;
+                        horizontal_alignment: left;
                         vertical_alignment: center;
                     }
+                }
+
+                // Horizontally scrollable viewport when window is narrow (< ~960px), centered when fits
+                flk := Flickable {
+                    horizontal_stretch: 1;
+                    min_width: 0px;
+                    preferred_width: 0px;
+                    height: 18px + root.grid_h;
+                    content_width: max(self.width, root.grid_w);
+                    content_height: self.height;
+                    interactive: root.grid_w > self.width;
+
                     Rectangle {
-                        height: 24px; border_radius: 12px;
-                        background: MaterialPalette.primary_container;
+                        x: 0px;
+                        y: 0px;
+                        width: root.grid_w;
+                        height: flk.height;
+                        background: transparent;
+
+                        // Month Headers anchored strictly above first week of each month
+                        for wk in root.heatmap_weeks : Text {
+                            visible: wk.month_label != "";
+                            x: min(wk.col_index * root.col_step, max(0px, parent.width - 28px));
+                            y: 0px;
+                            width: 34px;
+                            height: 16px;
+                            text: wk.month_label;
+                            font_size: 10px;
+                            font_weight: 500;
+                            color: MaterialPalette.on_surface_variant;
+                            vertical_alignment: center;
+                        }
+
+                        // 53 columns x 7 rows of rounded GitHub contribution squares
                         HorizontalLayout {
-                            padding_left: 10px; padding_right: 10px;
-                            Text {
-                                text: "Задач выполнено: " + root.completed_tasks_text;
-                                font_family: OxidiumTheme.font_mono;
-                                font_size: 10px; font_weight: 600;
-                                color: MaterialPalette.on_primary_container;
-                                vertical_alignment: center;
+                            x: 0px;
+                            y: 18px;
+                            width: root.grid_w;
+                            height: root.grid_h;
+                            spacing: root.cell_gap;
+
+                            for wk in root.heatmap_weeks : VerticalLayout {
+                                spacing: root.cell_gap;
+                                for d in wk.days : cell := Rectangle {
+                                    width: root.cell_sz;
+                                    height: root.cell_sz;
+                                    border_radius: 3px;
+                                    background: d.slot_count <= 1 ? d.cell_bg : MaterialPalette.surface_container_highest;
+                                    opacity: d.is_future ? 0.25 : 1.0;
+                                    border_width: 1px;
+                                    border_color: OxidiumTheme.dark_mode ? #FFFFFF10 : #1F23281A;
+                                    clip: true;
+
+                                    if d.slot_count == 2 : HorizontalLayout {
+                                        spacing: 1px;
+                                        Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
+                                        Rectangle { horizontal_stretch: 1; background: d.slot_1_color; }
+                                    }
+
+                                    if d.slot_count == 3 : HorizontalLayout {
+                                        spacing: 1px;
+                                        Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
+                                        VerticalLayout {
+                                            horizontal_stretch: 1;
+                                            spacing: 1px;
+                                            Rectangle { vertical_stretch: 1; background: d.slot_1_color; }
+                                            Rectangle { vertical_stretch: 1; background: d.slot_2_color; }
+                                        }
+                                    }
+
+                                    if d.slot_count >= 4 : VerticalLayout {
+                                        spacing: 1px;
+                                        HorizontalLayout {
+                                            vertical_stretch: 1; spacing: 1px;
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_0_color; }
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_1_color; }
+                                        }
+                                        HorizontalLayout {
+                                            vertical_stretch: 1; spacing: 1px;
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_2_color; }
+                                            Rectangle { horizontal_stretch: 1; background: d.slot_3_color; }
+                                        }
+                                    }
+
+                                    if h_ta.has_hover || d.is_today : Rectangle {
+                                        width: 100%;
+                                        height: 100%;
+                                        border_radius: 3px;
+                                        border_width: 1.5px;
+                                        border_color: h_ta.has_hover ? MaterialPalette.on_surface : MaterialPalette.primary;
+                                        background: transparent;
+                                    }
+
+                                    h_ta := TouchArea {
+                                        mouse_cursor: pointer;
+                                        changed has_hover => {
+                                            if (self.has_hover) {
+                                                root.hovered_day_key = d.date_iso;
+                                                root.hovered_day_title = d.full_date_label;
+                                                root.hovered_day_summary = d.summary_line;
+                                                root.hovered_day_details = d.details_line;
+                                                OxidiumTooltipState.text = d.tooltip;
+                                                OxidiumTooltipState.anchor_x = cell.absolute-position.x;
+                                                OxidiumTooltipState.anchor_y = cell.absolute-position.y;
+                                                OxidiumTooltipState.anchor_w = cell.width;
+                                                OxidiumTooltipState.anchor_h = cell.height;
+                                                OxidiumTooltipState.prefer_above = true;
+                                                OxidiumTooltipState.shown = true;
+                                            } else {
+                                                if (root.hovered_day_key == d.date_iso) {
+                                                    root.hovered_day_key = "";
+                                                }
+                                                if (OxidiumTooltipState.text == d.tooltip) {
+                                                    OxidiumTooltipState.shown = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
 
-                if root.hovered_day_key != "" : VerticalLayout {
-                    spacing: 3px;
-                    HorizontalLayout {
-                        alignment: space-between;
-                        spacing: 8px;
-                        Text {
-                            horizontal_stretch: 1;
-                            text: root.hovered_day_title;
-                            font_family: OxidiumTheme.font_display;
-                            font_size: 12px; font_weight: 700;
-                            color: MaterialPalette.on_surface;
-                            overflow: elide;
-                        }
-                        Text {
-                            text: root.hovered_day_summary;
-                            font_family: OxidiumTheme.font_mono;
-                            font_size: 11px; font_weight: 600;
-                            color: MaterialPalette.primary;
-                        }
+        // Fixed-Height Single-Line Footer + Classic GitHub "Less [][][][][] More" Intensity Scale (ZERO layout shift)
+        HorizontalLayout {
+            height: 24px;
+            vertical_stretch: 0;
+            spacing: 12px;
+
+            Text {
+                horizontal_stretch: 1;
+                min_width: 0px;
+                preferred_width: 0px;
+                text: root.hovered_day_key != ""
+                    ? (root.hovered_day_title + " — " + root.hovered_day_summary + (root.hovered_day_details != "" ? " · " + root.hovered_day_details : ""))
+                    : "Наведите на квадрат дня, чтобы увидеть оценки и пропуски · Выполнено задач: " + root.completed_tasks_text;
+                font_size: 11px;
+                color: root.hovered_day_key != "" ? MaterialPalette.on_surface : MaterialPalette.on_surface_variant;
+                overflow: elide;
+                vertical_alignment: center;
+            }
+
+            HorizontalLayout {
+                horizontal_stretch: 0;
+                spacing: 4px;
+                alignment: end;
+                Text {
+                    text: "Меньше";
+                    font_size: 10px;
+                    color: MaterialPalette.on_surface_variant;
+                    vertical_alignment: center;
+                }
+                for lvl_col in [
+                    OxidiumTheme.dark_mode ? #1E2026 : #EBEDF0,
+                    OxidiumTheme.dark_mode ? #0E4429 : #9BE9A8,
+                    OxidiumTheme.dark_mode ? #006D32 : #40C463,
+                    OxidiumTheme.dark_mode ? #26A641 : #30A14E,
+                    OxidiumTheme.dark_mode ? #39D353 : #216E39,
+                ] : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 11px;
+                        height: 11px;
+                        border_radius: 2.5px;
+                        background: lvl_col;
+                        border_width: 1px;
+                        border_color: OxidiumTheme.dark_mode ? #FFFFFF10 : #1F23281A;
                     }
-                    Text {
-                        text: root.hovered_day_details != "" ? root.hovered_day_details : "Подробностей за этот день нет";
-                        font_size: 11px;
-                        color: MaterialPalette.on_surface_variant;
-                        overflow: elide;
-                    }
+                }
+                Text {
+                    text: "Больше";
+                    font_size: 10px;
+                    color: MaterialPalette.on_surface_variant;
+                    vertical_alignment: center;
                 }
             }
         }
@@ -900,7 +941,8 @@ export component StatisticsView inherits Rectangle {
     in property <[StatBarItem]> subject_avg_bars;
     in property <[StatBarItem]> attendance_bars;
     in property <[HeatmapWeekRow]> heatmap_weeks;
-    in property <[string]> heatmap_weekdays: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    in property <[string]> heatmap_weekdays: ["Пн", "", "Ср", "", "Пт", "", ""];
+    in property <string> heatmap_headline: "";
 
     in_out property <int> hovered_trend_idx: -1;
     in_out property <string> hovered_trend_text: "";
@@ -937,6 +979,8 @@ export component StatisticsView inherits Rectangle {
         root.hovered_trend_idx = -1;
         root.hovered_trend_text = "";
         root.hovered_day_key = "";
+        OxidiumTooltipState.shown = false;
+        OxidiumTooltipState.prefer_above = false;
         root.forecast_subject_idx = 0;
     }
 
@@ -1249,43 +1293,25 @@ export component StatisticsView inherits Rectangle {
                 }
             }
 
-            // ===== ROW 3: STACKED ATTENDANCE + MULTI-TYPE 5x7 ACTIVITY HEATMAP =====
-            if !root.is_stacked : HorizontalLayout {
-                spacing: 16px;
-                AttendanceCard {
-                    horizontal_stretch: 1;
-                    attendance_bars: root.attendance_bars;
-                }
-                ActivityHeatmapCard {
-                    horizontal_stretch: 1;
-                    heatmap_weeks: root.heatmap_weeks;
-                    heatmap_weekdays: root.heatmap_weekdays;
-                    completed_tasks_text: root.completed_tasks_text;
-                    hovered_day_key <=> root.hovered_day_key;
-                    hovered_day_title <=> root.hovered_day_title;
-                    hovered_day_summary <=> root.hovered_day_summary;
-                    hovered_day_details <=> root.hovered_day_details;
-                }
+            // ===== ROW 3: FULL-WIDTH 53-WEEK GITHUB-STYLE ACTIVITY GRAPH =====
+            ActivityHeatmapCard {
+                heatmap_weeks: root.heatmap_weeks;
+                heatmap_weekdays: root.heatmap_weekdays;
+                heatmap_headline: root.heatmap_headline;
+                completed_tasks_text: root.completed_tasks_text;
+                hovered_day_key <=> root.hovered_day_key;
+                hovered_day_title <=> root.hovered_day_title;
+                hovered_day_summary <=> root.hovered_day_summary;
+                hovered_day_details <=> root.hovered_day_details;
             }
 
-            if root.is_stacked : VerticalLayout {
-                spacing: 14px;
-                AttendanceCard {
-                    compact: root.is_compact_w;
-                    attendance_bars: root.attendance_bars;
-                }
-                ActivityHeatmapCard {
-                    heatmap_weeks: root.heatmap_weeks;
-                    heatmap_weekdays: root.heatmap_weekdays;
-                    completed_tasks_text: root.completed_tasks_text;
-                    hovered_day_key <=> root.hovered_day_key;
-                    hovered_day_title <=> root.hovered_day_title;
-                    hovered_day_summary <=> root.hovered_day_summary;
-                    hovered_day_details <=> root.hovered_day_details;
-                }
+            // ===== ROW 4: FULL-WIDTH ATTENDANCE BARS =====
+            AttendanceCard {
+                compact: root.is_compact_w;
+                attendance_bars: root.attendance_bars;
             }
 
-            // ===== ROW 4: GRADE FORECAST CALCULATOR =====
+            // ===== ROW 5: GRADE FORECAST CALCULATOR =====
             Rectangle {
                 border_radius: 22px;
                 background: MaterialPalette.surface_container_low;

@@ -49,6 +49,7 @@ export component OxidiumIconButton inherits Rectangle {
                 OxidiumTooltipState.anchor_y = root.absolute-position.y;
                 OxidiumTooltipState.anchor_w = root.width;
                 OxidiumTooltipState.anchor_h = root.height;
+                OxidiumTooltipState.prefer_above = false;
                 OxidiumTooltipState.shown = true;
             } else if (!self.has_hover && OxidiumTooltipState.text == root.tooltip) {
                 OxidiumTooltipState.shown = false;

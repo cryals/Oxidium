@@ -147,6 +147,8 @@ export struct HeatmapDayItem {
 }
 
 export struct HeatmapWeekRow {
+    col_index: int,
+    month_label: string,
     week_label: string,
     days: [HeatmapDayItem],
 }

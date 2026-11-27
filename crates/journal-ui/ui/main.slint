@@ -60,11 +60,13 @@ export component MainWindow inherits MaterialWindow {
 
     public function reset_stats_view_state() {
         OxidiumTooltipState.shown = false;
+        OxidiumTooltipState.prefer_above = false;
         stats_view.reset_transient_state();
     }
 
     public function reset_kanban_hover_state() {
         OxidiumTooltipState.shown = false;
+        OxidiumTooltipState.prefer_above = false;
         kanban_view.hover_hint = "";
     }
     changed color_scheme_mode => {
@@ -201,7 +203,8 @@ export component MainWindow inherits MaterialWindow {
     in property <[StatBarItem]> stats_subject_avgs;
     in property <[StatBarItem]> stats_attendance_bars;
     in property <[HeatmapWeekRow]> stats_heatmap_weeks;
-    in property <[string]> stats_heatmap_weekdays: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    in property <[string]> stats_heatmap_weekdays: ["Пн", "", "Ср", "", "Пт", "", ""];
+    in property <string> stats_heatmap_headline: "";
     in property <string> forecast_result_text: "";
     in property <string> forecast_target_result_text: "";
 
@@ -990,6 +993,7 @@ export component MainWindow inherits MaterialWindow {
                         attendance_bars: root.stats_attendance_bars;
                         heatmap_weeks: root.stats_heatmap_weeks;
                         heatmap_weekdays: root.stats_heatmap_weekdays;
+                        heatmap_headline: root.stats_heatmap_headline;
                         subjects: root.active_subjects_list;
                         forecast_result_text: root.forecast_result_text;
                         forecast_target_result_text: root.forecast_target_result_text;
@@ -1252,7 +1256,9 @@ export component MainWindow inherits MaterialWindow {
 
     // Top-Level Unclipped M3 Expressive Floating Tooltip Overlay (above rail, headers, ScrollViews, modals)
     Rectangle {
-        property <bool> flip_above: OxidiumTooltipState.anchor_y + OxidiumTooltipState.anchor_h + 44px > root.height;
+        property <bool> flip_above: OxidiumTooltipState.prefer_above
+            ? (OxidiumTooltipState.anchor_y > self.height + 16px)
+            : (OxidiumTooltipState.anchor_y + OxidiumTooltipState.anchor_h + 44px > root.height);
         property <length> pop_offset: OxidiumTooltipState.shown ? 0px : 6px;
         animate pop_offset { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
 
@@ -1264,7 +1270,7 @@ export component MainWindow inherits MaterialWindow {
         y: flip_above
             ? (OxidiumTooltipState.anchor_y - self.height - 6px - self.pop_offset)
             : (OxidiumTooltipState.anchor_y + OxidiumTooltipState.anchor_h + 6px + self.pop_offset);
-        width: min(260px, tip_row.preferred_width);
+        width: min(340px, tip_row.preferred_width);
         height: tip_row.preferred_height;
         border_radius: 8px;
         background: MaterialPalette.inverse_surface;
@@ -1277,10 +1283,10 @@ export component MainWindow inherits MaterialWindow {
         tip_row := HorizontalLayout {
             padding_left: 10px;
             padding_right: 10px;
-            padding_top: 5px;
-            padding_bottom: 5px;
+            padding_top: 6px;
+            padding_bottom: 6px;
             Text {
-                max_width: 240px;
+                max_width: 320px;
                 text: OxidiumTooltipState.text;
                 font_size: 11px;
                 font_weight: 500;
