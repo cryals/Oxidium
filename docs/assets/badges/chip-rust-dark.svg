@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="98" height="28" viewBox="0 0 98 28" role="img" aria-label="Rust 2024">
+  <rect x="0.6" y="0.6" width="96.8" height="26.8" rx="14" fill="#2B292D" stroke="#484550" stroke-width="1"/>
+  <circle cx="15" cy="14" r="4" fill="#F08C5E"/>
+  <text x="26" y="18" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="500" fill="#C9C5D1">Rust 2024</text>
+  
+</svg>

@@ -1,93 +1,255 @@
-# Oxidium — Student Journal
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner-light.svg">
+    <img src="docs/assets/banner-dark.svg" alt="Oxidium — Электронный журнал ученика" width="900">
+  </picture>
+</p>
 
-> Русская версия документации: [README.ru.md](README.ru.md)
+<p align="center">
+  <sub><code>RUST · SLINT M3 EXPRESSIVE · SQLITE · MCP</code></sub><br>
+  <sub><b>Русский</b> · <a href="README.en.md">English</a></sub>
+</p>
 
-**Oxidium** is a free, open-source, local-first, offline-first personal **Student Journal** desktop application built with **Rust**, **Slint (Material Design 3 Expressive)**, **SQLite**, and a full built-in **Model Context Protocol (MCP)** server.
+<p align="center">
+  <b>Личный электронный журнал ученика нового поколения.</b><br>
+  Оценки, аналитика, канбан-задачи и AI-помощник через MCP — быстро, локально и без браузера.
+</p>
 
-Replace clunky institutional portals, scattered spreadsheets, notes, and Telegram Saved Messages with a fast, native desktop workspace that both you and your AI assistants can use together.
+<p align="center">
+  <a href="https://github.com/cryals/Oxidium/releases/latest">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/cta-download-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/cta-download-light.svg">
+      <img src="docs/assets/badges/cta-download-dark.svg" alt="Скачать Oxidium">
+    </picture>
+  </a>
+  <a href="docs/mcp/QUICKSTART.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/cta-mcp-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/cta-mcp-light.svg">
+      <img src="docs/assets/badges/cta-mcp-dark.svg" alt="Подключить MCP">
+    </picture>
+  </a>
+  <a href="CHANGELOG.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/cta-changelog-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/cta-changelog-light.svg">
+      <img src="docs/assets/badges/cta-changelog-dark.svg" alt="Что нового">
+    </picture>
+  </a>
+</p>
 
-## Screenshots
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/chip-rust-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/chip-rust-light.svg">
+    <img src="docs/assets/badges/chip-rust-dark.svg" alt="Rust 2024">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/chip-slint-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/chip-slint-light.svg">
+    <img src="docs/assets/badges/chip-slint-dark.svg" alt="Slint 1.19 · M3">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/chip-sqlite-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/chip-sqlite-light.svg">
+    <img src="docs/assets/badges/chip-sqlite-dark.svg" alt="SQLite · WAL + FTS5">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/chip-mcp-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/chip-mcp-light.svg">
+    <img src="docs/assets/badges/chip-mcp-dark.svg" alt="MCP · 80 Tools">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badges/chip-platforms-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/badges/chip-platforms-light.svg">
+    <img src="docs/assets/badges/chip-platforms-dark.svg" alt="Windows · Linux">
+  </picture>
+</p>
 
-### Electronic Journal (Dark & Light Themes)
-![Journal Dark](docs/screenshots/journal-dark.png)
-![Journal Light](docs/screenshots/journal-light.png)
+<p align="center">
+  <a href="https://github.com/cryals/Oxidium/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/cryals/Oxidium/ci.yml?branch=main&amp;style=flat-square&amp;logo=githubactions&amp;logoColor=E7DFF8&amp;label=CI&amp;labelColor=2B292D&amp;color=7C6FA6" alt="Статус CI"></a>
+  <a href="https://github.com/cryals/Oxidium/releases/latest"><img src="https://img.shields.io/github/v/release/cryals/Oxidium?style=flat-square&amp;logo=github&amp;logoColor=E7DFF8&amp;label=RELEASE&amp;labelColor=2B292D&amp;color=7C6FA6" alt="Последний релиз"></a>
+  <a href="https://github.com/cryals/Oxidium/releases"><img src="https://img.shields.io/github/downloads/cryals/Oxidium/total?style=flat-square&amp;logo=github&amp;logoColor=E7DFF8&amp;label=DOWNLOADS&amp;labelColor=2B292D&amp;color=4A4459" alt="Загрузки"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/LICENSE-MIT-4A4459?style=flat-square&amp;labelColor=2B292D" alt="Лицензия MIT"></a>
+</p>
 
-### Statistics & Analytics (Dark & Light Themes)
-![Statistics Dark](docs/screenshots/statistics-dark.png)
-![Statistics Light](docs/screenshots/statistics.png)
+**Oxidium** заменяет неудобные школьные и вузовские порталы, разрозненные таблицы и «Избранное» в Telegram единым нативным рабочим пространством. Все данные хранятся на вашем компьютере в SQLite, а встроенный MCP-сервер позволяет вести журнал и задачи как вручную, так и через AI-ассистентов.
 
-### Kanban Board (Dark & Light Themes)
-![Kanban Dark](docs/screenshots/kanban-dark.png)
-![Kanban Light](docs/screenshots/kanban.png)
+## Быстрый старт
 
-### Setup Wizard & Built-in MCP Server Settings
-![Setup Wizard](docs/screenshots/onboarding.png)
-![Settings & MCP](docs/screenshots/settings-mcp.png)
+1. Откройте [страницу релизов](https://github.com/cryals/Oxidium/releases/latest) и скачайте сборку для своей системы (`setup.exe` или `portable.zip` для Windows x64; `.deb`, `.AppImage` или `.tar.gz` для Linux).
+2. На Windows запустите установщик — установка проходит в папку пользователя (`%LOCALAPPDATA%\Programs\Oxidium`) без прав администратора и UAC.
+3. При первом запуске пройдите быстрый мастер настройки: выберите тему (тёмная, светлая или системная), язык (`ru` / `en`) и создайте учебный профиль.
+4. Далее приложение само уведомит о выходе новых версий на GitHub Releases и позволит обновиться с проверкой `SHA256SUMS.txt`.
 
-## Highlights
+## Интерфейс
 
-- **Native Desktop Performance**: 100% native Rust + Slint UI (no Electron, Tauri, WebView, or browser runtime). All fonts (`Roboto`, `Roboto Flex`, `Roboto Mono`) and Material Symbols SVG icons are bundled locally — zero CDN requests.
-- **Local-First & Offline-First**: Single local SQLite database (`WAL` + `FTS5` + online backup), zero telemetry, zero mandatory registration, zero cloud lock-in.
-- **Electronic Journal**: Synchronized pinned top dates header, pinned left subjects column, and pinned right average column; quick grade entry (`1–5`, `Н/Б`, `Уваж.`, `Зач.`, `Н/З`, plus custom mark types); multi-grade cells; exact `rust_decimal` arithmetic & weighted averages; leap-year calendar; and undo/redo.
-- **Multi-Profile Isolation**: Independent academic profiles (University, College, School, Online Courses) with isolated subjects, academic periods, grades, attendance, Kanban boards, and statistics.
-- **Statistics & Grade Forecast Calculator**: Cumulative GPA line chart, grade breakdown donut chart, 1–5 distribution bar chart, per-subject averages, honest attendance tracking (never fabricating attendance percentages from empty days), 35-day activity heatmap, two-period comparison, and non-destructive exact grade forecasting.
-- **Kanban Task Management**: Multiple boards per profile, custom columns with WIP limits and completion flags, drag-and-drop & quick moves, checklists, tags, badges, Markdown notes, deadlines, reminders, and subject/grade links.
-- **Production MCP Server (`rmcp 3.11`)**: Both **STDIO** (`student-journal-mcp`) and loopback-only **Streamable HTTP** (`127.0.0.1` + Bearer token auth in `mcp-token.secret`), **80 typed tools**, **6 MCP Resources**, **7 MCP Prompts**, server-side granular permissions (`ReadOnly` / `ReadWrite` / `Destructive`), idempotency keys, AI activity log with Undo, and live cross-process GUI synchronization.
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/journal-dark.png">
+        <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/journal-light.png">
+        <img src="docs/screenshots/journal-dark.png" alt="Электронный журнал" width="100%">
+      </picture><br>
+      <sub><b>Электронный журнал</b> — закреплённые колонки, быстрый ввод и несколько оценок в ячейке</sub>
+    </td>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/statistics-dark.png">
+        <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/statistics.png">
+        <img src="docs/screenshots/statistics-dark.png" alt="Статистика и аналитика" width="100%">
+      </picture><br>
+      <sub><b>Статистика</b> — динамика среднего балла, структура оценок, предметы и прогноз</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/kanban-dark.png">
+        <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/kanban.png">
+        <img src="docs/screenshots/kanban-dark.png" alt="Канбан-доска" width="100%">
+      </picture><br>
+      <sub><b>Канбан-доска</b> — доски, WIP-лимиты, чек-листы, дедлайны и теги</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/settings-mcp.png" alt="Настройки встроенного MCP-сервера" width="100%"><br>
+      <sub><b>MCP-сервер</b> — HTTP-порт 127.0.0.1, Bearer-токен, права AI и журнал действий с Undo</sub>
+    </td>
+  </tr>
+</table>
 
-## Verified Release Performance & Sizes (Windows x86_64)
+<details>
+<summary>Дополнительные экраны: тепловая карта активности, мастер настройки и окно обновлений</summary>
+<br>
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <img src="docs/screenshots/statistics-activity.png" alt="Тепловая карта активности за 35 дней и калькулятор прогноза" width="100%"><br>
+      <sub>Тепловая карта 5×7 и прогноз оценок</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/screenshots/onboarding.png" alt="Мастер первоначальной настройки" width="100%"><br>
+      <sub>Мастер первоначальной настройки</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/screenshots/update-modal.png" alt="Окно проверки и установки обновлений" width="100%"><br>
+      <sub>Проверка SHA-256 и автообновление</sub>
+    </td>
+  </tr>
+</table>
+</details>
 
-Measured with `cargo build --release --workspace` and `cargo test --release -p journal-app --test perf_benchmarks -- --include-ignored --nocapture`:
+## Возможности
 
-| Metric | Measured Result |
+<table>
+  <tr>
+    <td><b>Журнал</b></td>
+    <td>Синхронизированные закреплённые шапка дат, список предметов и колонка среднего; быстрый ввод <code>1–5</code>, <code>Н/Б</code>, <code>Уваж.</code>, <code>Зач.</code>, <code>Н/З</code> и своих отметок; мульти-ячейки; точная математика на <code>rust_decimal</code> и отмена/повтор (<code>Undo/Redo</code>).</td>
+  </tr>
+  <tr>
+    <td><b>Аналитика</b></td>
+    <td>Сглаженный график динамики среднего балла с целевой линией, кольцевая диаграмма структуры, распределение <code>1–5</code>, средние по предметам, честный учёт пропусков, мозаичная тепловая карта 35 дней, сравнение периодов и калькулятор прогноза.</td>
+  </tr>
+  <tr>
+    <td><b>Канбан</b></td>
+    <td>Несколько досок в профиле, гибкие колонки с WIP-лимитами и флагом завершения, перетаскивание и быстрые переходы, чек-листы, приоритеты, теги, бейджи, Markdown-заметки, напоминания и привязка к предметам и оценкам.</td>
+  </tr>
+  <tr>
+    <td><b>Профили</b></td>
+    <td>Изолированные учебные контексты (Университет, Колледж, Школа, Курсы) со своими предметами, учебными периодами, оценками, канбан-досками, бэкапами (SQLite Online Backup) и экспортом в CSV / JSON / XLSX.</td>
+  </tr>
+  <tr>
+    <td><b>Дизайн M3</b></td>
+    <td>Нативный интерфейс <b>Slint Material Design 3 Expressive</b>: spring-анимации, адаптивная сетка от <code>800×560</code>, тёмная и светлая схемы, настраиваемый акцент, компактный режим, горячие клавиши и встроенные шрифты/иконки без обращений к CDN.</td>
+  </tr>
+  <tr>
+    <td><b>MCP и AI</b></td>
+    <td>Встроенный сервер на <code>rmcp 3.11</code>: <b>80 типизированных инструментов</b>, <b>6 ресурсов</b> и <b>7 промптов</b>, права <code>ReadOnly</code> / <code>ReadWrite</code> / <code>Destructive</code>, ключи идемпотентности, Undo для действий AI и живая синхронизация с открытым окном.</td>
+  </tr>
+</table>
+
+## Подключение AI (MCP)
+
+Oxidium работает с Claude Desktop, Claude Code, Gemini CLI, Codex и любым MCP-совместимым клиентом через **STDIO** (`student-journal-mcp`) или встроенный **Streamable HTTP** (`127.0.0.1:38421/mcp` с Bearer-токеном в `mcp-token.secret`).
+
+```json
+{
+  "mcpServers": {
+    "oxidium": {
+      "command": "student-journal-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+- При установке на Windows бинарник расположен в `%LOCALAPPDATA%\Programs\Oxidium\student-journal-mcp.exe`.
+- Изменения от внешнего AI-клиента отображаются в открытом GUI в пределах ~0.5 с без перезапуска.
+- Подробнее о настройке, правах доступа и примерах запросов — в [быстром старте MCP](docs/mcp/QUICKSTART.md) и [справочнике 80 инструментов](docs/mcp/TOOLS.md).
+
+## Производительность
+
+Замеры выполнены на release-сборке (`v0.1.3`, Windows x86_64) и стресс-тестах `perf_benchmarks` на базе до **100 000 оценок** и **10 000 задач**:
+
+| Показатель | Результат |
 | --- | --- |
-| `student-journal.exe` (release, stripped, bundled SQLite + fonts/icons) | **38.11 MB** (`39,962,624` bytes) |
-| `student-journal-mcp.exe` (release, stripped, standalone MCP server) | **11.88 MB** (`12,453,888` bytes) |
-| Windows Portable ZIP / Per-User HKCU Installer | **20.16 MB** / **20.44 MB** |
-| Reopen 100,000-grade + 10,000-task SQLite DB | **3.21 ms** |
-| Monthly Journal Matrix (100 subjects × 30 days on 10k / 100k grades) | **8.46 ms** / **11.38 ms** |
-| Full Statistics (10,000 grades: cold / cached) | **95.19 ms** / **0.13 ms** |
-| Full Statistics (100,000 grades: cold / cached) | **1,424.59 ms** / **0.18 ms** |
-| FTS5 Russian Search (10k / 100k grades + 10k tasks) | **1.72 ms** / **19.17 ms** |
-| Slint UI `refresh_journal` (100 subjects stress test) | **17.06 ms** |
+| `student-journal.exe` / `student-journal-mcp.exe` (`v0.1.3`, stripped release) | **43.95 МБ** / **11.92 МБ** |
+| Установщик Windows (HKCU, без UAC) / Portable ZIP (`v0.1.3`) | **22.14 МБ** / **21.82 МБ** |
+| Открытие базы со 100 000 оценок и 10 000 задач | **3.21 мс** |
+| Матрица журнала (100 предметов × 30 дней при 10k / 100k оценок) | **8.46 мс** / **11.38 мс** |
+| Полная статистика (10k оценок: холодный расчёт / кэш) | **95.19 мс** / **0.13 мс** |
+| Полнотекстовый поиск FTS5 на русском (10k / 100k оценок + 10k задач) | **1.72 мс** / **19.17 мс** |
+| Обновление UI `refresh_journal` на 100 предметах | **17.06 мс** |
 
-## Building, Testing & Packaging
+## Разработка и проверки
+
+Понадобится **Rust 1.95+** (Edition 2024).
+
+```powershell
+git clone https://github.com/cryals/Oxidium.git
+cd Oxidium
+
+# Запуск настольного приложения и автономного MCP-сервера
+cargo run -p student-journal
+cargo run -p student-journal-mcp
+```
+
+<details>
+<summary>Системные зависимости для сборки на Linux (Ubuntu / Debian)</summary>
 
 ```sh
-# Format, lint, and test the entire workspace
+sudo apt-get update
+sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev \
+  libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libdbus-1-dev libssl-dev pkg-config
+```
+
+</details>
+
+```sh
+# Форматирование, линтер, тесты и аудит безопасности/лицензий
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo build -p student-journal-mcp
 cargo test --workspace
-
-# Security & license audit
 cargo audit
 cargo deny check
 
-# Run desktop GUI
-cargo run -p student-journal
-
-# Run standalone MCP STDIO server
-cargo run -p student-journal-mcp
-
-# Build release binaries
+# Сборка release и упаковка дистрибутива (Windows / Linux)
 cargo build --release --workspace
-
-# Package Windows portable ZIP, per-user HKCU installer, SBOM & SHA-256 checksums
 powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1
-
-# Package Linux tar.gz, .deb, and checksums (on Linux)
 bash scripts/package-linux.sh amd64
 ```
 
-## Documentation
+## Документация
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Database Schema](docs/DATABASE.md)
-- [MCP Quickstart](docs/mcp/QUICKSTART.md) | [MCP Tools (80)](docs/mcp/TOOLS.md) | [MCP Security](docs/mcp/SECURITY.md) | [MCP Examples](docs/mcp/EXAMPLES.md)
-- [Testing](docs/TESTING.md)
-- [Production Readiness Report](PRODUCTION-READINESS-REPORT.md)
-- [Security Policy](SECURITY.md)
+[Архитектура](docs/ARCHITECTURE.md) · [Схема БД](docs/DATABASE.md) · [Быстрый старт MCP](docs/mcp/QUICKSTART.md) · [80 инструментов MCP](docs/mcp/TOOLS.md) · [Безопасность MCP](docs/mcp/SECURITY.md) · [Примеры AI-сценариев](docs/mcp/EXAMPLES.md) · [Тестирование](docs/TESTING.md) · [Список изменений](CHANGELOG.md) · [Дорожная карта](ROADMAP.md)
 
-## License
+## Стек
 
-Oxidium source code is licensed under the MIT License ([LICENSE.txt](LICENSE.txt)). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled third-party components including Slint, Material Components, Google Fonts (SIL OFL 1.1), and Material Symbols (Apache 2.0).
+Rust 2024 · Slint UI (Material Design 3 Expressive) · SQLite (`rusqlite` + WAL + FTS5) · `rust_decimal` · `rmcp 3.11` · `axum` · `tokio`
+
+## Лицензия
+
+Исходный код **Oxidium** распространяется под лицензией **MIT** ([LICENSE.txt](LICENSE.txt)). Сведения о лицензиях встроенных компонентов (`Slint`, `Material Components`, шрифты Google Fonts `SIL OFL 1.1`, `Material Symbols Apache 2.0`) приведены в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

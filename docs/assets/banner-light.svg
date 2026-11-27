@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220" role="img" aria-label="Oxidium — Электронный журнал ученика">
+  <defs>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAF6FC"/>
+      <stop offset="55%" stop-color="#F3EEF7"/>
+      <stop offset="100%" stop-color="#EAE2F2"/>
+    </linearGradient>
+    <radialGradient id="glowTopRight" cx="82%" cy="18%" r="46%">
+      <stop offset="0%" stop-color="#4A4459" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#4A4459" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBottomLeft" cx="14%" cy="92%" r="36%">
+      <stop offset="0%" stop-color="#6D5862" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#6D5862" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="trendArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A4459" stop-opacity="0.24"/>
+      <stop offset="100%" stop-color="#4A4459" stop-opacity="0.0"/>
+    </linearGradient>
+    <clipPath id="bannerClip">
+      <rect x="1" y="1" width="898" height="218" rx="28"/>
+    </clipPath>
+  </defs>
+
+  <!-- Outer M3 Expressive Card -->
+  <rect x="1" y="1" width="898" height="218" rx="28" fill="url(#cardGrad)" stroke="#CAC4D0" stroke-width="1.5"/>
+
+  <g clip-path="url(#bannerClip)">
+    <rect x="0" y="0" width="900" height="220" fill="url(#glowTopRight)"/>
+    <rect x="0" y="0" width="900" height="220" fill="url(#glowBottomLeft)"/>
+    <!-- Subtle decorative concentric M3 rings on right -->
+    <circle cx="848" cy="36" r="140" fill="none" stroke="rgba(74,68,89,0.08)" stroke-width="1"/>
+    <circle cx="848" cy="36" r="205" fill="none" stroke="rgba(74,68,89,0.08)" stroke-width="1"/>
+  </g>
+
+  <!-- Left App Emblem (faithful vector version of Oxidium icon-192.png) -->
+  <rect x="42" y="54" width="112" height="112" rx="30" fill="#E6E0F0" stroke="rgba(74,68,89,0.16)" stroke-width="1.5"/>
+  <circle cx="98" cy="110" r="39" fill="#FFFFFF" stroke="rgba(74,68,89,0.14)" stroke-width="1"/>
+  <g transform="translate(98, 110) scale(1.26) translate(-24, -23.5)">
+    <!-- Left filled curved book page -->
+    <path d="M 8.0 14.5 C 13.8 11.0 19.8 11.6 23.6 14.8 L 23.6 38.6 C 19.6 34.4 13.8 33.4 8.0 35.8 Z" fill="#0B0B0E"/>
+    <!-- Right open-top curved book frame -->
+    <path d="M 24.4 38.6 L 24.4 35.0 C 29.2 33.4 33.8 33.0 36.8 32.8 L 36.8 15.2 L 40.0 13.8 L 40.0 35.8 C 34.4 34.0 28.6 34.8 24.4 38.6 Z" fill="#0B0B0E"/>
+    <!-- Vertical bookmark ribbon on right page (parallelogram cut matching icon-192.png) -->
+    <path d="M 27.6 9.8 L 33.0 7.2 L 33.0 27.6 L 27.6 30.0 Z" fill="#0B0B0E"/>
+  </g>
+
+  <!-- Center Brand & Metadata Block -->
+  <rect x="180" y="38" width="286" height="24" rx="12" fill="#E6E0F0"/>
+  <text x="323" y="53.8" text-anchor="middle" font-family="'Roboto Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace" font-size="10.5" font-weight="600" letter-spacing="0.9" fill="#1A1626">MATERIAL 3 EXPRESSIVE · LOCAL-FIRST</text>
+
+  <text x="178" y="114" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="-0.8" fill="#1C1B1F">Oxidium</text>
+  <text x="181" y="145" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="18.5" font-weight="500" fill="#48454E">Электронный журнал ученика</text>
+
+  <!-- Subtle bottom tech strip -->
+  <text x="181" y="177" font-family="'Roboto Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace" font-size="12" font-weight="500" fill="#4A4459">Rust 2024 · Slint UI · SQLite · 80 MCP Tools</text>
+
+  <!-- Right Expressive Analytics Preview Widget -->
+  <!-- Card 1: GPA Trend Spline -->
+  <rect x="582" y="24" width="286" height="84" rx="18" fill="#FFFFFF" stroke="#CAC4D0" stroke-width="1"/>
+  <text x="596" y="42" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="10.5" font-weight="600" fill="#48454E">Динамика баллов</text>
+  <rect x="814" y="31" width="42" height="17" rx="8.5" fill="#D4F2DB"/>
+  <text x="835" y="42.8" text-anchor="middle" font-family="'Roboto Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace" font-size="10.5" font-weight="700" fill="#146C2E">4.75</text>
+
+  <!-- Dashed goal line -->
+  <line x1="596" y1="68" x2="854" y2="68" stroke="#006A60" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <!-- Area fill & Smooth spline -->
+  <path d="M 596 91 C 624 91, 634 76, 662 78 C 690 80, 704 88, 732 74 C 760 61, 782 68, 808 60 C 826 55, 840 58, 852 56 L 852 98 L 596 98 Z" fill="url(#trendArea)"/>
+  <path d="M 596 91 C 624 91, 634 76, 662 78 C 690 80, 704 88, 732 74 C 760 61, 782 68, 808 60 C 826 55, 840 58, 852 56" fill="none" stroke="#4A4459" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="662" cy="78" r="2.6" fill="#4A4459"/>
+  <circle cx="732" cy="74" r="2.6" fill="#4A4459"/>
+  <circle cx="808" cy="60" r="2.6" fill="#4A4459"/>
+  <circle cx="852" cy="56" r="6" fill="#146C2E" fill-opacity="0.24"/>
+  <circle cx="852" cy="56" r="3.4" fill="#146C2E"/>
+
+  <!-- Card 2: Heatmap Mosaic -->
+  <rect x="582" y="116" width="148" height="80" rx="18" fill="#FFFFFF" stroke="#CAC4D0" stroke-width="1"/>
+  <text x="594" y="133" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="10.5" font-weight="600" fill="#48454E">Активность</text>
+  <circle cx="716" cy="129.5" r="3" fill="#146C2E"/>
+  <circle cx="707" cy="129.5" r="3" fill="#8D4E00"/>
+  <circle cx="698" cy="129.5" r="3" fill="#B3261E"/>
+  <rect x="594" y="142" width="18" height="12" rx="3.5" fill="#E4E0E5" fill-opacity="0.75"/><rect x="615" y="142" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/><rect x="636" y="142" width="18" height="12" rx="3.5" fill="#006A60" fill-opacity="0.86"/><rect x="657" y="142" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/><rect x="678" y="142" width="18" height="12" rx="3.5" fill="#8D4E00" fill-opacity="0.86"/><rect x="699" y="142" width="18" height="12" rx="3.5" fill="#B3261E" fill-opacity="0.86"/><rect x="594" y="157" width="18" height="12" rx="3.5" fill="#006A60" fill-opacity="0.86"/><rect x="615" y="157" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/><rect x="636" y="157" width="18" height="12" rx="3.5" fill="#B33B00" fill-opacity="0.86"/><rect x="657" y="157" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/><rect x="678" y="157" width="18" height="12" rx="3.5" fill="#B3261E" fill-opacity="0.88"/><path d="M 678 160.5 A 3.5 3.5 0 0 1 681.5 157 H 687.0 V 169 H 681.5 A 3.5 3.5 0 0 1 678 165.5 Z" fill="#146C2E" fill-opacity="0.92"/><rect x="699" y="157" width="18" height="12" rx="3.5" fill="#006A60" fill-opacity="0.86"/><rect x="594" y="172" width="18" height="12" rx="3.5" fill="#B3261E" fill-opacity="0.86"/><rect x="615" y="172" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/><rect x="636" y="172" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/><rect x="657" y="172" width="18" height="12" rx="3.5" fill="#E4E0E5" fill-opacity="0.75"/><rect x="678" y="172" width="18" height="12" rx="3.5" fill="#006A60" fill-opacity="0.86"/><rect x="699" y="172" width="18" height="12" rx="3.5" fill="#146C2E" fill-opacity="0.86"/>
+
+  <!-- Card 3: Donut + Live MCP Badge -->
+  <rect x="740" y="116" width="128" height="80" rx="18" fill="#FFFFFF" stroke="#CAC4D0" stroke-width="1"/>
+  <path d="M 774.92 139.20 A 21.00 21.00 0 0 1 789.41 171.74" fill="none" stroke="#146C2E" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M 784.34 176.99 A 21.00 21.00 0 0 1 757.41 175.11" fill="none" stroke="#006A60" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M 753.13 169.21 A 21.00 21.00 0 0 1 754.19 148.87" fill="none" stroke="#8D4E00" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M 759.07 143.45 A 21.00 21.00 0 0 1 767.63 139.46" fill="none" stroke="#B33B00" stroke-width="4.6" stroke-linecap="round"/>
+  <text x="772" y="161" text-anchor="middle" font-family="'Roboto Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace" font-size="10.5" font-weight="700" fill="#1C1B1F">4.7</text>
+  <text x="772" y="170" text-anchor="middle" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="6.4" fill="#48454E">средний</text>
+
+  <!-- Right mini status chips inside Card 3 -->
+  <rect x="803" y="133" width="53" height="20" rx="10" fill="#D4F2DB"/>
+  <circle cx="813" cy="143" r="3" fill="#146C2E"/>
+  <text x="821" y="146.5" font-family="'Roboto Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace" font-size="10" font-weight="700" fill="#146C2E">MCP</text>
+
+  <rect x="803" y="160" width="53" height="19" rx="9.5" fill="#E6E0F0"/>
+  <text x="829.5" y="173" text-anchor="middle" font-family="'Roboto Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace" font-size="9.5" font-weight="600" fill="#1A1626">WAL</text>
+</svg>

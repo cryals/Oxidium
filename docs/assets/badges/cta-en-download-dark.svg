@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="184" height="40" viewBox="0 0 184 40" role="img" aria-label="Download Oxidium">
+  <rect x="0.75" y="0.75" width="182.5" height="38.5" rx="20" fill="#CAC3DC"/>
+  <g transform="translate(18, 11) scale(0.75)">
+    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="#332D41"/>
+  </g>
+  <text x="44" y="24.5" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="13.5" font-weight="600" letter-spacing="0.15" fill="#332D41">Download Oxidium</text>
+</svg>

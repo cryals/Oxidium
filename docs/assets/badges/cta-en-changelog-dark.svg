@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="136" height="40" viewBox="0 0 136 40" role="img" aria-label="Changelog">
+  <rect x="0.75" y="0.75" width="134.5" height="38.5" rx="20" fill="#201F23" stroke="#484550" stroke-width="1.25"/>
+  <g transform="translate(18, 11) scale(0.75)">
+    <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm16 4H5V5h14v4zm-8 2h8v3h-8v-3zm-6 0h4v3H5v-3zm6 5h8v3h-8v-3zm-6 0h4v3H5v-3z" fill="#E3E2E7"/>
+  </g>
+  <text x="44" y="24.5" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="13.5" font-weight="600" letter-spacing="0.15" fill="#E3E2E7">Changelog</text>
+</svg>

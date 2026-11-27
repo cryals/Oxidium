@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="136" height="28" viewBox="0 0 136 28" role="img" aria-label="Windows · Linux">
+  <rect x="0.6" y="0.6" width="134.8" height="26.8" rx="14" fill="#2B292D" stroke="#484550" stroke-width="1"/>
+  <g transform="translate(11, 6.5) scale(0.625)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#CAC3DC"/></g>
+  <text x="31" y="18" font-family="'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="500" fill="#C9C5D1">Windows · Linux</text>
+  
+</svg>
