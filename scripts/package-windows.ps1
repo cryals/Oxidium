@@ -10,7 +10,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
     if ($CargoToml -match '(?m)^version\s*=\s*"([^"]+)"') {
         $Version = $Matches[1]
     } else {
-        $Version = "0.1.2"
+        $Version = "0.1.3"
     }
 }
 

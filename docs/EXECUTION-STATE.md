@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-27 (Phase 18 — M3 EXPRESSIVE MOTION PHYSICS, ADAPTIVES & UI FIXES)
+Last updated: 2026-11-27 (Phase 18 — v0.1.3 RELEASE PREP & VERIFICATION)
 
 ## Current Phase
 - **Active**: Completed Phase 18 — Material Design 3 Expressive spring motion curves/durations (`OxidiumMotion` + `OxidiumTheme`), zero-jitter 35-day heatmap hover card, top-level unclipped `OxidiumIconButton` tooltips, responsive narrow-window adaptives, `ShortcutsModal`/`QuickProfilePopover`/Settings MCP overflow fixes, and expanded rail cleanup (`Local-First · MCP` removed)
-- **Next**: Ready for local release build or remote `v0.1.3` release upon explicit user confirmation
+- **Next**: v0.1.3 release prepared after full verification, packaging, and isolated E2E validation
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |

@@ -3,6 +3,19 @@
 All notable changes to **Oxidium** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/) and [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [0.1.3] - 2026-11-27
+
+### Added
+
+- **Material Design 3 Expressive Motion Physics**: Added M3 Expressive Web spring-converted cubic-bezier easing (`expressive_fast_spatial`, `expressive_default_spatial`, `expressive_slow_spatial`, `expressive_fast_effects`, `expressive_default_effects`, `expressive_slow_effects`, `standard_spatial`) and duration tokens (`150ms`–`650ms`) in `OxidiumMotion`, with `OxidiumIconButton` press squircle morphing and spring-driven rail, modal, popover, picker, snackbar, and theme transitions.
+- **Unclipped Floating Root Tooltips (`OxidiumTooltipState`)**: Added a top-level floating tooltip overlay in `MainWindow` driven by `OxidiumIconButton` and `KanbanMicroButton` so tooltips are never clipped by toolbars, rails, or cards.
+- **Responsive Narrow-Window Adaptives**: Lowered minimum window width to `800px` (`min_height: 560px`) and added adaptive multi-row toolbars, 2×2 KPI / stacked analytics cards, responsive forecast layouts, flexible pinned journal columns/footers, responsive settings sidebar, and viewport-clamped modals across Journal, Statistics, Kanban, and TopBar.
+
+### Fixed
+
+- **Zero-Jitter 35-Day Heatmap Hover Card**: Fixed vertical layout jitter on cell hover with a fixed-height (`64px`, elided) hover detail inspector, constant `1px` outer cell borders, and inner `2px` opacity highlight rings.
+- **UI & Overflow Fixes**: Fixed `ShortcutsModal` vertical spacing gap, fixed `QuickProfilePopover` `>` button z-order and click action, split Settings → MCP Server HTTP port/controls and Bearer token rotation into two clean rows to prevent horizontal overflow, removed the redundant `"Local-First · MCP"` subtitle in the expanded rail, and removed the redundant bottom hint banner in Kanban.
+
 ## [0.1.2] - 2026-11-27
 
 ### Fixed

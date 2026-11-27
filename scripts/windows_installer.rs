@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 const APP_NAME: &str = "Oxidium";
 const APP_VERSION: &str = match option_env!("OXIDIUM_VERSION") {
     Some(v) => v,
-    None => "0.1.2",
+    None => "0.1.3",
 };
 const APP_PUBLISHER: &str = "Oxidium Contributors";
 const UNINSTALL_REG_KEY: &str =

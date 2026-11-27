@@ -4,7 +4,7 @@ set -euo pipefail
 ARCH="${1:-amd64}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_VER="$(grep -m1 '^version = ' "${ROOT_DIR}/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')"
-VERSION="${2:-${DEFAULT_VER:-0.1.2}}"
+VERSION="${2:-${DEFAULT_VER:-0.1.3}}"
 DIST_DIR="${ROOT_DIR}/dist"
 STAGE_DIR="${DIST_DIR}/stage-linux-${ARCH}"
 
