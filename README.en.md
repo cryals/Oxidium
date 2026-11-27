@@ -122,13 +122,13 @@
 </table>
 
 <details>
-<summary>More views: 35-day activity heatmap, onboarding wizard, and in-app updater</summary>
+<summary>More views: 53-week GitHub-style activity graph, onboarding wizard, and in-app updater</summary>
 <br>
 <table>
   <tr>
     <td width="33%" align="center">
-      <img src="docs/screenshots/statistics-activity.png" alt="35-day activity heatmap and grade forecast calculator" width="100%"><br>
-      <sub>5×7 activity heatmap &amp; forecast</sub>
+      <img src="docs/screenshots/statistics-activity.png" alt="53-week GitHub-style activity graph and grade forecast calculator" width="100%"><br>
+      <sub>53-week activity graph &amp; forecast</sub>
     </td>
     <td width="33%" align="center">
       <img src="docs/screenshots/onboarding.png" alt="Initial setup wizard" width="100%"><br>
@@ -151,7 +151,7 @@
   </tr>
   <tr>
     <td><b>Analytics</b></td>
-    <td>Monotone spline GPA trajectory with target line, rounded-cap donut chart, 1–5 histogram, per-subject progress, honest attendance tracking, 35-day mosaic heatmap, period comparison, and exact non-destructive forecasting.</td>
+    <td>Monotone spline GPA trajectory with target line, rounded-cap donut chart, 1–5 histogram, per-subject progress, honest attendance tracking, 53-week GitHub-style activity graph, period comparison, and exact non-destructive forecasting.</td>
   </tr>
   <tr>
     <td><b>Kanban</b></td>
@@ -192,12 +192,12 @@ Oxidium integrates with Claude Desktop, Claude Code, Gemini CLI, Codex, and any 
 
 ## Performance
 
-Measured on `v0.1.3` stripped release builds (Windows x86_64) and `perf_benchmarks` up to **100,000 grades** and **10,000 tasks**:
+Measured on `v0.1.4` stripped release builds (Windows x86_64) and `perf_benchmarks` up to **100,000 grades** and **10,000 tasks**:
 
 | Metric | Measured Result |
 | --- | --- |
-| `student-journal.exe` / `student-journal-mcp.exe` (`v0.1.3` release) | **43.95 MB** / **11.92 MB** |
-| Windows Installer (HKCU, no UAC) / Portable ZIP (`v0.1.3`) | **22.14 MB** / **21.82 MB** |
+| `student-journal.exe` / `student-journal-mcp.exe` (`v0.1.4` release) | **43.89 MB** / **11.92 MB** |
+| Windows Installer (HKCU, no UAC) / Portable ZIP (`v0.1.4`) | **22.14 MB** / **21.81 MB** |
 | Reopen SQLite DB with 100,000 grades + 10,000 tasks | **3.21 ms** |
 | Monthly Journal Matrix (100 subjects × 30 days on 10k / 100k grades) | **8.46 ms** / **11.38 ms** |
 | Full Statistics (10k grades: cold / cached) | **95.19 ms** / **0.13 ms** |
