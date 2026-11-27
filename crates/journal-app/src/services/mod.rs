@@ -21,6 +21,7 @@ use uuid::Uuid;
 use crate::error::AppResult;
 use crate::secret::TokenStore;
 use crate::sync::SyncCoordinator;
+use crate::sync_client::RemoteSyncRuntime;
 use crate::undo::UndoStack;
 
 /// Shared Application Services facade used identically by Slint GUI and MCP Server.
@@ -28,6 +29,7 @@ pub struct AppServices {
     pub db: Arc<Database>,
     pub data_dir: PathBuf,
     pub sync: Arc<SyncCoordinator>,
+    pub remote_sync: Arc<RemoteSyncRuntime>,
     pub tokens: TokenStore,
     pub undo: UndoStack,
     pub(crate) stats_cache: Mutex<HashMap<String, (i64, StatisticsReport)>>,
@@ -81,6 +83,7 @@ impl AppServices {
             db,
             data_dir,
             sync,
+            remote_sync: Arc::new(RemoteSyncRuntime::default()),
             tokens,
             undo: UndoStack::default(),
             stats_cache: Mutex::new(HashMap::new()),

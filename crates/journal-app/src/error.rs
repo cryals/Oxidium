@@ -33,6 +33,12 @@ pub enum AppError {
 
     #[error("Update error: {0}")]
     Update(String),
+
+    #[error("Sync error: {0}")]
+    Sync(String),
+
+    #[error("Vault key mismatch: {0}")]
+    VaultKeyMismatch(String),
 }
 
 pub type AppResult<T> = Result<T, AppError>;

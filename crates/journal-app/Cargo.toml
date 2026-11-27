@@ -7,10 +7,18 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+base64.workspace = true
+chacha20poly1305.workspace = true
 chrono.workspace = true
 csv.workspace = true
+data-encoding.workspace = true
 directories.workspace = true
+ed25519-dalek.workspace = true
+flate2.workspace = true
+futures-util.workspace = true
 hex.workspace = true
+hkdf.workspace = true
+hmac.workspace = true
 journal-domain.workspace = true
 journal-storage.workspace = true
 rand.workspace = true
@@ -20,11 +28,15 @@ rust_xlsxwriter.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+sha2_10.workspace = true
 subtle.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-tungstenite.workspace = true
 tracing.workspace = true
 uuid.workspace = true
+zeroize.workspace = true
 zip.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -35,4 +47,3 @@ tauri-winrt-notification.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
-tempfile.workspace = true

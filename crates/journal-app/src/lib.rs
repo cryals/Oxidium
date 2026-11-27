@@ -3,6 +3,8 @@ pub mod i18n;
 pub mod secret;
 pub mod services;
 pub mod sync;
+pub mod sync_client;
+pub mod sync_crypto;
 pub mod undo;
 pub mod updater;
 
@@ -10,6 +12,8 @@ pub use error::{AppError, AppResult};
 pub use secret::{TokenStore, redact_secrets};
 pub use services::*;
 pub use sync::{SyncCoordinator, SyncEvent};
+pub use sync_client::{SyncPairingSummary, run_remote_sync_worker};
+pub use sync_crypto::{SyncKeyStore, VaultMasterKey};
 pub use undo::{UndoCommand, UndoStack};
 pub use updater::{
     CURRENT_APP_VERSION, GITHUB_RELEASES_API, GITHUB_RELEASES_PAGE, ReleaseAssetInfo, UpdateInfo,

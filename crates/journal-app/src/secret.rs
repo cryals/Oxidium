@@ -88,20 +88,52 @@ impl TokenStore {
     }
 }
 
-/// Redacts any occurrence of Oxidium Bearer tokens from log/audit strings.
+/// Redacts any occurrence of Oxidium Bearer tokens, sync invite tickets, vault keys,
+/// private device keys, or sync session tokens from log/audit strings.
 pub fn redact_secrets(input: &str) -> String {
+    let mut s = input.to_string();
+    for (prefix, marker, extra_predicate) in [
+        ("oxsync-v1:", "[REDACTED_SYNC_INVITE]", false),
+        ("oxvault-v1-", "[REDACTED_VAULT_KEY]", false),
+        ("oxtok1.", "[REDACTED_SYNC_SESSION]", false),
+        ("oxd-ed25519-priv-v1:", "[REDACTED_SYNC_PRIVKEY]", false),
+        ("oxd_", "[REDACTED_TOKEN]", true),
+    ] {
+        s = redact_prefix_tokens(&s, prefix, marker, extra_predicate);
+    }
+    s
+}
+
+fn redact_prefix_tokens(input: &str, prefix: &str, marker: &str, require_hex_16: bool) -> String {
     let mut out = String::with_capacity(input.len());
     let mut rest = input;
-    while let Some(pos) = rest.find("oxd_") {
+    while let Some(pos) = rest.find(prefix) {
         out.push_str(&rest[..pos]);
-        let after = &rest[pos + 4..];
-        let hex_len = after.bytes().take_while(|b| b.is_ascii_hexdigit()).count();
-        if hex_len >= 16 {
-            out.push_str("[REDACTED_TOKEN]");
-            rest = &after[hex_len..];
+        let after = &rest[pos + prefix.len()..];
+        if require_hex_16 {
+            let hex_len = after.bytes().take_while(|b| b.is_ascii_hexdigit()).count();
+            if hex_len >= 16 {
+                out.push_str(marker);
+                rest = &after[hex_len..];
+            } else {
+                out.push_str(prefix);
+                rest = after;
+            }
         } else {
-            out.push_str("oxd_");
-            rest = after;
+            let tok_len = after
+                .bytes()
+                .take_while(|b| {
+                    b.is_ascii_alphanumeric()
+                        || matches!(b, b'-' | b'_' | b'.' | b'+' | b'/' | b'=' | b':')
+                })
+                .count();
+            if tok_len >= 8 {
+                out.push_str(marker);
+                rest = &after[tok_len..];
+            } else {
+                out.push_str(prefix);
+                rest = after;
+            }
         }
     }
     out.push_str(rest);
