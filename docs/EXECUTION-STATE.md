@@ -1,10 +1,10 @@
 # Oxidium Execution State
 
-Last updated: 2026-11-27 (Phase 17 — HOTFIX v0.1.2: MIGRATION EOL NORMALIZATION & STARTUP DIAGNOSTICS)
+Last updated: 2026-11-27 (Phase 18 — M3 EXPRESSIVE MOTION PHYSICS, ADAPTIVES & UI FIXES)
 
 ## Current Phase
-- **Active**: Completed Phase 17 (`v0.1.2`) — Fixed cross-platform SQL migration `LF`/`CRLF` checksum mismatch, enforced `.gitattributes`, added native GUI startup error dialog + `startup-error.log`, and hardened `.old` executable parking in `windows_installer.rs`
-- **Next**: Ready for remote release if requested by user (`git push` / `v0.1.2` release)
+- **Active**: Completed Phase 18 — Material Design 3 Expressive spring motion curves/durations (`OxidiumMotion` + `OxidiumTheme`), zero-jitter 35-day heatmap hover card, top-level unclipped `OxidiumIconButton` tooltips, responsive narrow-window adaptives, `ShortcutsModal`/`QuickProfilePopover`/Settings MCP overflow fixes, and expanded rail cleanup (`Local-First · MCP` removed)
+- **Next**: Ready for local release build or remote `v0.1.3` release upon explicit user confirmation
 
 ## Phase Tracker
 | Phase | Name | Status | Verification |

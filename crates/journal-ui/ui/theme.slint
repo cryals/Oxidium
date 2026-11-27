@@ -8,8 +8,29 @@ import "../../../assets/fonts/RobotoFlex.ttf";
 import { MaterialPalette } from "@material";
 
 export global OxidiumMotion {
-    out property <easing> ease_emphasized: cubic-bezier(0.05, 0.7, 0.1, 1.0);
-    out property <easing> ease_standard: cubic-bezier(0.2, 0.0, 0.0, 1.0);
+    // M3 Expressive Web spring-converted cubic-bezier curves (m3.material.io/styles/motion/overview/specs)
+    out property <easing> expressive_fast_spatial: cubic-bezier(0.42, 1.67, 0.21, 0.90);
+    out property <easing> expressive_default_spatial: cubic-bezier(0.38, 1.21, 0.22, 1.00);
+    out property <easing> expressive_slow_spatial: cubic-bezier(0.39, 1.29, 0.35, 0.98);
+
+    out property <easing> expressive_fast_effects: cubic-bezier(0.31, 0.94, 0.34, 1.00);
+    out property <easing> expressive_default_effects: cubic-bezier(0.34, 0.80, 0.34, 1.00);
+    out property <easing> expressive_slow_effects: cubic-bezier(0.34, 0.88, 0.34, 1.00);
+
+    out property <easing> standard_spatial: cubic-bezier(0.27, 1.06, 0.18, 1.00);
+
+    // Aliases for smooth backwards compatibility across components
+    out property <easing> ease_emphasized: cubic-bezier(0.38, 1.21, 0.22, 1.00);
+    out property <easing> ease_standard: cubic-bezier(0.34, 0.80, 0.34, 1.00);
+}
+
+export global OxidiumTooltipState {
+    in_out property <string> text: "";
+    in_out property <length> anchor_x: 0px;
+    in_out property <length> anchor_y: 0px;
+    in_out property <length> anchor_w: 40px;
+    in_out property <length> anchor_h: 40px;
+    in_out property <bool> shown: false;
 }
 
 export global OxidiumTheme {
@@ -23,12 +44,20 @@ export global OxidiumTheme {
     out property <string> font_display: "Roboto Flex";
     out property <string> font_mono: "Roboto Mono";
 
-    // M3 Expressive motion tokens (respects reduced_motion accessibility setting)
-    out property <duration> anim_instant: root.reduced_motion ? 0ms : 90ms;
-    out property <duration> anim_fast: root.reduced_motion ? 0ms : 160ms;
-    out property <duration> anim_medium: root.reduced_motion ? 0ms : 260ms;
-    out property <duration> anim_emphasized: root.reduced_motion ? 0ms : 380ms;
-    out property <duration> anim_chart: root.reduced_motion ? 0ms : 460ms;
+    // M3 Expressive Web duration tokens (respects reduced_motion accessibility setting)
+    out property <duration> dur_spatial_fast: root.reduced_motion ? 0ms : 350ms;
+    out property <duration> dur_spatial_default: root.reduced_motion ? 0ms : 500ms;
+    out property <duration> dur_spatial_slow: root.reduced_motion ? 0ms : 650ms;
+    out property <duration> dur_effects_fast: root.reduced_motion ? 0ms : 150ms;
+    out property <duration> dur_effects_default: root.reduced_motion ? 0ms : 200ms;
+    out property <duration> dur_effects_slow: root.reduced_motion ? 0ms : 300ms;
+
+    // Convenience duration roles
+    out property <duration> anim_instant: root.reduced_motion ? 0ms : 150ms;
+    out property <duration> anim_fast: root.reduced_motion ? 0ms : 200ms;
+    out property <duration> anim_medium: root.reduced_motion ? 0ms : 350ms;
+    out property <duration> anim_emphasized: root.reduced_motion ? 0ms : 500ms;
+    out property <duration> anim_chart: root.reduced_motion ? 0ms : 650ms;
 
     // Semantic heatmap & grade highlight tokens
     out property <color> grade_2_brown: root.dark_mode ? #D96B43 : #A1521D;

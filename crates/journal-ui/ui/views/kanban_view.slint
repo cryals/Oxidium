@@ -1,5 +1,6 @@
-import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView, Switch } from "@material";
-import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
+import { MaterialPalette, FilledButton, TonalButton, OutlineButton, Icon, ScrollView, Switch } from "@material";
+import { OxidiumTheme, OxidiumMotion, OxidiumTooltipState, OxidiumIcons } from "../theme.slint";
+import { OxidiumIconButton } from "../components.slint";
 import { BoardItem, KanbanColumnModel, KanbanTaskCard, ChecklistRowItem, SubjectItem, UiStrings } from "../types.slint";
 
 component KanbanMicroButton inherits Rectangle {
@@ -11,28 +12,43 @@ component KanbanMicroButton inherits Rectangle {
 
     width: 30px;
     height: 30px;
-    border_radius: 15px;
-    background: mb_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
-    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
+    border_radius: mb_ta.pressed ? 8px : 15px;
+    background: mb_ta.pressed ? MaterialPalette.on_surface.with_alpha(16%)
+        : mb_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+    animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+    animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
 
     Icon {
         source: root.icon;
         width: 16px;
         height: 16px;
         colorize: mb_ta.has_hover ? MaterialPalette.primary : root.icon_color;
+        animate colorize { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
     }
 
     mb_ta := TouchArea {
         mouse_cursor: pointer;
         clicked => {
             root.hover_target = "";
+            OxidiumTooltipState.shown = false;
             root.clicked();
         }
         changed has_hover => {
             if (self.has_hover && root.hint_text != "") {
                 root.hover_target = root.hint_text;
-            } else if (!self.has_hover && root.hover_target == root.hint_text) {
-                root.hover_target = "";
+                OxidiumTooltipState.text = root.hint_text;
+                OxidiumTooltipState.anchor_x = root.absolute-position.x;
+                OxidiumTooltipState.anchor_y = root.absolute-position.y;
+                OxidiumTooltipState.anchor_w = root.width;
+                OxidiumTooltipState.anchor_h = root.height;
+                OxidiumTooltipState.shown = true;
+            } else if (!self.has_hover) {
+                if (root.hover_target == root.hint_text) {
+                    root.hover_target = "";
+                }
+                if (OxidiumTooltipState.text == root.hint_text) {
+                    OxidiumTooltipState.shown = false;
+                }
             }
         }
     }
@@ -49,6 +65,7 @@ export component KanbanView inherits Rectangle {
     in_out property <int> filter_mode: 0; // 0=All, 1=Overdue, 2=HighPriority
     in_out property <bool> hand_mode: false;
     in_out property <string> hover_hint: "";
+    property <bool> narrow_toolbar: root.width < 1140px;
     property <length> pan_start_x: 0px;
     property <length> pan_start_vx: 0px;
     property <bool> is_panning: false;
@@ -116,14 +133,16 @@ export component KanbanView inherits Rectangle {
         padding: 16px;
         spacing: 12px;
 
-        // Kanban Header & Board Switcher
+        // Kanban Header & Adaptive Board Switcher
         Rectangle {
+            vertical_stretch: 0;
+            height: root.narrow_toolbar ? 98px : 60px;
             border_radius: 16px;
             background: MaterialPalette.surface_container_low;
             border_width: 1px;
             border_color: OxidiumTheme.cell_border;
 
-            HorizontalLayout {
+            if !root.narrow_toolbar : HorizontalLayout {
                 padding: 12px;
                 spacing: 10px;
                 alignment: space-between;
@@ -132,11 +151,12 @@ export component KanbanView inherits Rectangle {
                     spacing: 6px;
                     for b in root.boards : Rectangle {
                         height: 36px;
-                        border_radius: 18px;
+                        border_radius: b.id == root.active_board_id ? 11px : 18px;
                         background: b.id == root.active_board_id ? MaterialPalette.primary_container : MaterialPalette.surface;
                         border_width: 1px;
                         border_color: b.id == root.active_board_id ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                         HorizontalLayout {
                             padding_left: 14px;
                             padding_right: 14px;
@@ -179,9 +199,11 @@ export component KanbanView inherits Rectangle {
                             padding: 3px;
                             spacing: 2px;
                             Rectangle {
-                                width: 30px; height: 30px; border_radius: 15px;
+                                width: 30px; height: 30px;
+                                border_radius: !root.hand_mode ? 10px : 15px;
                                 background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
-                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                 Icon {
                                     source: OxidiumIcons.cursor;
                                     width: 16px; height: 16px;
@@ -190,9 +212,11 @@ export component KanbanView inherits Rectangle {
                                 TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = false; } }
                             }
                             Rectangle {
-                                width: 30px; height: 30px; border_radius: 15px;
+                                width: 30px; height: 30px;
+                                border_radius: root.hand_mode ? 10px : 15px;
                                 background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
-                                animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                 Icon {
                                     source: OxidiumIcons.hand;
                                     width: 16px; height: 16px;
@@ -267,11 +291,12 @@ export component KanbanView inherits Rectangle {
                     // Filter mode chips
                     for fm[idx] in ["Все", "Просрочено", "Срочные"] : Rectangle {
                         height: 36px;
-                        border_radius: 18px;
+                        border_radius: root.filter_mode == idx ? 11px : 18px;
                         background: root.filter_mode == idx ? MaterialPalette.secondary_container : MaterialPalette.surface;
                         border_width: 1px;
                         border_color: root.filter_mode == idx ? transparent : MaterialPalette.outline_variant;
-                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                         HorizontalLayout {
                             padding_left: 11px;
                             padding_right: 11px;
@@ -318,10 +343,155 @@ export component KanbanView inherits Rectangle {
                     }
                 }
             }
+
+            if root.narrow_toolbar : VerticalLayout {
+                padding: 10px;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: space-between;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        for b in root.boards : Rectangle {
+                            height: 34px;
+                            border_radius: b.id == root.active_board_id ? 10px : 17px;
+                            background: b.id == root.active_board_id ? MaterialPalette.primary_container : MaterialPalette.surface;
+                            border_width: 1px;
+                            border_color: b.id == root.active_board_id ? MaterialPalette.primary : MaterialPalette.outline_variant;
+                            animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                            animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+                            HorizontalLayout {
+                                padding_left: 12px; padding_right: 12px;
+                                Text { text: b.name; font_size: 12px; font_weight: b.id == root.active_board_id ? 600 : 400; color: b.id == root.active_board_id ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; vertical_alignment: center; }
+                            }
+                            TouchArea { mouse_cursor: pointer; clicked => { root.hover_hint = ""; root.select_board(b.id); } }
+                        }
+                        OutlineButton {
+                            text: root.tr.kanban_new_board;
+                            height: 34px;
+                            clicked => { root.new_board_name = ""; root.new_board_open = true; }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        OutlineButton {
+                            text: root.tr.kanban_new_column;
+                            height: 34px;
+                            clicked => {
+                                root.new_column_name = "";
+                                root.new_column_wip = "";
+                                root.new_column_done = false;
+                                root.new_column_open = true;
+                            }
+                        }
+                        FilledButton {
+                            text: root.tr.kanban_new_task;
+                            height: 34px;
+                            icon: OxidiumIcons.add;
+                            clicked => {
+                                root.new_task_col_id = "";
+                                root.new_task_title = "";
+                                root.new_task_desc = "";
+                                root.new_task_deadline = "";
+                                root.new_task_tags = "";
+                                root.new_task_open = true;
+                            }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: space-between;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Rectangle {
+                            height: 34px;
+                            border_radius: 17px;
+                            background: MaterialPalette.surface_container;
+                            HorizontalLayout {
+                                padding: 3px;
+                                spacing: 2px;
+                                Rectangle {
+                                    width: 28px; height: 28px;
+                                    border_radius: !root.hand_mode ? 9px : 14px;
+                                    background: !root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                    animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                    animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+                                    Icon { source: OxidiumIcons.cursor; width: 15px; height: 15px; colorize: !root.hand_mode ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant; }
+                                    TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = false; } }
+                                }
+                                Rectangle {
+                                    width: 28px; height: 28px;
+                                    border_radius: root.hand_mode ? 9px : 14px;
+                                    background: root.hand_mode ? MaterialPalette.secondary_container : transparent;
+                                    animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                    animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+                                    Icon { source: OxidiumIcons.hand; width: 15px; height: 15px; colorize: root.hand_mode ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant; }
+                                    TouchArea { mouse_cursor: pointer; clicked => { root.hand_mode = true; root.dragging_task = false; } }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: 140px;
+                            height: 34px;
+                            border_radius: 17px;
+                            background: MaterialPalette.surface_container_high;
+                            HorizontalLayout {
+                                padding_left: 10px; padding_right: 10px; spacing: 6px;
+                                VerticalLayout { alignment: center; Icon { source: OxidiumIcons.search; width: 14px; height: 14px; colorize: MaterialPalette.on_surface_variant; } }
+                                TextInput {
+                                    horizontal_stretch: 1; vertical_alignment: center;
+                                    text <=> root.filter_query; font_size: 12px; color: MaterialPalette.on_surface;
+                                    edited => { root.filter_changed(root.filter_query, root.filter_mode); }
+                                }
+                            }
+                            if root.filter_query == "" : Text {
+                                x: 30px; y: 0px; height: 100%;
+                                text: "Поиск задач..."; font_size: 12px; color: MaterialPalette.on_surface_variant; vertical_alignment: center;
+                            }
+                        }
+
+                        if root.subject_filter_label != "" : Rectangle {
+                            height: 34px;
+                            border_radius: 17px;
+                            background: MaterialPalette.tertiary_container;
+                            border_width: 1px; border_color: MaterialPalette.primary.with_alpha(45%);
+                            HorizontalLayout {
+                                padding_left: 10px; padding_right: 8px; spacing: 5px;
+                                Text { text: root.subject_filter_label; font_size: 11px; font_weight: 600; color: MaterialPalette.on_tertiary_container; vertical_alignment: center; overflow: elide; }
+                                VerticalLayout { alignment: center; Icon { source: OxidiumIcons.close; width: 14px; height: 14px; colorize: MaterialPalette.on_tertiary_container; } }
+                            }
+                            TouchArea { mouse_cursor: pointer; clicked => { root.clear_subject_filter(); } }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        for fm[idx] in ["Все", "Просрочено", "Срочные"] : Rectangle {
+                            height: 34px;
+                            border_radius: root.filter_mode == idx ? 10px : 17px;
+                            background: root.filter_mode == idx ? MaterialPalette.secondary_container : MaterialPalette.surface;
+                            border_width: 1px;
+                            border_color: root.filter_mode == idx ? transparent : MaterialPalette.outline_variant;
+                            animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                            animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+                            HorizontalLayout {
+                                padding_left: 10px; padding_right: 10px;
+                                Text { text: fm; font_size: 11px; font_weight: root.filter_mode == idx ? 600 : 500; color: root.filter_mode == idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant; vertical_alignment: center; }
+                            }
+                            TouchArea { mouse_cursor: pointer; clicked => { root.filter_mode = idx; root.filter_changed(root.filter_query, idx); } }
+                        }
+                    }
+                }
+            }
         }
 
         // Dragging Indicator Banner (click any column drop target to complete drag-and-drop)
         if root.dragging_task : Rectangle {
+            vertical_stretch: 0;
             height: 40px;
             border_radius: 12px;
             background: MaterialPalette.primary_container;
@@ -374,7 +544,8 @@ export component KanbanView inherits Rectangle {
                             ? MaterialPalette.primary
                             : col.over_wip ? OxidiumTheme.danger_color
                             : OxidiumTheme.cell_border;
-                        animate width, border_color { duration: OxidiumTheme.anim_medium; easing: OxidiumMotion.ease_emphasized; }
+                        animate width { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                        animate border_color { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
 
                     VerticalLayout {
                         padding: 12px;
@@ -691,7 +862,7 @@ export component KanbanView inherits Rectangle {
                                                     height: 100%;
                                                     border_radius: 3px;
                                                     background: OxidiumTheme.success_color;
-                                                    animate width { duration: OxidiumTheme.anim_medium; easing: OxidiumMotion.ease_emphasized; }
+                                                    animate width { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
                                                 }
                                             }
                                         }
@@ -766,52 +937,31 @@ export component KanbanView inherits Rectangle {
                     }
                 }
             }
-
-            // Floating M3 Expressive Unclipped Hint Pill (above all ScrollViews)
-            Rectangle {
-                x: (parent.width - self.width) / 2;
-                y: root.hover_hint != "" ? (parent.height - self.height - 10px) : (parent.height + 16px);
-                height: 30px;
-                border_radius: 15px;
-                background: MaterialPalette.inverse_surface;
-                opacity: root.hover_hint != "" ? 1.0 : 0.0;
-                visible: self.opacity > 0.01;
-                drop_shadow_blur: 14px;
-                drop_shadow_color: #00000040;
-                animate opacity { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
-                animate y { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
-
-                HorizontalLayout {
-                    padding_left: 14px;
-                    padding_right: 14px;
-                    Text {
-                        text: root.hover_hint;
-                        font_size: 12px;
-                        font_weight: 500;
-                        color: MaterialPalette.inverse_on_surface;
-                        vertical_alignment: center;
-                    }
-                }
-            }
         }
     }
 
     // ===== NEW TASK MODAL =====
-    if root.new_task_open : Rectangle {
+    Rectangle {
         width: 100%;
         height: 100%;
         background: #00000050;
-        TouchArea { clicked => { root.new_task_open = false; } }
+        opacity: root.new_task_open ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+        TouchArea { enabled: root.new_task_open; clicked => { root.new_task_open = false; } }
 
         Rectangle {
-            width: 500px;
-            height: 500px;
+            width: min(500px, parent.width - 28px);
+            height: min(500px, parent.height - 28px);
             x: (parent.width - self.width) / 2;
-            y: (parent.height - self.height) / 2;
+            y: root.new_task_open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 24px);
+            animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
             border_radius: 24px;
             background: MaterialPalette.surface_container_high;
             border_width: 1px;
             border_color: MaterialPalette.outline_variant;
+            drop_shadow_blur: 28px;
+            drop_shadow_color: #00000055;
             TouchArea {}
 
             VerticalLayout {
@@ -931,13 +1081,21 @@ export component KanbanView inherits Rectangle {
     }
 
     // ===== NEW COLUMN MODAL =====
-    if root.new_column_open : Rectangle {
+    Rectangle {
         width: 100%; height: 100%; background: #00000050;
-        TouchArea { clicked => { root.new_column_open = false; } }
+        opacity: root.new_column_open ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+        TouchArea { enabled: root.new_column_open; clicked => { root.new_column_open = false; } }
         Rectangle {
-            width: 390px; height: 310px;
-            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: min(390px, parent.width - 28px);
+            height: min(310px, parent.height - 28px);
+            x: (parent.width - self.width) / 2;
+            y: root.new_column_open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 24px);
+            animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
             border_radius: 22px; background: MaterialPalette.surface_container_high;
+            border_width: 1px; border_color: MaterialPalette.outline_variant;
+            drop_shadow_blur: 24px; drop_shadow_color: #00000050;
             TouchArea {}
             VerticalLayout {
                 padding: 20px; spacing: 10px;
@@ -976,13 +1134,21 @@ export component KanbanView inherits Rectangle {
     }
 
     // ===== NEW BOARD MODAL =====
-    if root.new_board_open : Rectangle {
+    Rectangle {
         width: 100%; height: 100%; background: #00000050;
-        TouchArea { clicked => { root.new_board_open = false; } }
+        opacity: root.new_board_open ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+        TouchArea { enabled: root.new_board_open; clicked => { root.new_board_open = false; } }
         Rectangle {
-            width: 360px; height: 210px;
-            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: min(360px, parent.width - 28px);
+            height: min(210px, parent.height - 28px);
+            x: (parent.width - self.width) / 2;
+            y: root.new_board_open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 24px);
+            animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
             border_radius: 22px; background: MaterialPalette.surface_container_high;
+            border_width: 1px; border_color: MaterialPalette.outline_variant;
+            drop_shadow_blur: 24px; drop_shadow_color: #00000050;
             TouchArea {}
             VerticalLayout {
                 padding: 20px; spacing: 10px;
@@ -1010,22 +1176,29 @@ export component KanbanView inherits Rectangle {
     }
 
     // ===== TASK DETAIL DRAWER MODAL =====
-    if root.detail_open : Rectangle {
+    Rectangle {
         width: 100%; height: 100%; background: #00000050;
-        TouchArea { clicked => { root.detail_open = false; } }
+        opacity: root.detail_open ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+        TouchArea { enabled: root.detail_open; clicked => { root.detail_open = false; } }
         Rectangle {
-            width: 580px; height: 630px;
-            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: min(580px, parent.width - 28px);
+            height: min(630px, parent.height - 28px);
+            x: (parent.width - self.width) / 2;
+            y: root.detail_open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 24px);
+            animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
             border_radius: 24px; background: MaterialPalette.surface_container_high;
             border_width: 1px; border_color: MaterialPalette.outline_variant;
+            drop_shadow_blur: 28px; drop_shadow_color: #00000055;
             TouchArea {}
 
             VerticalLayout {
                 padding: 20px; spacing: 10px;
                 HorizontalLayout {
                     alignment: space-between;
-                    Text { text: "Детали задачи"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
-                    IconButton { icon: OxidiumIcons.close; clicked => { root.detail_open = false; } }
+                    Text { text: "Детали задачи"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                    OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.detail_open = false; } }
                 }
 
                 Rectangle {
@@ -1147,8 +1320,10 @@ export component KanbanView inherits Rectangle {
                             alignment: space-between;
                             HorizontalLayout {
                                 spacing: 8px;
-                                IconButton {
+                                OxidiumIconButton {
                                     icon: ci.is_completed ? OxidiumIcons.check_box : OxidiumIcons.check;
+                                    button_size: 32px; icon_size: 16px;
+                                    tooltip: ci.is_completed ? "Снять отметку" : "Выполнено";
                                     clicked => { root.toggle_checklist_item(ci.id, !ci.is_completed); }
                                 }
                                 Text {
@@ -1158,8 +1333,10 @@ export component KanbanView inherits Rectangle {
                                     vertical_alignment: center;
                                 }
                             }
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumIcons.delete;
+                                button_size: 32px; icon_size: 16px;
+                                tooltip: "Удалить пункт";
                                 clicked => { root.delete_checklist_item(ci.id); }
                             }
                         }

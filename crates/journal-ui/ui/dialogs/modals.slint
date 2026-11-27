@@ -1,5 +1,6 @@
-import { MaterialPalette, FilledButton, TonalButton, OutlineButton, IconButton, Icon, ScrollView, Switch } from "@material";
-import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "../theme.slint";
+import { MaterialPalette, FilledButton, TonalButton, OutlineButton, Icon, ScrollView, Switch } from "@material";
+import { OxidiumTheme, OxidiumMotion, OxidiumTooltipState, OxidiumIcons } from "../theme.slint";
+import { OxidiumIconButton } from "../components.slint";
 import {
     ProfileItem, SubjectItem, PeriodItem, SearchHitItem,
     ActivityRowItem, NotificationRowItem, UiStrings
@@ -9,6 +10,7 @@ import {
 // Profiles Manager Dialog
 // ============================================================================
 export component ProfilesModal inherits Rectangle {
+    in property <bool> open: false;
     in property <[ProfileItem]> profiles;
     in_out property <string> new_name: "";
     in_out property <string> new_institution: "";
@@ -28,11 +30,17 @@ export component ProfilesModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000055;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        width: 620px; height: 560px;
-        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        width: min(620px, parent.width - 28px);
+        height: min(560px, parent.height - 28px);
+        x: (parent.width - self.width) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 26px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 24px;
         background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
@@ -43,8 +51,8 @@ export component ProfilesModal inherits Rectangle {
             padding: 22px; spacing: 14px;
             HorizontalLayout {
                 alignment: space-between;
-                Text { text: "Управление учебными профилями"; font_size: 19px; font_weight: 600; color: MaterialPalette.on_surface; }
-                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                Text { text: "Управление учебными профилями"; font_size: 19px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.close(); } }
             }
 
             if root.pending_delete_id != "" : Rectangle {
@@ -125,13 +133,14 @@ export component ProfilesModal inherits Rectangle {
                                         clicked => { root.switch_profile(p.id); }
                                     }
                                 }
-                                IconButton { icon: OxidiumIcons.copy; tooltip: "Дублировать"; clicked => { root.duplicate_profile(p.id); } }
-                                IconButton {
+                                OxidiumIconButton { icon: OxidiumIcons.copy; button_size: 34px; icon_size: 17px; tooltip: "Дублировать"; clicked => { root.duplicate_profile(p.id); } }
+                                OxidiumIconButton {
                                     icon: p.is_archived ? OxidiumIcons.restore : OxidiumIcons.archive;
+                                    button_size: 34px; icon_size: 17px;
                                     tooltip: p.is_archived ? "Восстановить" : "Архивировать";
                                     clicked => { root.archive_profile(p.id, !p.is_archived); }
                                 }
-                                IconButton { icon: OxidiumIcons.delete; tooltip: "Удалить профиль"; clicked => { root.request_delete_profile(p.id); } }
+                                OxidiumIconButton { icon: OxidiumIcons.delete; button_size: 34px; icon_size: 17px; tooltip: "Удалить профиль"; clicked => { root.request_delete_profile(p.id); } }
                             }
                         }
                     }
@@ -180,6 +189,7 @@ export component ProfilesModal inherits Rectangle {
 // Subjects Manager Dialog (with reorder, archive, delete impact warning)
 // ============================================================================
 export component SubjectsModal inherits Rectangle {
+    in property <bool> open: false;
     in property <[SubjectItem]> subjects;
     in_out property <string> new_name: "";
     in_out property <string> new_short: "";
@@ -198,11 +208,17 @@ export component SubjectsModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000055;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        width: 640px; height: 560px;
-        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        width: min(640px, parent.width - 28px);
+        height: min(560px, parent.height - 28px);
+        x: (parent.width - self.width) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 26px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 24px;
         background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
@@ -213,8 +229,8 @@ export component SubjectsModal inherits Rectangle {
             padding: 22px; spacing: 12px;
             HorizontalLayout {
                 alignment: space-between;
-                Text { text: "Управление предметами"; font_size: 19px; font_weight: 600; color: MaterialPalette.on_surface; }
-                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                Text { text: "Управление предметами"; font_size: 19px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.close(); } }
             }
 
             if root.pending_delete_id != "" : Rectangle {
@@ -268,14 +284,15 @@ export component SubjectsModal inherits Rectangle {
                             }
                             HorizontalLayout {
                                 spacing: 2px;
-                                IconButton { icon: OxidiumIcons.arrow_up; tooltip: "Выше"; clicked => { root.move_subject(s.id, -1); } }
-                                IconButton { icon: OxidiumIcons.arrow_down; tooltip: "Ниже"; clicked => { root.move_subject(s.id, 1); } }
-                                IconButton {
+                                OxidiumIconButton { icon: OxidiumIcons.arrow_up; button_size: 32px; icon_size: 16px; tooltip: "Выше"; clicked => { root.move_subject(s.id, -1); } }
+                                OxidiumIconButton { icon: OxidiumIcons.arrow_down; button_size: 32px; icon_size: 16px; tooltip: "Ниже"; clicked => { root.move_subject(s.id, 1); } }
+                                OxidiumIconButton {
                                     icon: s.is_archived ? OxidiumIcons.restore : OxidiumIcons.archive;
+                                    button_size: 32px; icon_size: 16px;
                                     tooltip: s.is_archived ? "Восстановить" : "Архивировать";
                                     clicked => { root.archive_subject(s.id, !s.is_archived); }
                                 }
-                                IconButton { icon: OxidiumIcons.delete; tooltip: "Удалить"; clicked => { root.request_delete_subject(s.id); } }
+                                OxidiumIconButton { icon: OxidiumIcons.delete; button_size: 32px; icon_size: 16px; tooltip: "Удалить"; clicked => { root.request_delete_subject(s.id); } }
                             }
                         }
                     }
@@ -328,6 +345,7 @@ export component SubjectsModal inherits Rectangle {
 // Academic Periods Modal
 // ============================================================================
 export component PeriodsModal inherits Rectangle {
+    in property <bool> open: false;
     in property <[PeriodItem]> periods;
     in_out property <string> new_name: "";
     in_out property <string> new_start: "2026-09-01";
@@ -340,21 +358,28 @@ export component PeriodsModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000055;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        width: 560px; height: 460px;
-        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        width: min(560px, parent.width - 28px);
+        height: min(460px, parent.height - 28px);
+        x: (parent.width - self.width) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 26px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 24px; background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 28px; drop_shadow_color: #00000055;
         TouchArea {}
 
         VerticalLayout {
             padding: 22px; spacing: 12px;
             HorizontalLayout {
                 alignment: space-between;
-                Text { text: "Учебные периоды"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; }
-                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                Text { text: "Учебные периоды"; font_size: 18px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.close(); } }
             }
 
             ScrollView {
@@ -441,6 +466,7 @@ export component PeriodsModal inherits Rectangle {
 // Global Search Modal (Ctrl+F)
 // ============================================================================
 export component GlobalSearchModal inherits Rectangle {
+    in property <bool> open: false;
     in_out property <string> query: "";
     in property <[SearchHitItem]> hits;
 
@@ -450,12 +476,22 @@ export component GlobalSearchModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000050;
-    init => { search_input.focus(); }
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    changed open => {
+        if (self.open) {
+            search_input.focus();
+        }
+    }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        width: 580px; height: 440px;
-        x: (parent.width - self.width) / 2; y: 76px;
+        width: min(580px, parent.width - 28px);
+        height: min(440px, parent.height - 96px);
+        x: (parent.width - self.width) / 2;
+        y: root.open ? 68px : 44px;
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 22px; background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
         drop_shadow_blur: 28px; drop_shadow_color: #00000055;
@@ -481,7 +517,7 @@ export component GlobalSearchModal inherits Rectangle {
                     }
                     if root.query == "" : Text { x: 40px; height: 100%; text: "Поиск по предметам, оценкам, задачам и тегам..."; font_size: 12px; color: MaterialPalette.on_surface_variant.with_alpha(65%); vertical_alignment: center; }
                 }
-                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.close(); } }
             }
 
             ScrollView {
@@ -530,6 +566,7 @@ export component GlobalSearchModal inherits Rectangle {
 // Notifications Center Modal
 // ============================================================================
 export component NotificationsModal inherits Rectangle {
+    in property <bool> open: false;
     in property <[NotificationRowItem]> items;
     in property <string> background_notice;
 
@@ -539,11 +576,17 @@ export component NotificationsModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000045;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        width: 440px; height: 500px;
-        x: parent.width - self.width - 24px; y: 68px;
+        width: min(440px, parent.width - 28px);
+        height: min(500px, parent.height - 96px);
+        x: max(14px, parent.width - self.width - 24px);
+        y: root.open ? 68px : 44px;
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 22px; background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
         drop_shadow_blur: 24px; drop_shadow_color: #00000045;
@@ -553,11 +596,11 @@ export component NotificationsModal inherits Rectangle {
             padding: 18px; spacing: 10px;
             HorizontalLayout {
                 alignment: space-between;
-                Text { text: "Центр уведомлений"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
+                Text { text: "Центр уведомлений"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
                 HorizontalLayout {
                     spacing: 4px;
                     VerticalLayout { alignment: center; TonalButton { text: "Прочитать все"; height: 32px; clicked => { root.mark_all_read(); } } }
-                    IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                    OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.close(); } }
                 }
             }
 
@@ -592,7 +635,7 @@ export component NotificationsModal inherits Rectangle {
                                 if n.body != "" : Text { text: n.body; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
                                 Text { text: n.time_text; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.on_surface_variant; }
                             }
-                            IconButton { icon: OxidiumIcons.close; clicked => { root.dismiss_item(n.id); } }
+                            OxidiumIconButton { icon: OxidiumIcons.close; button_size: 32px; icon_size: 16px; tooltip: "Скрыть"; clicked => { root.dismiss_item(n.id); } }
                         }
                     }
                 }
@@ -620,7 +663,7 @@ component SettingsToggleRow inherits Rectangle {
     min_height: root.subtitle != "" ? 54px : 44px;
     border_radius: 12px;
     background: row_ta.has_hover ? MaterialPalette.surface_container_high.with_alpha(65%) : transparent;
-    animate background { duration: OxidiumTheme.anim_instant; easing: OxidiumMotion.ease_standard; }
+    animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
 
     row_ta := TouchArea {
         mouse_cursor: pointer;
@@ -673,6 +716,7 @@ component SettingsToggleRow inherits Rectangle {
 // Settings & MCP Control Modal (6 Tabs: Appearance, Journal, Kanban, MCP, Data, About)
 // ============================================================================
 export component SettingsModal inherits Rectangle {
+    in property <bool> open: false;
     in_out property <int> active_tab: 0; // 0=Appearance, 1=Journal, 2=Kanban, 3=MCP, 4=Data, 5=About
     in property <UiStrings> tr;
 
@@ -744,11 +788,17 @@ export component SettingsModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000055;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
-    Rectangle {
-        width: 920px; height: 660px;
-        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+    settings_card := Rectangle {
+        width: min(920px, parent.width - 28px);
+        height: min(660px, parent.height - 28px);
+        x: (parent.width - self.width) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 26px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 24px; background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
         drop_shadow_blur: 32px; drop_shadow_color: #00000060;
@@ -758,17 +808,19 @@ export component SettingsModal inherits Rectangle {
         HorizontalLayout {
             // Left Settings Sidebar
             Rectangle {
-                width: 204px;
+                width: settings_card.width < 760px ? 158px : 204px;
                 background: MaterialPalette.surface_container;
                 VerticalLayout {
-                    padding: 16px; spacing: 6px;
+                    padding: 14px; spacing: 6px;
                     Text { text: "Настройки"; font_size: 18px; font_weight: 700; color: MaterialPalette.on_surface; }
                     Rectangle { height: 6px; }
                     for tab_label[idx] in ["Внешний вид", "Журнал", "Канбан и уведомления", "MCP-сервер", "Данные и бэкапы", "О приложении"] : Rectangle {
-                        height: 38px; border_radius: 12px;
+                        height: 38px;
+                        border_radius: root.active_tab == idx ? 10px : 14px;
                         background: root.active_tab == idx ? MaterialPalette.secondary_container
                             : tab_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                        animate background { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                        animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                         HorizontalLayout {
                             padding_left: 12px; padding_right: 12px;
                             Text {
@@ -776,6 +828,7 @@ export component SettingsModal inherits Rectangle {
                                 font_weight: root.active_tab == idx ? 600 : 400;
                                 color: root.active_tab == idx ? MaterialPalette.on_secondary_container : MaterialPalette.on_surface_variant;
                                 vertical_alignment: center;
+                                overflow: elide;
                             }
                         }
                         tab_ta := TouchArea { mouse_cursor: pointer; clicked => { root.active_tab = idx; } }
@@ -810,11 +863,13 @@ export component SettingsModal inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     for th[idx] in ["Светлая", "Тёмная", "Системная"] : Rectangle {
-                                        horizontal_stretch: 1; height: 38px; border_radius: 12px;
+                                        horizontal_stretch: 1; height: 38px;
+                                        border_radius: root.theme_mode_idx == idx ? 9px : 12px;
                                         background: root.theme_mode_idx == idx ? MaterialPalette.primary_container
                                             : th_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.theme_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                         Text { text: th; font_size: 13px; font_weight: 600; color: root.theme_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         th_ta := TouchArea { mouse_cursor: pointer; clicked => { root.theme_mode_idx = idx; } }
                                     }
@@ -824,11 +879,13 @@ export component SettingsModal inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     for lg[idx] in ["Русский (основной)", "English"] : Rectangle {
-                                        horizontal_stretch: 1; height: 38px; border_radius: 12px;
+                                        horizontal_stretch: 1; height: 38px;
+                                        border_radius: root.lang_idx == idx ? 9px : 12px;
                                         background: root.lang_idx == idx ? MaterialPalette.primary_container
                                             : lg_ta.has_hover ? MaterialPalette.surface_container_high : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.lang_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                         Text { text: lg; font_size: 13px; font_weight: 600; color: root.lang_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         lg_ta := TouchArea { mouse_cursor: pointer; clicked => { root.lang_idx = idx; } }
                                     }
@@ -848,11 +905,13 @@ export component SettingsModal inherits Rectangle {
                                         { hex: "#9333EA", c: #9333EA },
                                         { hex: "#BE123C", c: #BE123C },
                                     ] : Rectangle {
-                                        width: 34px; height: 34px; border_radius: 17px;
+                                        width: 34px; height: 34px;
+                                        border_radius: root.accent_hex == swatch.hex ? 10px : 17px;
                                         background: swatch.c;
                                         border_width: root.accent_hex == swatch.hex ? 3px : (sw_ta.has_hover ? 2px : 0px);
                                         border_color: MaterialPalette.on_surface;
-                                        animate border_width { duration: OxidiumTheme.anim_instant; }
+                                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate border_width { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
                                         sw_ta := TouchArea { mouse_cursor: pointer; clicked => { root.accent_hex = swatch.hex; } }
                                     }
                                 }
@@ -926,10 +985,11 @@ export component SettingsModal inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     for am[idx] in ["Арифметическое среднее", "Взвешенное (по весам работ)"] : Rectangle {
-                                        horizontal_stretch: 1; height: 38px; border_radius: 12px;
+                                        horizontal_stretch: 1; height: 38px; border_radius: root.avg_mode_idx == idx ? 9px : 12px;
                                         background: root.avg_mode_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.avg_mode_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                         Text { text: am; font_size: 12px; font_weight: 600; color: root.avg_mode_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         TouchArea { mouse_cursor: pointer; clicked => { root.avg_mode_idx = idx; } }
                                     }
@@ -939,10 +999,11 @@ export component SettingsModal inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     for pr[idx] in ["1 знак (4.5)", "2 знака (4.50)", "3 знака (4.500)"] : Rectangle {
-                                        horizontal_stretch: 1; height: 36px; border_radius: 12px;
+                                        horizontal_stretch: 1; height: 36px; border_radius: root.avg_precision_idx == idx ? 9px : 12px;
                                         background: root.avg_precision_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.avg_precision_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                         Text { text: pr; font_family: OxidiumTheme.font_mono; font_size: 12px; font_weight: 600; color: root.avg_precision_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         TouchArea { mouse_cursor: pointer; clicked => { root.avg_precision_idx = idx; } }
                                     }
@@ -952,10 +1013,11 @@ export component SettingsModal inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     for ws[idx] in ["Понедельник (Пн–Вс)", "Воскресенье (Вс–Сб)"] : Rectangle {
-                                        horizontal_stretch: 1; height: 36px; border_radius: 12px;
+                                        horizontal_stretch: 1; height: 36px; border_radius: root.week_start_idx == idx ? 9px : 12px;
                                         background: root.week_start_idx == idx ? MaterialPalette.primary_container : MaterialPalette.surface;
                                         border_width: 1px; border_color: root.week_start_idx == idx ? MaterialPalette.primary : MaterialPalette.outline_variant;
-                                        animate background, border_color { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                                        animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate background, border_color { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                         Text { text: ws; font_size: 12px; font_weight: 600; color: root.week_start_idx == idx ? MaterialPalette.on_primary_container : MaterialPalette.on_surface; horizontal_alignment: center; vertical_alignment: center; }
                                         TouchArea { mouse_cursor: pointer; clicked => { root.week_start_idx = idx; } }
                                     }
@@ -1076,9 +1138,21 @@ export component SettingsModal inherits Rectangle {
                                     if !root.mcp_http_running : FilledButton { text: "Запустить HTTP"; height: 38px; icon: OxidiumIcons.play; clicked => { root.mcp_start_http(); } }
                                     if root.mcp_http_running : OutlineButton { text: "Остановить"; height: 38px; icon: OxidiumIcons.stop; clicked => { root.mcp_stop_http(); } }
                                     if root.mcp_http_running : TonalButton { text: "Перезапустить"; height: 38px; icon: OxidiumIcons.refresh; clicked => { root.mcp_restart_http(); } }
-                                    TonalButton { text: "Перевыпустить токен"; height: 38px; icon: OxidiumIcons.lock; clicked => { root.mcp_rotate_token(); } }
                                 }
-                                Text { text: "Bearer токен: " + root.mcp_token_preview + " (хранится в mcp-token.secret, вне SQLite и Git)"; font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant; wrap: word_wrap; }
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    alignment: space-between;
+                                    Text {
+                                        horizontal_stretch: 1;
+                                        text: "Bearer токен: " + root.mcp_token_preview + " (хранится в mcp-token.secret, вне SQLite и Git)";
+                                        font_family: OxidiumTheme.font_mono; font_size: 11px; color: MaterialPalette.on_surface_variant;
+                                        wrap: word_wrap; vertical_alignment: center;
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        TonalButton { text: "Перевыпустить токен"; height: 36px; icon: OxidiumIcons.lock; clicked => { root.mcp_rotate_token(); } }
+                                    }
+                                }
                             }
                         }
 
@@ -1312,21 +1386,30 @@ export component SettingsModal inherits Rectangle {
 // Keyboard Shortcuts Reference Modal
 // ============================================================================
 export component ShortcutsModal inherits Rectangle {
+    in property <bool> open: false;
     callback close();
     width: 100%; height: 100%; background: #00000050;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
     Rectangle {
-        width: 440px; height: 420px;
-        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        width: min(460px, parent.width - 28px);
+        height: min(parent.height - 28px, shortcuts_col.preferred_height);
+        x: (parent.width - self.width) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 24px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 22px; background: MaterialPalette.surface_container_high;
         border_width: 1px; border_color: MaterialPalette.outline_variant;
+        drop_shadow_blur: 28px; drop_shadow_color: #00000055;
         TouchArea {}
-        VerticalLayout {
-            padding: 20px; spacing: 10px;
+        shortcuts_col := VerticalLayout {
+            padding: 20px; spacing: 8px; alignment: start;
             HorizontalLayout {
+                height: 40px;
                 alignment: space-between;
-                Text { text: "Горячие клавиши"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; }
-                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                Text { text: "Горячие клавиши"; font_size: 17px; font_weight: 600; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                OxidiumIconButton { icon: OxidiumIcons.close; tooltip: "Закрыть"; clicked => { root.close(); } }
             }
             for sc in [
                 { k: "Ctrl + 1 / 2 / 3", d: "Журнал / Статистика / Канбан" },
@@ -1338,8 +1421,10 @@ export component ShortcutsModal inherits Rectangle {
                 { k: "Цифры 1 – 5", d: "Быстрый ввод оценки в активной ячейке" },
                 { k: "Delete / Escape", d: "Удалить выбранное / Закрыть диалог" },
             ] : HorizontalLayout {
+                height: 28px;
                 alignment: space-between;
-                Text { text: sc.d; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; }
+                spacing: 8px;
+                Text { horizontal_stretch: 1; text: sc.d; font_size: 12px; color: MaterialPalette.on_surface; vertical_alignment: center; overflow: elide; }
                 Rectangle {
                     height: 24px; border_radius: 6px; background: MaterialPalette.surface_container;
                     HorizontalLayout {
@@ -1356,6 +1441,7 @@ export component ShortcutsModal inherits Rectangle {
 // Quick Profile Switcher Popover (Stitch A01 — bottom-left next to rail)
 // ============================================================================
 export component QuickProfilePopover inherits Rectangle {
+    in property <bool> open: false;
     in property <[ProfileItem]> profiles;
     in property <length> rail_width: 88px;
     callback close();
@@ -1364,13 +1450,17 @@ export component QuickProfilePopover inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000028;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        x: root.rail_width + 12px;
-        y: max(20px, parent.height - self.height - 18px);
-        width: 310px;
-        height: min(400px, qp_layout.preferred_height + 24px);
+        width: min(310px, parent.width - root.rail_width - 24px);
+        height: min(parent.height - 32px, qp_layout.preferred_height + 4px);
+        x: root.open ? (root.rail_width + 12px) : (root.rail_width - 8px);
+        y: root.open ? max(16px, parent.height - self.height - 18px) : max(16px, parent.height - self.height);
+        animate x, y { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
         border_radius: 24px;
         background: MaterialPalette.surface_container_high;
         border_width: 1px;
@@ -1382,8 +1472,10 @@ export component QuickProfilePopover inherits Rectangle {
         qp_layout := VerticalLayout {
             padding: 14px;
             spacing: 8px;
+            alignment: start;
 
             HorizontalLayout {
+                height: 36px;
                 alignment: space-between;
                 Text {
                     text: "Учебные профили";
@@ -1392,13 +1484,27 @@ export component QuickProfilePopover inherits Rectangle {
                     color: MaterialPalette.on_surface_variant;
                     vertical_alignment: center;
                 }
-                IconButton { icon: OxidiumIcons.close; clicked => { root.close(); } }
+                OxidiumIconButton { icon: OxidiumIcons.close; button_size: 32px; icon_size: 16px; tooltip: "Закрыть"; clicked => { root.close(); } }
             }
 
             for p in root.profiles : Rectangle {
                 height: 50px;
                 border_radius: 14px;
                 background: p.is_active ? MaterialPalette.secondary_container : p_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+                animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
+
+                // Row TouchArea goes BEFORE foreground children so > button receives clicks directly
+                p_ta := TouchArea {
+                    mouse_cursor: pointer;
+                    clicked => {
+                        if (!p.is_active) {
+                            root.switch_profile(p.id);
+                        } else {
+                            root.open_full_manager();
+                        }
+                        root.close();
+                    }
+                }
 
                 HorizontalLayout {
                     padding_left: 10px;
@@ -1443,24 +1549,15 @@ export component QuickProfilePopover inherits Rectangle {
 
                     if p.is_active : VerticalLayout {
                         alignment: center;
-                        IconButton {
+                        OxidiumIconButton {
                             icon: OxidiumIcons.chevron_right;
+                            button_size: 32px; icon_size: 18px;
                             tooltip: "Редактировать профили";
                             clicked => {
                                 root.close();
                                 root.open_full_manager();
                             }
                         }
-                    }
-                }
-
-                p_ta := TouchArea {
-                    mouse_cursor: pointer;
-                    clicked => {
-                        if (!p.is_active) {
-                            root.switch_profile(p.id);
-                        }
-                        root.close();
                     }
                 }
             }
@@ -1471,6 +1568,7 @@ export component QuickProfilePopover inherits Rectangle {
                 height: 38px;
                 border_radius: 12px;
                 background: addp_ta.has_hover ? MaterialPalette.surface_container_highest : transparent;
+                animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
                 HorizontalLayout {
                     padding_left: 10px; padding_right: 10px; spacing: 8px;
                     VerticalLayout { alignment: center; Icon { source: OxidiumIcons.add; width: 18px; height: 18px; colorize: MaterialPalette.primary; } }
@@ -1492,6 +1590,7 @@ export component QuickProfilePopover inherits Rectangle {
 // 4-Step Expressive Setup Wizard (Stitch E06 — Welcome, Profile, Subjects, MCP)
 // ============================================================================
 export component OnboardingModal inherits Rectangle {
+    in property <bool> open: false;
     in_out property <int> step: 1; // 1..4
     in_out property <string> profile_name: "Основной профиль";
     in_out property <string> institution: "";
@@ -1509,13 +1608,17 @@ export component OnboardingModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000066;
-    TouchArea { clicked => { root.close(); } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { OxidiumTooltipState.shown = false; root.close(); } }
 
     Rectangle {
-        width: 680px;
-        height: 560px;
+        width: min(680px, parent.width - 28px);
+        height: min(560px, parent.height - 28px);
         x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 26px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 28px;
         background: MaterialPalette.surface_container_low;
         border_width: 1px;
@@ -1550,19 +1653,20 @@ export component OnboardingModal inherits Rectangle {
                             height: 10px;
                             border_radius: 5px;
                             background: root.step == s ? MaterialPalette.primary : MaterialPalette.surface_container_highest;
-                            animate width, background { duration: OxidiumTheme.anim_emphasized; easing: OxidiumMotion.ease_emphasized; }
+                            animate width { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                            animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                         }
                     }
                 }
 
                 HorizontalLayout {
                     spacing: 4px;
-                    IconButton {
+                    OxidiumIconButton {
                         icon: OxidiumTheme.dark_mode ? OxidiumIcons.light_mode : OxidiumIcons.dark_mode;
                         tooltip: "Переключить тему";
                         clicked => { root.toggle_theme(); }
                     }
-                    IconButton {
+                    OxidiumIconButton {
                         icon: OxidiumIcons.close;
                         tooltip: "Закрыть";
                         clicked => { root.close(); }
@@ -1800,7 +1904,8 @@ export component OnboardingModal inherits Rectangle {
 // Dynamic Semi-Automatic Update Modal (GitHub Releases)
 // ============================================================================
 export component UpdateModal inherits Rectangle {
-    in property <string> current_version: "v0.1.0";
+    in property <bool> open: false;
+    in property <string> current_version: "v0.1.2";
     in property <string> latest_version: "";
     in property <string> release_name: "";
     in property <string> published_at: "";
@@ -1817,13 +1922,17 @@ export component UpdateModal inherits Rectangle {
 
     width: 100%; height: 100%;
     background: #00000060;
-    TouchArea { clicked => { if (!root.downloading) { root.close(); } } }
+    opacity: root.open ? 1.0 : 0.0;
+    visible: self.opacity > 0.01;
+    animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+    TouchArea { enabled: root.open; clicked => { if (!root.downloading) { OxidiumTooltipState.shown = false; root.close(); } } }
 
     Rectangle {
-        width: 600px;
-        height: 490px;
+        width: min(600px, parent.width - 28px);
+        height: min(490px, parent.height - 28px);
         x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
+        y: root.open ? ((parent.height - self.height) / 2) : ((parent.height - self.height) / 2 + 26px);
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
         border_radius: 26px;
         background: MaterialPalette.surface_container_high;
         border_width: 1px;
@@ -1862,9 +1971,10 @@ export component UpdateModal inherits Rectangle {
                         }
                     }
                 }
-                IconButton {
+                OxidiumIconButton {
                     icon: OxidiumIcons.close;
                     enabled: !root.downloading;
+                    tooltip: "Закрыть";
                     clicked => { root.close(); }
                 }
             }

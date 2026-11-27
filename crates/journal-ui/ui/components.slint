@@ -1,0 +1,58 @@
+import { MaterialPalette, Icon } from "@material";
+import { OxidiumTheme, OxidiumMotion, OxidiumTooltipState } from "theme.slint";
+
+/// M3 Expressive icon button with spring shape morph on press, smooth state-layer fade,
+/// and unclipped root-level floating tooltip integration via `OxidiumTooltipState`.
+export component OxidiumIconButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> tooltip: "";
+    in property <bool> enabled: true;
+    in property <bool> inverse: false;
+    in property <length> button_size: 40px;
+    in property <length> icon_size: 20px;
+    callback clicked();
+
+    width: root.button_size;
+    height: root.button_size;
+    border_radius: (ta.pressed && root.enabled) ? 10px : (root.button_size / 2);
+    background: !root.enabled ? transparent
+        : ta.pressed ? (root.inverse ? MaterialPalette.inverse_on_surface.with_alpha(18%) : MaterialPalette.on_surface.with_alpha(16%))
+        : ta.has_hover ? (root.inverse ? MaterialPalette.inverse_on_surface.with_alpha(12%) : MaterialPalette.on_surface.with_alpha(10%))
+        : transparent;
+    animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+    animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
+
+    Icon {
+        source: root.icon;
+        width: root.icon_size;
+        height: root.icon_size;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        colorize: root.inverse ? MaterialPalette.inverse_on_surface
+            : (ta.has_hover && root.enabled) ? MaterialPalette.on_surface
+            : MaterialPalette.on_surface_variant;
+        opacity: root.enabled ? 1.0 : 0.38;
+        animate colorize { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse_cursor: root.enabled ? pointer : default;
+        clicked => {
+            OxidiumTooltipState.shown = false;
+            root.clicked();
+        }
+        changed has_hover => {
+            if (self.has_hover && root.tooltip != "") {
+                OxidiumTooltipState.text = root.tooltip;
+                OxidiumTooltipState.anchor_x = root.absolute-position.x;
+                OxidiumTooltipState.anchor_y = root.absolute-position.y;
+                OxidiumTooltipState.anchor_w = root.width;
+                OxidiumTooltipState.anchor_h = root.height;
+                OxidiumTooltipState.shown = true;
+            } else if (!self.has_hover && OxidiumTooltipState.text == root.tooltip) {
+                OxidiumTooltipState.shown = false;
+            }
+        }
+    }
+}

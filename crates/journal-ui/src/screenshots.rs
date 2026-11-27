@@ -95,6 +95,7 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         let _ = app.update_settings(&s, RecordSource::Gui);
     }
     controller.apply_settings_and_theme(&win);
+    win.global::<crate::OxidiumTheme>().set_reduced_motion(true);
     win.invoke_apply_color_scheme(1);
     controller.refresh_all(&win);
     capture("journal-dark.png")?;
@@ -105,6 +106,7 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         let _ = app.update_settings(&s, RecordSource::Gui);
     }
     controller.apply_settings_and_theme(&win);
+    win.global::<crate::OxidiumTheme>().set_reduced_motion(true);
     win.set_active_section(1);
     controller.refresh_statistics(&win);
     win.invoke_apply_color_scheme(0);
@@ -135,6 +137,13 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         (5, "settings-about.png"),
     ] {
         win.set_settings_active_tab(tab);
+        if tab == 3 {
+            win.set_mcp_http_running(true);
+            win.set_mcp_status_text("Запущен (HTTP)".into());
+        } else {
+            win.set_mcp_http_running(false);
+            win.set_mcp_status_text("Остановлен".into());
+        }
         if tab == 4 {
             // Avoid leaking host developer username paths in committed documentation screenshots
             win.set_db_path_text(r"%LOCALAPPDATA%\oxidium\oxidium.db".into());
@@ -142,6 +151,8 @@ pub fn render_screenshots_headless(out_dir: &Path) -> Result<()> {
         win.invoke_apply_color_scheme(1);
         capture(shot)?;
     }
+    win.set_mcp_http_running(false);
+    win.set_mcp_status_text("Остановлен".into());
 
     // 6. Statistics Dark Mode + Lower Activity Heatmap / Attendance / Forecast View
     win.set_settings_modal_open(false);

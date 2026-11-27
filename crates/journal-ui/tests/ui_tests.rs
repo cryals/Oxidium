@@ -280,4 +280,19 @@ fn headless_ui_end_to_end_flows() {
     assert!(win.get_update_available());
     assert_eq!(win.get_update_latest_version().as_str(), "v0.2.0");
     assert!(win.get_update_has_asset());
+
+    // 12. Narrow-window responsive layout & modal state smoke check (840x820)
+    win.window().set_size(slint::LogicalSize::new(840.0, 820.0));
+    for sec in [0, 1, 2, 0] {
+        win.set_active_section(sec);
+        win.invoke_section_changed(sec);
+    }
+    win.set_quick_profile_open(true);
+    win.set_quick_profile_open(false);
+    win.set_shortcuts_modal_open(true);
+    win.set_shortcuts_modal_open(false);
+    win.set_settings_active_tab(3);
+    win.set_mcp_http_running(true);
+    win.set_settings_modal_open(true);
+    win.set_settings_modal_open(false);
 }

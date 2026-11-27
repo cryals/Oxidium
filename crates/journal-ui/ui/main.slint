@@ -1,6 +1,7 @@
-import { MaterialWindow, MaterialPalette, MaterialSchemes, MaterialScheme, IconButton, Icon } from "@material";
+import { MaterialWindow, MaterialPalette, MaterialSchemes, MaterialScheme, Icon } from "@material";
 import { Palette } from "std-widgets.slint";
-import { OxidiumTheme, OxidiumMotion, OxidiumIcons } from "theme.slint";
+import { OxidiumTheme, OxidiumMotion, OxidiumTooltipState, OxidiumIcons } from "theme.slint";
+import { OxidiumIconButton } from "components.slint";
 import {
     DayHeaderItem, JournalRowItem, CellDetailEntry, ProfileItem, SubjectItem,
     PeriodItem, MarkTypeItem, StatBarItem, TrendPointItem, HeatmapWeekRow,
@@ -30,8 +31,8 @@ export component MainWindow inherits MaterialWindow {
     default_font_family: OxidiumTheme.font_sans;
     preferred_width: 1380px;
     preferred_height: 860px;
-    min_width: 820px;
-    min_height: 580px;
+    min_width: 800px;
+    min_height: 560px;
 
     // Theme bridging helper
     in_out property <int> color_scheme_mode: 2; // 0=Light, 1=Dark, 2=System
@@ -58,10 +59,12 @@ export component MainWindow inherits MaterialWindow {
     }
 
     public function reset_stats_view_state() {
+        OxidiumTooltipState.shown = false;
         stats_view.reset_transient_state();
     }
 
     public function reset_kanban_hover_state() {
+        OxidiumTooltipState.shown = false;
         kanban_view.hover_hint = "";
     }
     changed color_scheme_mode => {
@@ -467,7 +470,8 @@ export component MainWindow inherits MaterialWindow {
                 width: root.rail_expanded ? 212px : (root.width < 940px ? 72px : 92px);
                 background: MaterialPalette.surface_container;
                 clip: true;
-                animate width { duration: OxidiumTheme.anim_emphasized; easing: OxidiumMotion.ease_emphasized; }
+                animate width { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
+                animate background { duration: OxidiumTheme.dur_effects_slow; easing: OxidiumMotion.expressive_slow_effects; }
 
                 VerticalLayout {
                     x: 0px;
@@ -491,7 +495,7 @@ export component MainWindow inherits MaterialWindow {
                             spacing: 10px;
                             padding_left: root.rail_expanded ? 8px : 0px;
 
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumIcons.menu;
                                 tooltip: root.rail_expanded ? "Свернуть панель" : "Развернуть панель";
                                 clicked => { root.rail_expanded = !root.rail_expanded; }
@@ -523,8 +527,7 @@ export component MainWindow inherits MaterialWindow {
                             }
                             if root.rail_expanded : VerticalLayout {
                                 alignment: center;
-                                Text { text: "Журнал ученика"; font_size: 11px; color: MaterialPalette.on_surface_variant; }
-                                Text { text: "Local-First · MCP"; font_family: OxidiumTheme.font_mono; font_size: 10px; color: MaterialPalette.primary; }
+                                Text { text: "Журнал ученика"; font_size: 12px; font_weight: 500; color: MaterialPalette.on_surface_variant; }
                             }
                         }
 
@@ -535,11 +538,12 @@ export component MainWindow inherits MaterialWindow {
                             { label: root.tr.nav_kanban, icon: OxidiumIcons.kanban },
                         ] : Rectangle {
                             height: root.rail_expanded ? 44px : 56px;
-                            border_radius: 22px;
+                            border_radius: nav_ta.pressed ? 14px : 22px;
                             background: root.rail_expanded && root.active_section == idx
                                 ? MaterialPalette.secondary_container
                                 : root.rail_expanded && nav_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                            animate background, height { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_emphasized; }
+                            animate border_radius, height { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                            animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
 
                             if !root.rail_expanded : VerticalLayout {
                                 spacing: 3px;
@@ -547,11 +551,13 @@ export component MainWindow inherits MaterialWindow {
                                 HorizontalLayout {
                                     alignment: center;
                                     Rectangle {
-                                        width: root.active_section == idx ? 56px : 44px; height: 32px; border_radius: 16px;
+                                        width: root.active_section == idx ? 56px : 44px; height: 32px;
+                                        border_radius: nav_ta.pressed ? 10px : 16px;
                                         background: root.active_section == idx
                                             ? MaterialPalette.secondary_container
                                             : nav_ta.has_hover ? MaterialPalette.surface_container_high : transparent;
-                                        animate width, background { duration: OxidiumTheme.anim_medium; easing: OxidiumMotion.ease_emphasized; }
+                                        animate width, border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                        animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                         Icon {
                                             source: nav.icon;
                                             width: 22px; height: 22px;
@@ -594,6 +600,7 @@ export component MainWindow inherits MaterialWindow {
                             nav_ta := TouchArea {
                                 mouse_cursor: pointer;
                                 clicked => {
+                                    OxidiumTooltipState.shown = false;
                                     root.active_section = idx;
                                     root.section_changed(idx);
                                 }
@@ -612,10 +619,12 @@ export component MainWindow inherits MaterialWindow {
                             Rectangle {
                                 height: 30px;
                                 min_width: root.rail_expanded ? 176px : 56px;
-                                border_radius: 15px;
+                                border_radius: mcp_pill_ta.pressed ? 9px : 15px;
                                 background: root.mcp_http_running
                                     ? OxidiumTheme.grade_5_bg
                                     : MaterialPalette.surface_container_high;
+                                animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                animate background { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
                                 HorizontalLayout {
                                     padding_left: 10px; padding_right: 10px;
                                     alignment: center; spacing: 6px;
@@ -634,9 +643,10 @@ export component MainWindow inherits MaterialWindow {
                                         vertical_alignment: center;
                                     }
                                 }
-                                TouchArea {
+                                mcp_pill_ta := TouchArea {
                                     mouse_cursor: pointer;
                                     clicked => {
+                                        OxidiumTooltipState.shown = false;
                                         root.settings_active_tab = 3;
                                         root.settings_modal_open = true;
                                     }
@@ -649,7 +659,7 @@ export component MainWindow inherits MaterialWindow {
                             alignment: root.rail_expanded ? start : center;
                             padding_left: root.rail_expanded ? 8px : 0px;
                             spacing: 8px;
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumTheme.dark_mode ? OxidiumIcons.light_mode : OxidiumIcons.dark_mode;
                                 tooltip: OxidiumTheme.dark_mode ? "Светлая тема" : "Тёмная тема";
                                 clicked => { root.theme_quick_toggle(); }
@@ -667,7 +677,7 @@ export component MainWindow inherits MaterialWindow {
                             alignment: root.rail_expanded ? start : center;
                             padding_left: root.rail_expanded ? 8px : 0px;
                             spacing: 8px;
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumIcons.settings;
                                 tooltip: root.tr.nav_settings + " (Ctrl+,)";
                                 clicked => {
@@ -689,10 +699,13 @@ export component MainWindow inherits MaterialWindow {
                             padding_left: root.rail_expanded ? 8px : 0px;
                             spacing: 10px;
                             Rectangle {
-                                width: 40px; height: 40px; border_radius: 20px;
+                                width: 40px; height: 40px;
+                                border_radius: (av_ta.pressed || root.quick_profile_open) ? 12px : 20px;
                                 background: MaterialPalette.primary_container;
-                                border_width: root.quick_profile_open ? 2px : 0px;
+                                border_width: root.quick_profile_open ? 2px : (av_ta.has_hover ? 1px : 0px);
                                 border_color: MaterialPalette.primary;
+                                animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                animate border_width { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
                                 Text {
                                     text: root.active_profile_initials;
                                     font_family: OxidiumTheme.font_display;
@@ -700,9 +713,12 @@ export component MainWindow inherits MaterialWindow {
                                     color: MaterialPalette.on_primary_container;
                                     horizontal_alignment: center; vertical_alignment: center;
                                 }
-                                TouchArea {
+                                av_ta := TouchArea {
                                     mouse_cursor: pointer;
-                                    clicked => { root.quick_profile_open = !root.quick_profile_open; }
+                                    clicked => {
+                                        OxidiumTooltipState.shown = false;
+                                        root.quick_profile_open = !root.quick_profile_open;
+                                    }
                                 }
                             }
                             if root.rail_expanded : VerticalLayout {
@@ -737,6 +753,7 @@ export component MainWindow inherits MaterialWindow {
                 Rectangle {
                     height: 54px;
                     background: MaterialPalette.surface;
+                    animate background { duration: OxidiumTheme.dur_effects_slow; easing: OxidiumMotion.expressive_slow_effects; }
 
                     HorizontalLayout {
                         x: 0px;
@@ -745,25 +762,28 @@ export component MainWindow inherits MaterialWindow {
                         height: parent.height;
                         padding_left: 20px;
                         padding_right: 16px;
-                        spacing: 12px;
+                        spacing: 10px;
                         alignment: space-between;
 
                         HorizontalLayout {
-                            spacing: 12px;
+                            spacing: 10px;
                             Text {
                                 text: root.active_section == 0 ? root.tr.nav_journal
                                     : root.active_section == 1 ? root.tr.nav_statistics
                                     : root.tr.nav_kanban;
                                 font_family: OxidiumTheme.font_display;
-                                font_size: 22px; font_weight: 600;
+                                font_size: root.width < 900px ? 19px : 22px; font_weight: 600;
                                 color: MaterialPalette.on_surface;
                                 vertical_alignment: center;
                             }
                             Rectangle {
                                 height: 30px;
+                                max_width: root.width < 940px ? 168px : 280px;
                                 y: (parent.height - self.height) / 2;
-                                border_radius: 15px;
-                                background: MaterialPalette.surface_container_high;
+                                border_radius: prof_chip_ta.pressed ? 9px : 15px;
+                                background: prof_chip_ta.has_hover ? MaterialPalette.surface_container_highest : MaterialPalette.surface_container_high;
+                                animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
                                 HorizontalLayout {
                                     padding_left: 11px; padding_right: 12px; spacing: 6px;
                                     VerticalLayout {
@@ -775,21 +795,23 @@ export component MainWindow inherits MaterialWindow {
                                         font_size: 12px; font_weight: 600;
                                         color: MaterialPalette.on_surface;
                                         vertical_alignment: center;
+                                        overflow: elide;
                                     }
                                 }
-                                TouchArea { mouse_cursor: pointer; clicked => { root.quick_profile_open = !root.quick_profile_open; } }
+                                prof_chip_ta := TouchArea { mouse_cursor: pointer; clicked => { root.quick_profile_open = !root.quick_profile_open; } }
                             }
                         }
 
                         // Global Search Bar Trigger
                         Rectangle {
-                            width: min(360px, max(180px, root.width * 0.28));
+                            width: min(360px, max(126px, root.width * 0.24));
                             height: 36px;
                             y: (parent.height - self.height) / 2;
                             border_radius: 18px;
-                            background: MaterialPalette.surface_container_low;
+                            background: srch_top_ta.has_hover ? MaterialPalette.surface_container : MaterialPalette.surface_container_low;
                             border_width: 1px;
                             border_color: OxidiumTheme.cell_border;
+                            animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
                             HorizontalLayout {
                                 padding_left: 12px; padding_right: 12px; spacing: 8px;
                                 VerticalLayout { alignment: center; Icon { source: OxidiumIcons.search; width: 16px; height: 16px; colorize: MaterialPalette.on_surface_variant; } }
@@ -800,18 +822,20 @@ export component MainWindow inherits MaterialWindow {
                                     overflow: elide;
                                 }
                             }
-                            TouchArea { mouse_cursor: pointer; clicked => { root.search_modal_open = true; } }
+                            srch_top_ta := TouchArea { mouse_cursor: pointer; clicked => { root.search_modal_open = true; } }
                         }
 
                         HorizontalLayout {
-                            spacing: 6px;
+                            spacing: 4px;
                             if root.update_available : Rectangle {
                                 height: 32px;
                                 y: (parent.height - self.height) / 2;
-                                border_radius: 16px;
+                                border_radius: upd_ta.pressed ? 10px : 16px;
                                 background: upd_ta.has_hover ? MaterialPalette.primary : MaterialPalette.primary_container;
                                 border_width: 1px;
                                 border_color: MaterialPalette.primary;
+                                animate border_radius { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+                                animate background { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
                                 HorizontalLayout {
                                     padding_left: 11px; padding_right: 12px; spacing: 6px;
                                     VerticalLayout {
@@ -835,13 +859,13 @@ export component MainWindow inherits MaterialWindow {
                                     clicked => { root.update_modal_open = true; }
                                 }
                             }
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumIcons.undo;
                                 enabled: root.can_undo;
                                 tooltip: "Отменить (Ctrl+Z)";
                                 clicked => { root.undo_clicked(); }
                             }
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumIcons.redo;
                                 enabled: root.can_redo;
                                 tooltip: "Повторить (Ctrl+Shift+Z)";
@@ -849,7 +873,7 @@ export component MainWindow inherits MaterialWindow {
                             }
                             Rectangle {
                                 width: 40px; height: 40px;
-                                IconButton {
+                                OxidiumIconButton {
                                     icon: OxidiumIcons.notifications;
                                     tooltip: "Уведомления";
                                     clicked => { root.notifications_modal_open = !root.notifications_modal_open; }
@@ -866,7 +890,7 @@ export component MainWindow inherits MaterialWindow {
                                     }
                                 }
                             }
-                            IconButton {
+                            OxidiumIconButton {
                                 icon: OxidiumIcons.keyboard;
                                 tooltip: "Горячие клавиши";
                                 clicked => { root.shortcuts_modal_open = true; }
@@ -877,14 +901,21 @@ export component MainWindow inherits MaterialWindow {
                     Rectangle { y: parent.height - 1px; height: 1px; width: 100%; background: OxidiumTheme.cell_border; }
                 }
 
-                // Active Main View Stack
+                // Active Main View Stack with M3 Expressive Section Transitions
                 Rectangle {
                     vertical_stretch: 1;
                     background: MaterialPalette.background;
+                    clip: true;
+                    animate background { duration: OxidiumTheme.dur_effects_slow; easing: OxidiumMotion.expressive_slow_effects; }
 
                     journal_view := JournalView {
-                        visible: root.active_section == 0;
+                        x: 0px;
+                        y: root.active_section == 0 ? 0px : 14px;
                         width: 100%; height: 100%;
+                        opacity: root.active_section == 0 ? 1.0 : 0.0;
+                        visible: self.opacity > 0.01;
+                        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
+                        animate opacity { duration: OxidiumTheme.dur_effects_slow; easing: OxidiumMotion.expressive_slow_effects; }
                         tr: root.tr;
                         month_title: root.journal_month_title;
                         view_mode <=> root.journal_view_mode;
@@ -918,8 +949,13 @@ export component MainWindow inherits MaterialWindow {
                     }
 
                     stats_view := StatisticsView {
-                        visible: root.active_section == 1;
+                        x: 0px;
+                        y: root.active_section == 1 ? 0px : 14px;
                         width: 100%; height: 100%;
+                        opacity: root.active_section == 1 ? 1.0 : 0.0;
+                        visible: self.opacity > 0.01;
+                        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
+                        animate opacity { duration: OxidiumTheme.dur_effects_slow; easing: OxidiumMotion.expressive_slow_effects; }
                         tr: root.tr;
                         period_preset <=> root.stats_period_preset;
                         overall_avg: root.stats_overall_avg;
@@ -965,8 +1001,13 @@ export component MainWindow inherits MaterialWindow {
                     }
 
                     kanban_view := KanbanView {
-                        visible: root.active_section == 2;
+                        x: 0px;
+                        y: root.active_section == 2 ? 0px : 14px;
                         width: 100%; height: 100%;
+                        opacity: root.active_section == 2 ? 1.0 : 0.0;
+                        visible: self.opacity > 0.01;
+                        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
+                        animate opacity { duration: OxidiumTheme.dur_effects_slow; easing: OxidiumMotion.expressive_slow_effects; }
                         tr: root.tr;
                         boards: root.kanban_boards;
                         active_board_id: root.kanban_active_board_id;
@@ -1000,8 +1041,9 @@ export component MainWindow inherits MaterialWindow {
         }
     }
 
-    // ===== AUXILIARY MODALS & DRAWERS =====
-    if root.profiles_modal_open : ProfilesModal {
+    // ===== AUXILIARY MODALS & DRAWERS (unconditionally mounted for Expressive open/close motion) =====
+    ProfilesModal {
+        open: root.profiles_modal_open;
         profiles: root.profiles_list;
         delete_warning_text: root.profile_delete_warning;
         pending_delete_id <=> root.profile_pending_delete_id;
@@ -1014,7 +1056,8 @@ export component MainWindow inherits MaterialWindow {
         confirm_delete_profile(id) => { root.profile_confirm_delete(id); }
     }
 
-    if root.subjects_modal_open : SubjectsModal {
+    SubjectsModal {
+        open: root.subjects_modal_open;
         subjects: root.subjects_list;
         delete_warning_text: root.subject_delete_warning;
         pending_delete_id <=> root.subject_pending_delete_id;
@@ -1026,21 +1069,24 @@ export component MainWindow inherits MaterialWindow {
         confirm_delete_subject(id) => { root.subject_confirm_delete(id); }
     }
 
-    if root.periods_modal_open : PeriodsModal {
+    PeriodsModal {
+        open: root.periods_modal_open;
         periods: root.academic_periods;
         close => { root.periods_modal_open = false; }
         create_period(n, t, s, e) => { root.period_create(n, t, s, e); }
         select_period(id) => { root.journal_select_period(id); }
     }
 
-    if root.search_modal_open : GlobalSearchModal {
+    GlobalSearchModal {
+        open: root.search_modal_open;
         hits: root.search_hits;
         close => { root.search_modal_open = false; }
         search_edited(q) => { root.search_query_changed(q); }
         hit_selected(t, id) => { root.search_hit_selected(t, id); }
     }
 
-    if root.notifications_modal_open : NotificationsModal {
+    NotificationsModal {
+        open: root.notifications_modal_open;
         items: root.notifications_list;
         background_notice: root.tr.reminders_notice;
         close => { root.notifications_modal_open = false; }
@@ -1048,7 +1094,8 @@ export component MainWindow inherits MaterialWindow {
         dismiss_item(id) => { root.notif_dismiss(id); }
     }
 
-    if root.settings_modal_open : SettingsModal {
+    SettingsModal {
+        open: root.settings_modal_open;
         active_tab <=> root.settings_active_tab;
         tr: root.tr;
         theme_mode_idx <=> root.setting_theme_idx;
@@ -1107,7 +1154,8 @@ export component MainWindow inherits MaterialWindow {
         open_releases_page => { root.open_releases_page(); }
     }
 
-    if root.quick_profile_open : QuickProfilePopover {
+    QuickProfilePopover {
+        open: root.quick_profile_open;
         profiles: root.profiles_list;
         rail_width: root.rail_expanded ? 212px : (root.width < 940px ? 72px : 92px);
         close => { root.quick_profile_open = false; }
@@ -1115,7 +1163,8 @@ export component MainWindow inherits MaterialWindow {
         open_full_manager => { root.profiles_modal_open = true; }
     }
 
-    if root.onboarding_open : OnboardingModal {
+    OnboardingModal {
+        open: root.onboarding_open;
         step <=> root.onboarding_step;
         profile_name: root.active_profile_name;
         close => {
@@ -1130,7 +1179,8 @@ export component MainWindow inherits MaterialWindow {
         }
     }
 
-    if root.update_modal_open : UpdateModal {
+    UpdateModal {
+        open: root.update_modal_open;
         current_version: root.update_current_version;
         latest_version: root.update_latest_version;
         release_name: root.update_release_name;
@@ -1147,7 +1197,8 @@ export component MainWindow inherits MaterialWindow {
         open_releases_page => { root.open_releases_page(); }
     }
 
-    if root.shortcuts_modal_open : ShortcutsModal {
+    ShortcutsModal {
+        open: root.shortcuts_modal_open;
         close => { root.shortcuts_modal_open = false; }
     }
 
@@ -1165,12 +1216,12 @@ export component MainWindow inherits MaterialWindow {
         }
     }
 
-    // Floating Snackbar feedback with smooth M3 slide + fade animation
+    // Floating Snackbar feedback with M3 Expressive slide + fade animation
     Rectangle {
         x: (parent.width - self.width) / 2;
         y: root.snackbar_visible && root.snackbar_message != "" ? (parent.height - self.height - 20px) : (parent.height + 16px);
         min_width: 280px;
-        max_width: 560px;
+        max_width: min(560px, parent.width - 32px);
         height: 44px;
         border_radius: 14px;
         background: MaterialPalette.inverse_surface;
@@ -1178,20 +1229,64 @@ export component MainWindow inherits MaterialWindow {
         visible: self.opacity > 0.01;
         drop_shadow_blur: 16px;
         drop_shadow_color: #00000045;
-        animate opacity { duration: OxidiumTheme.anim_fast; easing: OxidiumMotion.ease_standard; }
-        animate y { duration: OxidiumTheme.anim_emphasized; easing: OxidiumMotion.ease_emphasized; }
+        animate opacity { duration: OxidiumTheme.dur_effects_default; easing: OxidiumMotion.expressive_default_effects; }
+        animate y { duration: OxidiumTheme.dur_spatial_default; easing: OxidiumMotion.expressive_default_spatial; }
 
         HorizontalLayout {
-            padding_left: 16px; padding_right: 12px; spacing: 12px; alignment: space-between;
+            padding_left: 16px; padding_right: 8px; spacing: 10px; alignment: space-between;
             Text {
                 text: root.snackbar_message;
                 font_size: 13px; color: MaterialPalette.inverse_on_surface;
                 vertical_alignment: center;
+                overflow: elide;
             }
-            IconButton {
+            OxidiumIconButton {
                 icon: OxidiumIcons.close;
                 inverse: true;
+                button_size: 32px; icon_size: 18px;
+                tooltip: "Закрыть";
                 clicked => { root.snackbar_visible = false; }
+            }
+        }
+    }
+
+    // Top-Level Unclipped M3 Expressive Floating Tooltip Overlay (above rail, headers, ScrollViews, modals)
+    Rectangle {
+        property <bool> flip_above: OxidiumTooltipState.anchor_y + OxidiumTooltipState.anchor_h + 44px > root.height;
+        property <length> pop_offset: OxidiumTooltipState.shown ? 0px : 6px;
+        animate pop_offset { duration: OxidiumTheme.dur_spatial_fast; easing: OxidiumMotion.expressive_fast_spatial; }
+
+        x: clamp(
+            OxidiumTooltipState.anchor_x + (OxidiumTooltipState.anchor_w - self.width) / 2,
+            10px,
+            max(10px, parent.width - self.width - 10px)
+        );
+        y: flip_above
+            ? (OxidiumTooltipState.anchor_y - self.height - 6px - self.pop_offset)
+            : (OxidiumTooltipState.anchor_y + OxidiumTooltipState.anchor_h + 6px + self.pop_offset);
+        width: min(260px, tip_row.preferred_width);
+        height: tip_row.preferred_height;
+        border_radius: 8px;
+        background: MaterialPalette.inverse_surface;
+        drop_shadow_blur: 10px;
+        drop_shadow_color: #00000045;
+        opacity: OxidiumTooltipState.shown && OxidiumTooltipState.text != "" ? 1.0 : 0.0;
+        visible: self.opacity > 0.01;
+        animate opacity { duration: OxidiumTheme.dur_effects_fast; easing: OxidiumMotion.expressive_fast_effects; }
+
+        tip_row := HorizontalLayout {
+            padding_left: 10px;
+            padding_right: 10px;
+            padding_top: 5px;
+            padding_bottom: 5px;
+            Text {
+                max_width: 240px;
+                text: OxidiumTooltipState.text;
+                font_size: 11px;
+                font_weight: 500;
+                color: MaterialPalette.inverse_on_surface;
+                wrap: word_wrap;
+                vertical_alignment: center;
             }
         }
     }
